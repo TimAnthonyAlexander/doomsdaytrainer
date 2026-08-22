@@ -89,17 +89,52 @@ describe('Weekday trainer', () => {
     expect(screen.getByRole('button', { name: 'Sat' })).toBeInTheDocument();
   });
 
-  it('shows the year code in assisted mode and hides it in unassisted', async () => {
+  it('hides the year code by default and shows it in assisted mode', async () => {
     pinDate();
     await seed();
     mount();
 
     await screen.findByLabelText(formatDate(2000, 1, 1));
-    // 2000-01-01: year code for 00 is 0.
-    expect(screen.getByText('0 (XX00)')).toBeInTheDocument();
+    // Unassisted on a fresh device. The year code is the part the app spent ten
+    // decades teaching, so the screen does not hand it over unless asked.
+    expect(screen.getByRole('radio', { name: 'Unassisted' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByText('0 (XX00)')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Unassisted' }));
-    await waitFor(() => expect(screen.queryByText('0 (XX00)')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('radio', { name: 'Assisted' }));
+    // Still a year in the 2000s, so the code is still 0.
+    await waitFor(() => expect(screen.getByText('0 (XX00)')).toBeInTheDocument());
+  });
+
+  it('comes back on the mode the user last chose', async () => {
+    await seed();
+    const first = mount();
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Assisted' }));
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Assisted' })).toHaveAttribute('aria-checked', 'true'),
+    );
+    first.unmount();
+
+    mount();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('radio', { name: 'Assisted' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Unassisted' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('comes back on the range the user last chose', async () => {
+    await seed();
+    const first = mount();
+
+    fireEvent.click(await screen.findByRole('radio', { name: 'Living memory' }));
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Living memory' })).toHaveAttribute('aria-checked', 'true'),
+    );
+    first.unmount();
+
+    mount();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('radio', { name: 'Living memory' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'This century' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('advances itself after a correct answer', async () => {
@@ -176,7 +211,7 @@ describe('Weekday trainer', () => {
       fullYear: 2000,
       month: 1,
       day: 1,
-      mode: 'assisted',
+      mode: 'unassisted',
       correct: true,
     });
     // A weekday answer is not a review of anything.
@@ -193,7 +228,7 @@ describe('Weekday trainer', () => {
     });
     const final = await loadAppData();
     expect(final.weekdayRuns[0]).toMatchObject({
-      mode: 'assisted',
+      mode: 'unassisted',
       rangeId: 'century',
       correct: 1,
       total: 1,
@@ -364,12 +399,13 @@ describe('Lifetime totals under the pad', () => {
 
     await waitFor(async () => {
       const stored = await loadAppData();
-      expect(stored.weekdayTotals.assisted.answered).toBe(1);
+      expect(stored.weekdayTotals.unassisted.answered).toBe(1);
     });
     const stored = await loadAppData();
-    expect(stored.weekdayTotals.assisted.correct).toBe(1);
-    expect(stored.weekdayTotals.unassisted.answered).toBe(0);
-    expect(stored.weekdayTotals.assisted.latencyBuckets.reduce((sum, n) => sum + n, 0)).toBe(1);
+    expect(stored.weekdayTotals.unassisted.correct).toBe(1);
+    // Counted apart by mode, and nothing was answered with the year code given.
+    expect(stored.weekdayTotals.assisted.answered).toBe(0);
+    expect(stored.weekdayTotals.unassisted.latencyBuckets.reduce((sum, n) => sum + n, 0)).toBe(1);
 
     await waitFor(() =>
       expect(within(block('This session')).queryByText('No dates answered yet.')).not.toBeInTheDocument(),
@@ -378,8 +414,10 @@ describe('Lifetime totals under the pad', () => {
   });
 
   it('keeps the lifetime numbers when the raw log is trimmed', async () => {
+    // Unassisted, the mode the screen opens in, so the one new answer lands on
+    // the same row as the seeded history.
     const history = Array.from({ length: MAX_WEEKDAY_ATTEMPTS }, (_, i) =>
-      weekdayAttempt('assisted', true, 700 + (i % 5) * 10),
+      weekdayAttempt('unassisted', true, 700 + (i % 5) * 10),
     );
     const data = defaultAppData(Date.now());
     data.settings = { ...data.settings, onboardingComplete: true, autoAdvanceMs: 0 };
@@ -395,13 +433,13 @@ describe('Lifetime totals under the pad', () => {
 
     await waitFor(async () => {
       const stored = await loadAppData();
-      expect(stored.weekdayTotals.assisted.answered).toBe(MAX_WEEKDAY_ATTEMPTS + 1);
+      expect(stored.weekdayTotals.unassisted.answered).toBe(MAX_WEEKDAY_ATTEMPTS + 1);
     });
     const stored = await loadAppData();
     // The raw log lost its oldest entry. The lifetime count did not.
     expect(stored.weekdayAttempts).toHaveLength(MAX_WEEKDAY_ATTEMPTS);
-    expect(stored.weekdayTotals.assisted.correct).toBe(MAX_WEEKDAY_ATTEMPTS + 1);
-    expect(stored.weekdayTotals.assisted.latencyBuckets.reduce((sum, n) => sum + n, 0)).toBe(
+    expect(stored.weekdayTotals.unassisted.correct).toBe(MAX_WEEKDAY_ATTEMPTS + 1);
+    expect(stored.weekdayTotals.unassisted.latencyBuckets.reduce((sum, n) => sum + n, 0)).toBe(
       MAX_WEEKDAY_ATTEMPTS + 1,
     );
   });

@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Screen } from '@/components/ui/Screen';
 import type { WeekdayMode, WeekdayRangeId } from '@/domain/types';
@@ -18,6 +18,12 @@ import { WeekdayWorking } from '@/features/weekday/WeekdayWorking';
 import { tableQueue } from '@/features/weekday/tableDrill';
 import { useWeekdaySession } from '@/features/weekday/useWeekdaySession';
 import { weekdayOptions } from '@/features/weekday/weekdayPad';
+import {
+  readWeekdayMode,
+  readWeekdayRange,
+  writeWeekdayMode,
+  writeWeekdayRange,
+} from '@/features/weekday/weekdayPrefs';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
 
@@ -202,11 +208,28 @@ function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
 /**
  * Give the user a full date, they pick the weekday. Assisted mode hands over
  * the year code and nothing else; unassisted hands over nothing.
+ *
+ * Mode and range are remembered per device, so the screen comes back on
+ * whatever the user last chose. The view is not: it is where they were standing
+ * rather than what they picked, and a half-finished table drill is not a
+ * preference worth restoring.
  */
 export function WeekdayScreen() {
   const [view, setView] = useState<View>('dates');
-  const [mode, setMode] = useState<WeekdayMode>('assisted');
-  const [rangeId, setRangeId] = useState<WeekdayRangeId>('century');
+  const [mode, setMode] = useState<WeekdayMode>(readWeekdayMode);
+  const [rangeId, setRangeId] = useState<WeekdayRangeId>(readWeekdayRange);
+
+  // Written on the change, not on every render: a preference is only touched
+  // when the user touches it.
+  const chooseMode = useCallback((next: WeekdayMode) => {
+    setMode(next);
+    writeWeekdayMode(next);
+  }, []);
+
+  const chooseRange = useCallback((next: WeekdayRangeId) => {
+    setRangeId(next);
+    writeWeekdayRange(next);
+  }, []);
 
   if (view === 'daystep') {
     return (
@@ -232,5 +255,5 @@ export function WeekdayScreen() {
     );
   }
 
-  return <Trainer mode={mode} rangeId={rangeId} onMode={setMode} onRange={setRangeId} onView={setView} />;
+  return <Trainer mode={mode} rangeId={rangeId} onMode={chooseMode} onRange={chooseRange} onView={setView} />;
 }

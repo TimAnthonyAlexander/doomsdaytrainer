@@ -5,6 +5,11 @@ import { cleanup } from '@testing-library/react';
 
 afterEach(() => {
   cleanup();
+  // jsdom hands every test in a file the same localStorage, so a screen that
+  // stores a device preference — the theme, the weekday pickers — would set the
+  // next test's starting state. Clearing here keeps each case starting on a
+  // fresh device, rather than on whatever the case above it left behind.
+  window.localStorage.clear();
 });
 
 // jsdom has no media stack at all: `HTMLMediaElement.play` is a stub that
