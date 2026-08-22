@@ -120,20 +120,6 @@ only scroller in the app. The rail, the phone's title bar, the notice bar and
 the bottom bar are rows of that frame, so all four are subtracted from the
 scroll area by the layout and none of them can move.
 
-That height is `var(--app-height)`, not `100dvh`, and the difference is a bug
-that took an installed app to see. `dvh` is right in a browser tab, where the
-toolbar comes and goes. On an iOS home screen it is short by about fifty pixels
-— WebKit reports a `dvh` that still allows for a toolbar that is not there — so
-the frame ended above the bottom of the screen and the nav bar floated over a
-band of background, exactly as though Safari's address bar were still down
-there. Nothing showed it while the bar was `position: fixed`, because fixed
-pinned it to the window whatever `dvh` claimed; making the bar a row of the
-frame handed it the frame's wrong height. So `--app-height` is `100dvh`
-normally and `100%` under `display-mode: standalone`, where there is no browser
-chrome to be dynamic about and the percentage chain is the window. `html`,
-`body` and `#root` all carry a definite height for that percentage to resolve
-against.
-
 It used to be a page: `minHeight: 100dvh`, a `sticky` title bar, a `fixed`
 bottom bar paid for a second time as bottom padding on the content, and
 `AppChrome` rendered above the router entirely. Every one of those is fine on
@@ -154,6 +140,41 @@ scroller squeezes it instead of itself.
 `AppChrome` mounts inside the frame rather than in `App`, which is why
 `startServiceWorker()` is called from `App` directly: registration should not
 wait for onboarding to finish.
+
+### Installed on iOS, the browser lies about the bottom of the screen
+
+Reported as: on the home screen, with no Safari chrome anywhere on the display,
+the nav bar sits well above the bottom of the screen as though the floating
+address bar were still there. In a Safari tab, the same build is correct.
+
+Two separate numbers can produce that, and both are the browser's rather than
+the app's, so both are now treated as claims to be checked.
+
+**The window's height.** `--app-height` is what the frame is built from:
+`100dvh` in a browser tab, where the toolbar comes and goes and the frame has
+to follow it, and `100vh` under `display-mode: standalone`, where there is no
+chrome to be dynamic about. iOS reports a `dvh` in a home-screen app that still
+allows for a toolbar it does not have, and `100%` off the document element
+comes out the same, so neither can be trusted on its own. `appHeight.ts`
+therefore measures: in a standalone app whose window is as wide as the screen,
+short by no more than a toolbar's worth, the frame is set to `screen.height` in
+pixels — the one figure in the page not derived from the viewport the browser
+got wrong. Every one of those conditions is a refusal to guess. A window
+narrower than the screen is iPadOS multitasking, where `screen.height` means
+nothing; a shortfall of hundreds is a keyboard, or `screen.height` unrotated in
+landscape. Outside them it writes nothing and the stylesheet stands. On a
+device with no bug the shortfall is zero and it changes nothing.
+
+**The bottom inset.** `--safe-bottom` is capped at 34px, the home indicator on
+every iPhone that has one; landscape asks for 21 and iPad for 20. Nothing real
+asks for more, so a larger figure is a toolbar being accounted for, and it
+would lift the bar off the bottom of the screen exactly as reported. Sane
+values pass through untouched.
+
+Neither of these showed while the bar was `position: fixed`, which pinned it to
+the window whatever the frame said, and iOS keeps a bottom-fixed element above
+its own chrome. Making the bar a row of the frame handed it the frame's
+numbers, and the numbers were wrong.
 
 ### The domain layer
 

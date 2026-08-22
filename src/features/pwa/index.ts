@@ -8,4 +8,5 @@ export { AppChrome } from './AppChrome';
 export { useInstallPrompt, type InstallPrompt } from './useInstallPrompt';
 export { useServiceWorker } from './useServiceWorker';
 export { startServiceWorker } from './serviceWorkerStore';
+export { trackAppHeight } from './appHeight';
 export type { ServiceWorkerState } from './serviceWorkerStore';
