@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { DUE_COUNT_PATH, NAV_ITEMS, isNavActive, screenTitle } from './BottomNav';
 
 describe('NAV_ITEMS', () => {
-  it('is Weekday first, then the four destinations, in order', () => {
+  it('is Weekday first, Concept second, then the rest, in order', () => {
     expect(NAV_ITEMS.map((item) => [item.path, item.label])).toEqual([
       ['/', 'Weekday'],
+      ['/concept', 'Concept'],
       ['/year-codes', 'Year codes'],
       ['/stats', 'Stats'],
       ['/settings', 'Settings'],
     ]);
+  });
+
+  it('gives every entry its own icon', () => {
+    const icons = new Set(NAV_ITEMS.map((item) => item.icon));
+    expect(icons.size).toBe(NAV_ITEMS.length);
   });
 
   it('hangs the due count on Year codes, which is what falls due', () => {
@@ -21,6 +27,7 @@ describe('isNavActive', () => {
   it('matches the weekday root exactly and nothing else', () => {
     expect(isNavActive('/', '/')).toBe(true);
     expect(isNavActive('/stats', '/')).toBe(false);
+    expect(isNavActive('/concept', '/')).toBe(false);
     expect(isNavActive('/year-codes', '/')).toBe(false);
   });
 

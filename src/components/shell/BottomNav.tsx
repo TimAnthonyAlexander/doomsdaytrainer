@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { BarChart3, CalendarDays, Hash, Settings } from 'lucide-react';
+import { BarChart3, CalendarDays, Hash, Route, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
@@ -13,8 +13,15 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
+/**
+ * Five entries, and Concept is second because it is the one screen that says
+ * what the other four are for: a date walked to its weekday, every step
+ * answered. `Route` is the icon for the same reason — a path with stops on it,
+ * which is what the screen is.
+ */
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/', label: 'Weekday', icon: CalendarDays },
+  { path: '/concept', label: 'Concept', icon: Route },
   { path: '/year-codes', label: 'Year codes', icon: Hash },
   { path: '/stats', label: 'Stats', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
@@ -86,7 +93,12 @@ export function BottomNav({ dueCount }: BottomNavProps) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${NAV_ITEMS.length}, 1fr)`,
+          // minmax(0, …) rather than 1fr: at five columns a 375px phone gives
+          // each entry 67px of room, and "Year codes" with a two-digit due
+          // count beside it is wider than that. A plain 1fr would let the
+          // column grow to fit and push the whole bar past the viewport, so
+          // the label gives way instead and the bar keeps its width.
+          gridTemplateColumns: `repeat(${NAV_ITEMS.length}, minmax(0, 1fr))`,
         }}
       >
         {NAV_ITEMS.map((item) => {
@@ -101,6 +113,7 @@ export function BottomNav({ dueCount }: BottomNavProps) {
               aria-current={active ? 'page' : undefined}
               sx={{
                 minHeight: 'var(--nav-height)',
+                minWidth: 0,
                 px: `${space[1]}px`,
                 py: `${space[2]}px`,
                 display: 'flex',
@@ -124,12 +137,31 @@ export function BottomNav({ dueCount }: BottomNavProps) {
                   lineHeight: 1,
                   display: 'flex',
                   alignItems: 'baseline',
+                  justifyContent: 'center',
                   gap: `${space[1]}px`,
+                  maxWidth: '100%',
                 }}
               >
-                {item.label}
+                <Box
+                  component="span"
+                  sx={{
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.label}
+                </Box>
+                {/* The count never shrinks. A clipped label is still readable;
+                    a clipped number is a different number. */}
                 {count > 0 ? (
-                  <Numeral size={typeScale.caption.size} weight={500} color="var(--brand-deep)">
+                  <Numeral
+                    size={typeScale.caption.size}
+                    weight={500}
+                    color="var(--brand-deep)"
+                    sx={{ flexShrink: 0 }}
+                  >
                     {count}
                   </Numeral>
                 ) : null}

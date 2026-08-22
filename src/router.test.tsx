@@ -26,6 +26,7 @@ function resolves(pathname: string): boolean {
 const LINKED_PATHS = [
   '/',
   '/welcome',
+  '/concept',
   '/year-codes',
   '/year-codes/learn',
   '/year-codes/revise',
@@ -63,6 +64,11 @@ describe('the route table', () => {
       'year-codes/calc',
       'year-codes/trouble',
     ]);
+  });
+
+  it('keeps Concept at the top level, so its nav entry lights on it alone', () => {
+    expect(leaf('/concept')).toBe('concept');
+    expect(leaf('/concept/anything')).toBe('*');
   });
 
   it('sends an address with no screen to the catch-all', () => {

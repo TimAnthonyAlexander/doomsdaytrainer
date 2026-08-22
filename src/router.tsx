@@ -1,6 +1,7 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppShell } from '@/components/shell/AppShell';
 import { CalcScreen } from '@/routes/CalcScreen';
+import { ConceptScreen } from '@/routes/ConceptScreen';
 import { LearnScreen } from '@/routes/LearnScreen';
 import { NotFoundScreen } from '@/routes/NotFoundScreen';
 import { ReviseScreen } from '@/routes/ReviseScreen';
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
     element: <AppShell />,
     children: [
       { index: true, element: <WeekdayScreen /> },
+      { path: 'concept', element: <ConceptScreen /> },
       { path: 'year-codes', element: <YearCodesScreen /> },
       { path: 'year-codes/learn', element: <LearnScreen /> },
       { path: 'year-codes/revise', element: <ReviseScreen /> },
