@@ -71,6 +71,12 @@ interface BottomNavProps {
 /**
  * Mobile navigation. Separated from the content by one 1px rule, nothing else:
  * no shadow, no blur, no floating pill.
+ *
+ * The last row of the shell's frame rather than a fixed overlay. Fixed was the
+ * same bar in the same place, but it had to be paid for twice — once here and
+ * once as bottom padding on the content — and the two only agreed while the
+ * document was exactly the viewport. As a row it is subtracted from the
+ * scroller once, by the layout.
  */
 export function BottomNav({ dueCount }: BottomNavProps) {
   const { pathname } = useLocation();
@@ -81,10 +87,7 @@ export function BottomNav({ dueCount }: BottomNavProps) {
       aria-label="Main"
       sx={{
         display: { xs: 'block', md: 'none' },
-        position: 'fixed',
-        insetInline: 0,
-        bottom: 0,
-        zIndex: 2,
+        flexShrink: 0,
         bgcolor: 'var(--bg)',
         borderTop: stroke.hairline,
         pb: 'var(--safe-bottom)',

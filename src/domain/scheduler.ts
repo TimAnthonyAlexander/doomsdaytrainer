@@ -105,7 +105,15 @@ export function applyReview(
   let interval: number;
   if (repetitions === 1) interval = 1;
   else if (repetitions === 2) interval = 6;
-  else interval = Math.round(item.interval * easeFactor);
+  // Floored at a day, and that floor is load-bearing rather than defensive. The
+  // multiplication reads the *stored* interval, so a stored 0 with repetitions
+  // already past two multiplies out to 0, which is `dueAt: now` — the item is
+  // still due the instant it is answered, so the queue hands it straight back
+  // and the session cannot end. Re-introducing an item that had a schedule used
+  // to write exactly that state, and the queue looped on it forever. That hole
+  // is closed in `introduce`; this keeps a correct answer from ever meaning
+  // "due again immediately" whatever else wrote the item.
+  else interval = Math.max(1, Math.round(item.interval * easeFactor));
 
   return {
     grade,
@@ -123,8 +131,19 @@ export function applyReview(
   };
 }
 
-/** Learn mode → review queue: interval 0, due immediately. */
+/**
+ * Learn mode → review queue: interval 0, due immediately.
+ *
+ * Idempotent, and that is the whole point. A finished block can be redone, and
+ * Learn writes all ten years when it finishes rather than only the new ones, so
+ * this runs on items that already have a schedule. Resetting them threw away
+ * every interval in the decade and dropped the ten back into today's queue —
+ * and worse, it left `interval: 0` beside a `repetitions` that had not been
+ * reset, which is the one combination `applyReview` could not grow out of.
+ * Practising a decade again must not cost the user their schedule for it.
+ */
 export function introduce(item: ItemState, now: number): ItemState {
+  if (item.introduced) return item;
   return {
     ...item,
     introduced: true,

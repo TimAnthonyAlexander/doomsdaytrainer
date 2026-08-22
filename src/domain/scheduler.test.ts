@@ -219,6 +219,34 @@ describe('applyReview interval progression', () => {
     expect(next.lapses).toBe(4);
     expect(next.leech).toBe(false);
   });
+
+  /*
+   * The multiplying branch reads the stored interval, so a stored 0 beside
+   * repetitions past two multiplies out to 0 and schedules the item for right
+   * now. The queue then hands it straight back, forever. Documents written
+   * before `introduce` became idempotent still hold that pair, so a correct
+   * answer has to be able to grow out of it rather than only never entering it.
+   */
+  it('never leaves a passed item due again immediately, even from a zero interval', () => {
+    const stuck = reviewing({ repetitions: 4, interval: 0, dueAt: NOW });
+    const next = applyReview(stuck, attempt({ latencyMs: 300 }), settings, NOW).next;
+    expect(next.interval).toBeGreaterThanOrEqual(1);
+    expect(next.dueAt).toBeGreaterThan(NOW);
+    expect(isDue(next, NOW)).toBe(false);
+  });
+
+  it('grows a zero interval back to a real schedule over consecutive passes', () => {
+    let item = reviewing({ repetitions: 4, interval: 0, dueAt: NOW });
+    const fast = attempt({ latencyMs: 300 });
+    const intervals: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      item = applyReview(item, fast, settings, NOW).next;
+      intervals.push(item.interval);
+    }
+    expect(intervals[0]).toBe(1);
+    expect(intervals.every((days) => days >= 1)).toBe(true);
+    expect(item.interval).toBeGreaterThan(1);
+  });
 });
 
 describe('applyReview ease factor', () => {
@@ -326,6 +354,24 @@ describe('introduce', () => {
     const first = introduce(createItem(31), NOW);
     const second = introduce(first, NOW + 86_400_000);
     expect(second.introducedAt).toBe(NOW);
+  });
+
+  /*
+   * Learn writes all ten years of a block when it finishes, new or not, so a
+   * redone block runs this over items that already have a schedule. Resetting
+   * them threw the decade's intervals away and made all ten due again — and it
+   * wrote `interval: 0` beside repetitions it did not reset, which is the state
+   * the review queue could never clear.
+   */
+  it('leaves an item that already has a schedule completely alone', () => {
+    const scheduled: ItemState = {
+      ...introduce(createItem(31), NOW),
+      interval: 38,
+      dueAt: addDays(NOW, 38),
+      repetitions: 4,
+      easeFactor: 2.6,
+    };
+    expect(introduce(scheduled, NOW + 5 * 86_400_000)).toEqual(scheduled);
   });
 });
 
@@ -476,5 +522,40 @@ describe('isLeech', () => {
     expect(isLeech({ ...createItem(1), lapses: LEECH_THRESHOLD - 1 })).toBe(false);
     expect(isLeech({ ...createItem(1), lapses: LEECH_THRESHOLD })).toBe(true);
     expect(isLeech({ ...createItem(1), leech: true })).toBe(true);
+  });
+});
+
+/*
+ * The queue must be finishable. This is the whole of the reported defect, at
+ * the level it actually happened: learn a decade, review it, redo the block,
+ * and two of the ten came back forever — the counter reading 47 / 49 while the
+ * screen alternated between 00 and 01.
+ */
+describe('a redone block still leaves the due queue', () => {
+  const fast = attempt({ latencyMs: 300 });
+
+  it('empties after one correct answer each, however many times the block is redone', () => {
+    const years = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let items = years.map((yy) => introduce(createItem(yy), NOW));
+    let day = NOW;
+
+    // Three sessions of review with a redo of the learn block before each, so
+    // the years pass through every repetition count the old reset could pair
+    // with a wiped interval.
+    for (let session = 0; session < 3; session++) {
+      items = items.map((item) => introduce(item, day));
+      let guard = 0;
+      while (dueItems(items, FULL, day).length > 0) {
+        const next = dueItems(items, FULL, day)[0];
+        items = items.map((item) =>
+          item.yy === next.yy ? applyReview(item, fast, settings, day).next : item,
+        );
+        // Ten years, one answer each. Anything more means an item came back.
+        expect((guard += 1)).toBeLessThanOrEqual(years.length);
+      }
+      day = addDays(day, 30);
+    }
+
+    expect(items.every((item) => item.interval >= 1)).toBe(true);
   });
 });

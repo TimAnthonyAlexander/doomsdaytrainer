@@ -254,6 +254,17 @@ violation, and several were bugs before they were rules.
     fluency for the middle of the ramp and the interval only above it. An item
     the user works out every time cannot report as mastered, however long its
     interval grows.
+13. **The due queue has to be finishable.** A correct answer always moves the
+    item at least one day out, so it cannot come back in the same session, and
+    `introduce` is idempotent so redoing a learn block cannot reset a schedule.
+    Those are two halves of one rule: `applyReview`'s multiplying branch reads
+    the *stored* interval, so a stored 0 beside repetitions past two multiplies
+    out to 0, which is `dueAt: now`, which is a queue that hands the year
+    straight back forever. Learn writes all ten years of a block when it
+    finishes rather than only the new ones, and the old `introduce` wiped the
+    interval without resetting the repetitions, so redoing a decade wrote
+    exactly that pair. Reported as "47 / 49, and it keeps alternating 00 and
+    01"; the redo had also silently thrown away the whole decade's intervals.
 
 ---
 

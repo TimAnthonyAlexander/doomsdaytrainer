@@ -7,16 +7,15 @@ import {
 import { useReminderCapability } from '@/features/notifications/useReminderCapability';
 import { activateBackgroundReminders } from './backgroundReminders';
 import { UpdateChrome } from './UpdateChrome';
-// Side effect only: `beforeinstallprompt` fires early and once. Loading the
-// store here means the event is captured at app start rather than whenever the
-// settings screen happens to be opened.
-import './installStore';
 
 /**
- * The single mount point for everything the app says about itself: the service
- * worker registration, the update notice, and the reminder machinery.
+ * Everything the app says about itself: the update notice and the reminder
+ * machinery. It renders one hairline bar at a time, or nothing, which is the
+ * usual case.
  *
- * It renders one hairline bar at a time, or nothing, which is the usual case.
+ * It sits inside the shell's frame rather than above the router, so the bar
+ * takes its height out of the one scroller instead of adding it to a document
+ * that was already exactly one viewport tall.
  */
 export function AppChrome() {
   const { permission } = useReminderCapability();

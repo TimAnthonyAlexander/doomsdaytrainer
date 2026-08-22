@@ -20,6 +20,9 @@ interface ChromeBarProps {
  * A hairline rule and the ground colour, nothing else. It sits above the screen
  * rather than over it: a reload notice or a missed reminder must never take the
  * eye off the answer pad, and it must never take focus.
+ *
+ * A row of the shell's frame, so it must not be squeezed by the scroller beside
+ * it — hence `flexShrink: 0`.
  */
 export function ChromeBar({ children, action, onDismiss, dismissLabel = 'Dismiss' }: ChromeBarProps) {
   return (
@@ -27,6 +30,7 @@ export function ChromeBar({ children, action, onDismiss, dismissLabel = 'Dismiss
       role="status"
       sx={{
         width: '100%',
+        flexShrink: 0,
         bgcolor: 'background.default',
         borderBottom: `1px solid ${palette.rule}`,
       }}
@@ -40,18 +44,42 @@ export function ChromeBar({ children, action, onDismiss, dismissLabel = 'Dismiss
           mx: 'auto',
           px: { xs: '20px', sm: '32px' },
           py: 1.25,
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: { xs: 'stretch', sm: 'center' },
-          gap: 1,
+          // A grid rather than a wrapping row, because the dismiss control has
+          // to stay on the sentence's first line at every width. Stacked as a
+          // column it dropped to a line of its own under the button on a phone,
+          // which made a one-sentence notice three rows tall.
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'minmax(0, 1fr) auto',
+            sm: 'minmax(0, 1fr) auto auto',
+          },
+          alignItems: 'center',
+          columnGap: 1,
+          rowGap: 1,
         }}
       >
-        <Typography variant="body2" color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ gridColumn: '1', gridRow: '1', minWidth: 0 }}
+        >
           {children}
         </Typography>
 
         {action ? (
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>{action}</Box>
+          <Box
+            sx={{
+              // Under the sentence on a phone, beside it from 600px up.
+              gridColumn: { xs: '1', sm: '2' },
+              gridRow: { xs: '2', sm: '1' },
+              justifySelf: 'start',
+              display: 'flex',
+              gap: 1,
+              alignItems: 'center',
+            }}
+          >
+            {action}
+          </Box>
         ) : null}
 
         {onDismiss ? (
@@ -59,11 +87,11 @@ export function ChromeBar({ children, action, onDismiss, dismissLabel = 'Dismiss
             onClick={onDismiss}
             aria-label={dismissLabel}
             sx={{
+              gridColumn: { xs: '2', sm: '3' },
+              gridRow: '1',
               width: 40,
               height: 40,
-              alignSelf: { xs: 'flex-end', sm: 'center' },
               color: 'text.secondary',
-              flexShrink: 0,
             }}
           >
             <X size={18} strokeWidth={1.75} aria-hidden />
