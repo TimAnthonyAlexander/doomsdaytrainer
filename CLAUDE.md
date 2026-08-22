@@ -76,7 +76,7 @@ domain layer has no `Math.random` at all, so its ordering is deterministic.
 
 ### Navigation
 
-Five destinations, and the whole table is in `src/router.tsx`:
+Six destinations, and the whole table is in `src/router.tsx`:
 
 ```
 /                       Weekday          the index route, and the point of the app
@@ -86,23 +86,27 @@ Five destinations, and the whole table is in `src/router.tsx`:
 /year-codes/revise      Revise           the due queue and the three drills
 /year-codes/calc        Calc
 /year-codes/trouble     Trouble spots    off the nav, and off the grid until flagged
+/doomsdays              the grid         Tables and Day step
+/doomsdays/tables       Tables           the 12 month doomsdays and the 4 century anchors
+/doomsdays/day-step     Day step         the last step of the method, timed on its own
 /stats                  Progress
 /settings               Settings
 /welcome                Onboarding       outside the shell
 ```
 
 The nesting is load-bearing rather than tidy. `isNavActive` matches a `${path}/`
-prefix, so one `/year-codes` entry lights up on all four children with no extra
-rule, and the due count hangs off that one entry through `DUE_COUNT_PATH` rather
-than being written out in the bottom bar and the rail separately, which is how
-the two drifted apart before.
+prefix, so one `/year-codes` entry lights up on all four children and one
+`/doomsdays` entry on both of its, with no extra rule; and the due count hangs
+off `/year-codes` through `DUE_COUNT_PATH` rather than being written out in the
+bottom bar and the rail separately, which is how the two drifted apart before.
 
-The bottom bar's columns are `minmax(0, 1fr)` rather than `1fr`. Five columns
-give each entry 67px on a 375px phone, and "Year codes" with a two-digit due
-count beside it measures about 74px. A plain `1fr` grows the column to fit and
-pushes the whole bar past the viewport, so the label truncates instead and the
-numeral never shrinks. A clipped label is still readable; a clipped number is a
-different number.
+The bottom bar's columns are `minmax(0, 1fr)` rather than `1fr`. Six columns
+give each entry 54px of label room on a 375px phone, and "Year codes" with a
+two-digit due count beside it is wider than that. A plain `1fr` grows the column
+to fit and pushes the whole bar past the viewport, so the label truncates
+instead and the numeral never shrinks. A clipped label is still readable; a
+clipped number is a different number. "Doomsdays" measures about 54px itself, so
+it fits at 375 and gives up its last letter at 360.
 
 `screenTitle` has to work the other way round, and this is the part that will
 catch the next person. Prefix matching gives the wrong answer for a title: it
@@ -350,9 +354,9 @@ Dates never enter spaced repetition, because they are not a fixed item set. Mont
 doomsdays and century anchors do, because they are 12 and 4 fixed items. A wrong
 weekday answer does not punish either, since which step failed is unknowable.
 
-**Day step** is the last step of that method timed on its own, and it sits on
-the Weekday screen beside the dates and the tables. "In March, the 14th is a
-Tuesday. What is the 5th?" — one addition, seven buttons. It exists because a
+**Day step** is the last step of that method timed on its own, and it lives
+under Doomsdays. "In March, the 14th is a Tuesday. What is the 5th?" — one
+addition, seven buttons. It exists because a
 whole date cannot say where the time went: an answer that took six seconds spent
 them on the century anchor, the year code, the month doomsday or this final
 count, and the full-date trainer cannot tell those apart. David Turner's
@@ -371,6 +375,33 @@ nothing about that item either. The totals are cut by step size and by
 direction, because "I am slow at this" is not actionable and "the +5 steps cost
 twice what the +1 steps do" is. Both cuts cover every attempt, so either one
 sums to the overall figures and there is no third stored copy of them.
+
+### Doomsdays
+
+One destination for the doomsday itself, presented as a grid the same way Year
+codes is: **Tables**, the twelve month doomsdays and four century anchors, and
+**Day step**. Each tile carries one line derived by the same function the screen
+it points at uses — due out of sixteen for Tables, the slowest step size for Day
+step, which is the one figure there that names a drill rather than a mood.
+
+Both used to sit on the Weekday screen as rows under the answer pad, and that is
+the whole reason this destination exists. `main` is the only scroller, the
+Trainer's `Screen` is `flex: 1` inside it, and the date block is `flex: { xs: 1 }`,
+so the pad is pinned to the bottom of the viewport by construction and every row
+after it begins exactly at the fold. Nothing in the date loop ever scrolls — a
+correct answer advances itself — so neither row was ever seen. They were not hard
+to find; they were unreachable without going looking. The only user of the app
+did not know the day-step trainer existed.
+
+Stats stayed on Weekday, because it reports on the dates answered there and
+nowhere else, and moved above the prompt as an icon button. It is the one control
+on that screen that is not a word: everything else in the header row is a
+`PlainToggle`, which is a setting, and drawing a destination as another word
+would make it read as a third thing to switch.
+
+The nav went from five entries to six. The argument against that in
+`WeekdayScreen.tsx` was arithmetic on a wrong number — it said the bar was
+"already seven entries wide" when it was five.
 
 **Concept** is the method on one date, start to finish, with the user answering
 every step. Pick a date, and nine screens hand over the two tables and ask for
@@ -696,9 +727,12 @@ Tests to know about, because they encode decisions rather than behaviour:
 - import rejection paths, each with the message the UI will show
 - every nav path and every linked path resolving to a real route, and the paths
   the restructure retired falling through to the catch-all
-- `screenTitle('/year-codes/learn')` being `Learn` rather than `Year codes`,
-  which is the one way the prefix matching goes wrong and the one way it goes
-  wrong silently
+- `screenTitle('/year-codes/learn')` being `Learn` rather than `Year codes`, and
+  the same for both children of `/doomsdays`, which is the one way the prefix
+  matching goes wrong and the one way it goes wrong silently
+- the day step and the tables walked in through the `/doomsdays` grid rather
+  than by rendering their views directly, because the way in is the part that
+  broke
 - a stored weekday preference that is not a legal value falling back to the
   default instead of reaching the screen
 - the shell holding exactly one scroller, with the notice bar and the bottom bar

@@ -41,7 +41,7 @@ function BackRow({ onBack }: DayStepViewProps) {
     >
       <ChevronLeft size={18} strokeWidth={1.75} aria-hidden />
       <Typography component="span" variant="body2">
-        Dates
+        Doomsdays
       </Typography>
     </ButtonBase>
   );

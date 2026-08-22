@@ -281,66 +281,6 @@ describe('Weekday trainer', () => {
   });
 });
 
-describe('Tables', () => {
-  it('drills a month doomsday and schedules only that item', async () => {
-    await seed({ autoAdvanceMs: 0 });
-    mount();
-
-    fireEvent.click(await screen.findByRole('button', { name: /Tables/ }));
-
-    const heading = await screen.findByRole('heading', { level: 1 });
-    expect(heading).toHaveTextContent('January');
-    await nextPaint();
-    fireEvent.click(screen.getByRole('button', { name: `Day ${monthDoomsday(1, false)}` }));
-
-    await waitFor(async () => {
-      const stored = await loadAppData();
-      expect(stored.monthItems[monthItemKey(1)].introduced).toBe(true);
-    });
-    const stored = await loadAppData();
-    expect(stored.monthItems[monthItemKey(1)].repetitions).toBe(1);
-    expect(stored.monthItems[monthItemKey(1)].attemptHistory[0].source).toBe('month');
-    // Nothing else moved.
-    expect(stored.monthItems[monthItemKey(2)].introduced).toBe(false);
-    expect(stored.centuryItems['18'].introduced).toBe(false);
-    expect(stored.weekdayAttempts).toEqual([]);
-  });
-
-  it('offers twelve day buttons, always the same twelve', async () => {
-    await seed();
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: /Tables/ }));
-    await screen.findByRole('heading', { level: 1 });
-
-    const days = screen.getAllByRole('button').filter((b) => /^Day \d+$/.test(b.getAttribute('aria-label') ?? ''));
-    expect(days.map((b) => b.getAttribute('aria-label'))).toEqual(
-      [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 28].map((n) => `Day ${n}`),
-    );
-  });
-
-  it('states the leap rule after a wrong January answer', async () => {
-    await seed({ autoAdvanceMs: 0 });
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: /Tables/ }));
-    await screen.findByRole('heading', { level: 1 });
-
-    await nextPaint();
-    fireEvent.click(screen.getByRole('button', { name: 'Day 28' }));
-    expect(await screen.findByText('January 3, and the 4th in a leap year.')).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument();
-  });
-
-  it('goes back to the dates', async () => {
-    await seed();
-    mount();
-    fireEvent.click(await screen.findByRole('button', { name: /Tables/ }));
-    await screen.findByRole('heading', { level: 1 });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Dates' }));
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Assisted' })).toBeInTheDocument());
-  });
-});
-
 describe('Lifetime totals under the pad', () => {
   function block(title: string): HTMLElement {
     return screen.getByRole('heading', { name: title }).parentElement as HTMLElement;

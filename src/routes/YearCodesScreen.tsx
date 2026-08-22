@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Screen } from '@/components/ui/Screen';
+import { TileGrid } from '@/components/ui/TileGrid';
 import { resolveScope } from '@/domain/scope';
 import { dailyAllowance, newItemsIntroducedToday } from '@/features/learn/blocks';
-import { YearCodeGrid } from '@/features/yearCodes/YearCodeGrid';
 import { yearCodeTiles } from '@/features/yearCodes/tiles';
 import { useAppState } from '@/state/useAppState';
 
@@ -33,7 +33,7 @@ export function YearCodesScreen() {
       <PageTitle subtitle="A year code is the number from 0 to 6 that turns a century anchor into that year's doomsday, and every weekday answer starts there. These are the ways to get the hundred of them and keep them.">
         Year codes
       </PageTitle>
-      <YearCodeGrid tiles={tiles} />
+      <TileGrid tiles={tiles} />
     </Screen>
   );
 }

@@ -1,6 +1,6 @@
 import { ThemeProvider } from '@mui/material/styles';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppData, Code, DayStepAttempt, Settings } from '@/domain/types';
 import { dayStepAnswer } from '@/domain/dayStep';
@@ -9,7 +9,8 @@ import { buildDayStepTotals } from '@/domain/dayStepLifetime';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { MAX_DAY_STEP_ATTEMPTS, defaultAppData, monthItemKey } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
-import { WeekdayScreen } from '@/routes/WeekdayScreen';
+import { DayStepScreen } from '@/routes/DayStepScreen';
+import { DoomsdaysScreen } from '@/routes/DoomsdaysScreen';
 import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
 
@@ -30,13 +31,21 @@ async function seed(settings: Partial<Settings> = {}, patch: Partial<AppData> = 
   await closeDb();
 }
 
+/**
+ * The grid and the trainer, on the two addresses the app gives them. Entering
+ * through the grid rather than rendering the view directly is the point: the
+ * tile's status line and the way in are the parts that broke last time.
+ */
 function mount() {
   return render(
     <ThemeProvider theme={theme}>
       <AppStateProvider>
         <AppStateGate>
-          <MemoryRouter>
-            <WeekdayScreen />
+          <MemoryRouter initialEntries={['/doomsdays']}>
+            <Routes>
+              <Route path="/doomsdays" element={<DoomsdaysScreen />} />
+              <Route path="/doomsdays/day-step" element={<DayStepScreen />} />
+            </Routes>
           </MemoryRouter>
         </AppStateGate>
       </AppStateProvider>
@@ -45,8 +54,12 @@ function mount() {
 }
 
 async function openDayStep(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: /Day step/ }));
-  await screen.findByRole('heading', { level: 1 });
+  fireEvent.click(await screen.findByRole('link', { name: /Day step/ }));
+  // The grid's title is an h1 as well, so waiting for "an h1" would resolve on
+  // the screen we just left. Only the prompt carries the sentence.
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAttribute('aria-label'),
+  );
 }
 
 async function wait(ms: number): Promise<void> {
@@ -306,12 +319,14 @@ describe('Day step totals', () => {
     expect(answered).toBe(MAX_DAY_STEP_ATTEMPTS + 1);
   });
 
-  it('goes back to the dates', async () => {
+  it('goes back to the doomsday grid', async () => {
     await seed();
     mount();
     await openDayStep();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dates' }));
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Assisted' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Doomsdays' }));
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Doomsdays' })).toBeInTheDocument(),
+    );
   });
 });

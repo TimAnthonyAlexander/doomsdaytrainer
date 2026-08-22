@@ -3,10 +3,13 @@ import { DUE_COUNT_PATH, NAV_ITEMS, isNavActive, screenTitle } from './BottomNav
 
 describe('NAV_ITEMS', () => {
   it('is Weekday first, Concept second, then the rest, in order', () => {
+    // The two subjects sit in the order the calculation needs them: the year
+    // code is worked out before the month's doomsday is looked up.
     expect(NAV_ITEMS.map((item) => [item.path, item.label])).toEqual([
       ['/', 'Weekday'],
       ['/concept', 'Concept'],
       ['/year-codes', 'Year codes'],
+      ['/doomsdays', 'Doomsdays'],
       ['/stats', 'Stats'],
       ['/settings', 'Settings'],
     ]);
@@ -43,6 +46,12 @@ describe('isNavActive', () => {
       expect(isNavActive(`/year-codes/${child}`, '/year-codes')).toBe(true);
     }
   });
+
+  it('lights Doomsdays on both of its children, with no extra rule', () => {
+    for (const child of ['tables', 'day-step']) {
+      expect(isNavActive(`/doomsdays/${child}`, '/doomsdays')).toBe(true);
+    }
+  });
 });
 
 describe('screenTitle', () => {
@@ -59,6 +68,11 @@ describe('screenTitle', () => {
     expect(screenTitle('/year-codes/revise')).toBe('Revise');
     expect(screenTitle('/year-codes/calc')).toBe('Calc');
     expect(screenTitle('/year-codes/trouble')).toBe('Trouble spots');
+  });
+
+  it('lets a child of Doomsdays name itself instead of inheriting the parent', () => {
+    expect(screenTitle('/doomsdays/tables')).toBe('Tables');
+    expect(screenTitle('/doomsdays/day-step')).toBe('Day step');
   });
 
   it('falls back to Not found for an address with no screen', () => {

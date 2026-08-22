@@ -32,6 +32,9 @@ const LINKED_PATHS = [
   '/year-codes/revise',
   '/year-codes/calc',
   '/year-codes/trouble',
+  '/doomsdays',
+  '/doomsdays/tables',
+  '/doomsdays/day-step',
   '/stats',
   '/settings',
 ];
@@ -64,6 +67,15 @@ describe('the route table', () => {
       'year-codes/calc',
       'year-codes/trouble',
     ]);
+  });
+
+  it('nests the doomsday screens under the nav entry that lights up for them', () => {
+    const nested = routes
+      .flatMap((route) => route.children ?? [])
+      .map((route) => route.path)
+      .filter((path): path is string => path !== undefined && path.startsWith('doomsdays'));
+
+    expect(nested).toEqual(['doomsdays', 'doomsdays/tables', 'doomsdays/day-step']);
   });
 
   it('keeps Concept at the top level, so its nav entry lights on it alone', () => {

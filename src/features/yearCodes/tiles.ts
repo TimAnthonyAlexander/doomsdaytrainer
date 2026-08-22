@@ -1,4 +1,5 @@
-import { BookOpen, Calculator, Flag, Repeat, type LucideIcon } from 'lucide-react';
+import { BookOpen, Calculator, Flag, Repeat } from 'lucide-react';
+import type { Tile } from '@/components/ui/TileGrid';
 import type { ItemState, Scope } from '@/domain/types';
 import { decadeBlocks, type DailyAllowance, type DecadeBlock } from '@/features/learn/blocks';
 import { reviseStatus } from '@/features/revise/revisePlan';
@@ -14,13 +15,8 @@ import { troubleItems } from '@/features/trouble/troublePool';
 
 export type YearCodeTileId = 'learn' | 'revise' | 'calc' | 'trouble';
 
-export interface YearCodeTile {
+export interface YearCodeTile extends Tile {
   id: YearCodeTileId;
-  path: string;
-  label: string;
-  icon: LucideIcon;
-  /** One true line under the name. Never empty. */
-  status: string;
 }
 
 export interface TileInput {

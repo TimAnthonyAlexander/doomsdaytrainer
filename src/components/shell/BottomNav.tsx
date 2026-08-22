@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { BarChart3, CalendarDays, Hash, Route, Settings } from 'lucide-react';
+import { Anchor, BarChart3, CalendarDays, Hash, Route, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
@@ -14,15 +14,21 @@ export interface NavItem {
 }
 
 /**
- * Five entries, and Concept is second because it is the one screen that says
- * what the other four are for: a date walked to its weekday, every step
- * answered. `Route` is the icon for the same reason — a path with stops on it,
- * which is what the screen is.
+ * Six entries, and Concept is second because it is the one screen that says
+ * what the rest are for: a date walked to its weekday, every step answered.
+ * `Route` is the icon for the same reason — a path with stops on it, which is
+ * what the screen is.
+ *
+ * The two subjects sit in the order the calculation needs them, year code then
+ * doomsday, which is also the order Concept walks. `Anchor` is Doomsdays for
+ * the century anchors and because the month's doomsday is the day the rest of
+ * the month is counted from.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/', label: 'Weekday', icon: CalendarDays },
   { path: '/concept', label: 'Concept', icon: Route },
   { path: '/year-codes', label: 'Year codes', icon: Hash },
+  { path: '/doomsdays', label: 'Doomsdays', icon: Anchor },
   { path: '/stats', label: 'Stats', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -31,7 +37,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
  * Screens that name themselves, because the nav cannot name them.
  *
  * `isNavActive` matches the whole subtree under a path, which is what lights
- * one nav entry on all four year-code screens. Read for a title it gives the
+ * one nav entry on every screen of a subject. Read for a title it gives the
  * wrong answer: the bar would say "Year codes" while the user is on Learn. So
  * this map is consulted first and a child always wins. A screen kept out of the
  * bar entirely needs an entry here too, or the bar calls it "Not found" while
@@ -42,6 +48,8 @@ const SCREEN_TITLES: Readonly<Record<string, string>> = {
   '/year-codes/revise': 'Revise',
   '/year-codes/calc': 'Calc',
   '/year-codes/trouble': 'Trouble spots',
+  '/doomsdays/tables': 'Tables',
+  '/doomsdays/day-step': 'Day step',
 };
 
 export const ICON_SIZE = 20;
@@ -96,11 +104,13 @@ export function BottomNav({ dueCount }: BottomNavProps) {
       <Box
         sx={{
           display: 'grid',
-          // minmax(0, …) rather than 1fr: at five columns a 375px phone gives
-          // each entry 67px of room, and "Year codes" with a two-digit due
-          // count beside it is wider than that. A plain 1fr would let the
-          // column grow to fit and push the whole bar past the viewport, so
-          // the label gives way instead and the bar keeps its width.
+          // minmax(0, …) rather than 1fr: at six columns a 375px phone gives
+          // each entry 54px of label room, and "Year codes" with a two-digit
+          // due count beside it is wider than that. "Doomsdays" measures about
+          // 54px itself, so it fits at 375 and gives up its last letter at 360.
+          // A plain 1fr would let the column grow to fit and push the whole bar
+          // past the viewport, so the label gives way instead and the bar keeps
+          // its width.
           gridTemplateColumns: `repeat(${NAV_ITEMS.length}, minmax(0, 1fr))`,
         }}
       >
