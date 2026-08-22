@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -9,7 +9,6 @@ import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { useAppState } from '@/state/useAppState';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData } from '@/storage/defaults';
-import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
 
 /** Renders the live settings document so assertions read what was persisted. */
@@ -64,54 +63,6 @@ async function mount(entry = '/welcome') {
 const heading = (name: string | RegExp) => screen.queryByRole('heading', { name });
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 
-/**
- * 20 March 1987 walked to Friday: 87 with its 28s taken off, the leap days in
- * what is left, the two added, the sevens off that, the anchor added, the
- * sevens off that, the day it names, the nearest doomsday date, the count on
- * from it, that added to the doomsday, the sevens off, and the day it names.
- * Same date and same answers as the Concept screen's own test, because it is
- * the same walk. A string is a weekday button.
- */
-const WALK_DATE = '1987-03-20';
-const WALK_ANSWERS = [3, 0, 3, 3, 6, 6, 'Sat', 14, 6, 12, 5, 'Fri'] as const;
-
-/** Answers the walk step on screen, whichever of its four controls it uses. */
-async function answerStep(value: number | string): Promise<void> {
-  await nextPaint();
-  if (typeof value === 'number' && screen.queryByRole('button', { name: 'Check' })) {
-    // The date picker is the other input on this screen; the typed answer is
-    // whichever text field is not it.
-    const field = screen.getAllByRole('textbox').find((element) => element.id !== 'concept-date');
-    fireEvent.change(field as HTMLInputElement, { target: { value: String(value) } });
-    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
-    return;
-  }
-  const label = String(value);
-  fireEvent.click(
-    screen.queryByRole('button', { name: label }) ??
-      screen.getByRole('button', { name: `Day ${label}` }),
-  );
-}
-
-/**
- * Reads past the explainer, which stands in front of the walk on every mount.
- * Idempotent, so a test can step past it itself and still call `finishWalk`.
- */
-function pastExplainer(): void {
-  const on = screen.queryByRole('button', { name: 'Try one yourself' });
-  if (on) fireEvent.click(on);
-}
-
-/** All twelve steps of the guided walk, answered correctly, on a fixed date. */
-async function finishWalk(): Promise<void> {
-  pastExplainer();
-  fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
-  for (const value of WALK_ANSWERS) {
-    await answerStep(value);
-    fireEvent.click(screen.getByRole('button', { name: /^(Next|Finish)$/ }));
-  }
-}
-
 beforeEach(deleteDb);
 
 describe('onboarding flow', () => {
@@ -138,8 +89,7 @@ describe('onboarding flow', () => {
     expect(from).toHaveValue('25');
 
     await user.click(button('Next'));
-    await finishWalk();
-    await user.click(button('Start learning'));
+    await user.click(button('Next'));
 
     expect(await screen.findByText('learn screen')).toBeInTheDocument();
 
@@ -159,8 +109,7 @@ describe('onboarding flow', () => {
     await user.click(button('Skip'));
     await user.click(button('Next'));
     await user.click(button('Next'));
-    await finishWalk();
-    await user.click(button('Start learning'));
+    await user.click(button('Next'));
 
     await screen.findByText('learn screen');
     const settings = persistedSettings();
@@ -211,8 +160,7 @@ describe('onboarding flow', () => {
     expect(button(/Living memory/)).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(button('Next'));
-    await finishWalk();
-    await user.click(button('Start learning'));
+    await user.click(button('Next'));
     await screen.findByText('learn screen');
     expect(persistedSettings().scopeId).toBe('living');
     expect(persistedSettings().indexConvention).toBe('monday');
@@ -278,8 +226,8 @@ describe('onboarding flow', () => {
 
 type User = ReturnType<typeof userEvent.setup>;
 
-/** The four read steps, tapped through, leaving the walk on screen. */
-async function reachWalk(user: User, convention: 'sunday' | 'monday' = 'sunday'): Promise<void> {
+/** The four choice steps, tapped through, leaving the explainer on screen. */
+async function reachMethod(user: User, convention: 'sunday' | 'monday' = 'sunday'): Promise<void> {
   await user.click(button('Next'));
   await user.click(button('Skip'));
   if (convention === 'monday') await user.click(button('0 = Monday'));
@@ -287,70 +235,32 @@ async function reachWalk(user: User, convention: 'sunday' | 'monday' = 'sunday')
   await user.click(button('Next'));
 }
 
-describe('the guided walk at the end of onboarding', () => {
-  it('comes after the scope choice and cannot be stepped past', async () => {
+describe('the explainer at the end of onboarding', () => {
+  it('is the last step, and the only thing on it', async () => {
     const { user } = await mount();
-    await reachWalk(user);
+    await reachMethod(user);
 
-    // The explainer opens the step, and the walk is behind it.
     expect(heading('How it works')).not.toBeNull();
     expect(screen.getByRole('group', { name: 'Step 5 of 5' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start learning' })).toBeNull();
 
-    pastExplainer();
-    expect(heading('One whole date')).not.toBeNull();
-    // The only way on is through the walk: the button that opens the app is not
-    // on screen until the last step has been answered.
-    expect(screen.queryByRole('button', { name: 'Start learning' })).toBeNull();
-    expect(persistedSettings().onboardingComplete).toBe(false);
-
-    await finishWalk();
-    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
-
-    await user.click(button('Start learning'));
-    expect(await screen.findByText('learn screen')).toBeInTheDocument();
+    // The guided walk lives on `/concept` and no longer stands between the
+    // reader and the app: neither the button that starts it nor anything it
+    // draws is on this screen.
+    expect(screen.queryByRole('button', { name: 'Try one yourself' })).toBeNull();
+    expect(heading('One whole date')).toBeNull();
+    expect(screen.queryByLabelText('Date')).toBeNull();
+    expect(screen.queryByRole('progressbar', { name: 'Steps done' })).toBeNull();
   });
 
-  it('orders the last pad by the convention picked in this run', async () => {
+  it('writes nothing until its button, then commits the whole run', async () => {
     const { user } = await mount();
-    await reachWalk(user, 'monday');
-
-    // The choice is two steps back and still only in the draft. A read of the
-    // stored settings here would open the pad on Sunday, which is what the
-    // document still says.
-    expect(persistedSettings().indexConvention).toBe('sunday');
-
-    pastExplainer();
-    fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
-    for (const value of WALK_ANSWERS.slice(0, 11)) {
-      await answerStep(value);
-      fireEvent.click(screen.getByRole('button', { name: /^(Next|Finish)$/ }));
-    }
-    await nextPaint();
-
-    const pad = screen.getByRole('button', { name: 'Mon' }).parentElement as HTMLElement;
-    expect(
-      within(pad)
-        .getAllByRole('button')
-        .map((element) => element.getAttribute('aria-label')),
-    ).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-
-    // Invariant 8: the buttons moved and the number did not.
-    expect(screen.getByTestId('concept-expression')).toHaveTextContent('5 as a weekday');
-    fireEvent.click(screen.getByRole('button', { name: 'Fri' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
-    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
-  });
-
-  it('writes nothing of its own, then commits the run at the end', async () => {
-    const { user } = await mount();
-    await reachWalk(user, 'monday');
+    await reachMethod(user, 'monday');
 
     const before = JSON.stringify(await loadAppData());
-    await finishWalk();
+    expect(persistedSettings().onboardingComplete).toBe(false);
     expect(JSON.stringify(await loadAppData())).toBe(before);
 
-    await user.click(button('Start learning'));
+    await user.click(button('Next'));
     await screen.findByText('learn screen');
 
     const settings = persistedSettings();

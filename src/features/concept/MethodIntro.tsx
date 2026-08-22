@@ -232,19 +232,31 @@ function Row({ children }: { children: ReactNode }) {
 }
 
 export interface MethodIntroProps {
-  /** Starts the walkthrough proper. */
-  onStart: () => void;
+  /**
+   * Starts the walkthrough proper, and draws the button that does it.
+   *
+   * Optional, because the explainer also stands on its own: onboarding shows it
+   * as the last step and carries on with the flow's own footer, and two primary
+   * buttons on one screen are two different ways forward.
+   */
+  onStart?: () => void;
 }
 
 /**
  * The whole method on one screen, worked on one fixed date, before the user is
  * asked to do anything.
  *
- * It sits in front of the walkthrough rather than replacing any part of it. The
- * walk proves the method by making somebody produce a weekday; this says what
- * they are about to produce and why it takes so few steps. It is one screen
- * with the way on at the bottom, so a reader who already knows this scrolls
- * past it in a second.
+ * On the Concept screen it sits in front of the walkthrough rather than
+ * replacing any part of it. The walk proves the method by making somebody
+ * produce a weekday; this says what they are about to produce and why it takes
+ * so few steps. It is one screen with the way on at the bottom, so a reader who
+ * already knows this scrolls past it in a second.
+ *
+ * Onboarding shows it without a walk behind it. Somebody who has never seen the
+ * method should meet it once, read, before anything asks them for a number; the
+ * walk is a screen in the app they can go and do, and putting twelve compulsory
+ * questions between them and the app made the last step of onboarding the
+ * longest thing in it.
  *
  * The date is fixed at 20 March 2026, it is named before the first sum rather
  * than three sections later, and every number on the screen is derived rather
@@ -422,19 +434,21 @@ export function MethodIntro({ onStart }: MethodIntroProps) {
 
       {/* Outside the columns, so it is the one thing under both of them rather
           than the tail of whichever column happened to end lower. */}
-      <Button
-        variant="contained"
-        onClick={onStart}
-        sx={{
-          mt: `${space[5]}px`,
-          display: { xs: 'flex', sm: 'inline-flex' },
-          width: { xs: '100%', sm: 'auto' },
-          minHeight: 48,
-          minWidth: 200,
-        }}
-      >
-        Try one yourself
-      </Button>
+      {onStart ? (
+        <Button
+          variant="contained"
+          onClick={onStart}
+          sx={{
+            mt: `${space[5]}px`,
+            display: { xs: 'flex', sm: 'inline-flex' },
+            width: { xs: '100%', sm: 'auto' },
+            minHeight: 48,
+            minWidth: 200,
+          }}
+        >
+          Try one yourself
+        </Button>
+      ) : null}
     </Box>
   );
 }

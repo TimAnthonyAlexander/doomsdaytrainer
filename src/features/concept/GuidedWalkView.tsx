@@ -40,8 +40,8 @@ export interface GuidedWalkViewProps {
   onDate: (date: CalendarDate) => void;
   /**
    * Which day the seven weekday buttons start on. A prop rather than a read of
-   * `useAppState`, because onboarding mounts this before the choice has been
-   * committed and committed settings would show the wrong pad there.
+   * `useAppState`, so the walk can be rendered and asserted under either
+   * convention without a settings document behind it.
    */
   convention: IndexConvention;
   keyboard?: boolean;
@@ -52,8 +52,6 @@ export interface GuidedWalkViewProps {
    * thing they are supposed to be looking at.
    */
   intro?: ReactNode;
-  /** Drawn under the closing line once the walk is finished. */
-  footer?: ReactNode;
 }
 
 /** How far along, as a rule rather than a sentence. */
@@ -108,7 +106,6 @@ export function GuidedWalkView({
   convention,
   keyboard = true,
   intro,
-  footer,
 }: GuidedWalkViewProps) {
   const walk = useMemo(() => guidedWalk(date), [date]);
   const dateId = toDateInput(date);
@@ -191,7 +188,6 @@ export function GuidedWalkView({
           The anchor and the doomsday dates came off a table. Every other number on the way here you
           worked out.
         </Typography>
-        {footer}
       </Box>
     );
   }

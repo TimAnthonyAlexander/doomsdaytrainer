@@ -3,14 +3,12 @@ import Button from '@mui/material/Button';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/components/ui/Screen';
-import type { CalendarDate } from '@/domain/types';
-import { randomConceptDate } from '@/features/concept/conceptDate';
+import { MethodIntro } from '@/features/concept/MethodIntro';
 import { useAppState } from '@/state/useAppState';
 import { IndexStep } from './IndexStep';
 import { IntroStep } from './IntroStep';
 import { ScopeStep, type RangeField } from './ScopeStep';
 import { StepIndicator } from './StepIndicator';
-import { WalkStep } from './WalkStep';
 import { WhyStep } from './WhyStep';
 import {
   STEP_COUNT,
@@ -24,23 +22,17 @@ import {
   stepNumber,
 } from './onboardingModel';
 
-const PRIMARY_LABEL: Record<OnboardingStep, string> = {
-  intro: 'Next',
-  why: 'Next',
-  index: 'Next',
-  scope: 'Next',
-  walk: 'Start learning',
-};
-
 /**
  * Five steps, one commit. Choices live in local state until the last button, so
  * a run that is abandoned halfway leaves nothing behind and starts clean.
  *
- * The last step is the guided walk, and it is the one step with no way past it:
- * the four before it are read, and this one is done. The commit and the
- * navigation therefore hang off the end of the walk rather than off a button in
- * the flow's own footer, which is why step five draws no primary button of its
- * own.
+ * Every step is read, including the last: it is the method explainer, the same
+ * component the Concept screen opens on, and the button under it leaves for the
+ * app. The guided walk used to be bolted to the back of it and answering its
+ * twelve questions was the only way out of onboarding — a fine screen, and the
+ * wrong place for it. Somebody who has just been told what a doomsday is should
+ * reach the app after reading, not after a quiz; the walk is on `/concept`
+ * whenever they want it.
  *
  * It finishes on Learn rather than on Weekday, which is otherwise the app's
  * first destination: nothing has been introduced yet, so there is no code to
@@ -53,9 +45,6 @@ export function OnboardingFlow() {
   const [step, setStep] = useState<OnboardingStep>('intro');
   const [draft, setDraft] = useState<OnboardingDraft>(() => initialDraft(settings));
   const [saving, setSaving] = useState(false);
-  // Held here rather than inside the step, so stepping back to the scope choice
-  // and forward again returns to the date the user picked.
-  const [walkDate, setWalkDate] = useState<CalendarDate>(() => randomConceptDate());
 
   const range = draftRange(draft);
   const back = previousStep(step);
@@ -113,25 +102,9 @@ export function OnboardingFlow() {
             onRangeChange={setRange}
           />
         ) : null}
-        {step === 'walk' ? (
-          <WalkStep
-            date={walkDate}
-            onDate={setWalkDate}
-            convention={draft.indexConvention}
-            keyboard={settings.keyboardInput}
-            footer={
-              <Button
-                fullWidth
-                variant="contained"
-                disabled={saving}
-                onClick={() => void commit()}
-                sx={{ minHeight: 48 }}
-              >
-                {PRIMARY_LABEL.walk}
-              </Button>
-            }
-          />
-        ) : null}
+        {/* No `onStart`: the way on is the flow's own footer button, which is
+            also the button that commits the run. */}
+        {step === 'method' ? <MethodIntro /> : null}
       </Box>
 
       <Box sx={{ mt: 'auto', pt: 4, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -149,11 +122,9 @@ export function OnboardingFlow() {
             </Button>
           ) : null}
         </Box>
-        {step === 'walk' ? null : (
-          <Button fullWidth variant="contained" disabled={saving} onClick={advance}>
-            {PRIMARY_LABEL[step]}
-          </Button>
-        )}
+        <Button fullWidth variant="contained" disabled={saving} onClick={advance}>
+          Next
+        </Button>
       </Box>
     </Screen>
   );

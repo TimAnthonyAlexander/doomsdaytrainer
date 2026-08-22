@@ -358,13 +358,21 @@ Nothing on it is timed and nothing is written. A test walks the whole sequence
 and asserts the stored document is unchanged, because a demonstration that
 recorded attempts would put untimed taps inside the numbers Progress reports.
 
-It is also the last step of onboarding, mounted from the same component. There
-the index convention comes from the onboarding draft rather than from settings,
-since the user picks it two steps earlier and it has not been committed yet.
-Reading committed settings would order the final pad by the value they just
-replaced. That step cannot be skipped, which is safe rather than harsh: every
-step's working line names the value it wanted and both pads outline the correct
-button, so someone who knows nothing can finish by tapping what is on screen.
+In front of the walk, on every mount, is `MethodIntro`: the whole method read
+rather than done, worked on one fixed date, every number on it derived through
+`introContent.ts` rather than written into the copy. It is one screen with the
+way on at the bottom, so somebody who already knows this scrolls past it in a
+second, and it is not remembered as seen — a flag in storage would buy a second
+and cost a setting.
+
+That explainer, and only that explainer, is also the last step of onboarding.
+The guided walk used to be bolted behind it there and answering its twelve
+questions was the only way out of the flow, which made the last step of
+onboarding the longest thing in it. Somebody who has just been told what a
+doomsday is should reach the app after reading; the walk is a screen they can go
+and do. `MethodIntro`'s `onStart` is optional for exactly that reason — without
+it the component draws no button of its own, and onboarding's own footer is the
+single way forward.
 
 This screen is also where invariant 8 is easiest to see. Every number in the
 first eight steps is Sunday-indexed whatever the user picked; the convention
