@@ -56,6 +56,9 @@ function mount() {
 }
 
 async function open(date = EXAMPLE): Promise<void> {
+  // The explainer is in front of the walk on every mount, and its button is
+  // the way through to picking a date.
+  fireEvent.click(await screen.findByRole('button', { name: 'Try one yourself' }));
   const input = await screen.findByLabelText('Date');
   fireEvent.change(input, { target: { value: date } });
   await screen.findByTestId('concept-ledger');
@@ -139,6 +142,48 @@ async function walk(): Promise<void> {
 }
 
 beforeEach(deleteDb);
+
+describe('the explainer in front of the walk', () => {
+  it('comes first, on its own fixed date, with the walk behind it', async () => {
+    await seed();
+    mount();
+
+    expect(await screen.findByRole('heading', { name: 'How it works' })).toBeInTheDocument();
+    // Its date is 20 March 2026 and is not the one the walk will use, which is
+    // drawn at random. Nothing here is answerable.
+    expect(screen.getByText('20 March 2026 is a Friday.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Date')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('concept-ledger')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try one yourself' }));
+    expect(screen.queryByRole('heading', { name: 'How it works' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Date')).toBeInTheDocument();
+  });
+
+  it('shows the doomsday dates grouped the way they are remembered', async () => {
+    await seed();
+    mount();
+    await screen.findByRole('heading', { name: 'How it works' });
+
+    expect(screen.getByText('The even months')).toBeInTheDocument();
+    expect(screen.getByText(/Nine to five at seven eleven/)).toBeInTheDocument();
+    expect(screen.getByText(/Pi day/)).toBeInTheDocument();
+    // The two that move, printed as both dates rather than only the common one.
+    expect(screen.getByText('3/4')).toBeInTheDocument();
+    expect(screen.getByText('28/29')).toBeInTheDocument();
+  });
+
+  it('writes nothing', async () => {
+    await seed();
+    const before = JSON.stringify(await loadAppData());
+
+    mount();
+    await screen.findByRole('heading', { name: 'How it works' });
+    fireEvent.click(screen.getByRole('button', { name: 'Try one yourself' }));
+
+    expect(JSON.stringify(await loadAppData())).toBe(before);
+  });
+});
 
 describe('the concept walkthrough', () => {
   it('takes one date to its weekday in twelve steps, all of them answered', async () => {

@@ -93,8 +93,18 @@ async function answerStep(value: number | string): Promise<void> {
   );
 }
 
+/**
+ * Reads past the explainer, which stands in front of the walk on every mount.
+ * Idempotent, so a test can step past it itself and still call `finishWalk`.
+ */
+function pastExplainer(): void {
+  const on = screen.queryByRole('button', { name: 'Try one yourself' });
+  if (on) fireEvent.click(on);
+}
+
 /** All twelve steps of the guided walk, answered correctly, on a fixed date. */
 async function finishWalk(): Promise<void> {
+  pastExplainer();
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
   for (const value of WALK_ANSWERS) {
     await answerStep(value);
@@ -282,8 +292,13 @@ describe('the guided walk at the end of onboarding', () => {
     const { user } = await mount();
     await reachWalk(user);
 
-    expect(heading('One whole date')).not.toBeNull();
+    // The explainer opens the step, and the walk is behind it.
+    expect(heading('How it works')).not.toBeNull();
     expect(screen.getByRole('group', { name: 'Step 5 of 5' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start learning' })).toBeNull();
+
+    pastExplainer();
+    expect(heading('One whole date')).not.toBeNull();
     // The only way on is through the walk: the button that opens the app is not
     // on screen until the last step has been answered.
     expect(screen.queryByRole('button', { name: 'Start learning' })).toBeNull();
@@ -305,6 +320,7 @@ describe('the guided walk at the end of onboarding', () => {
     // document still says.
     expect(persistedSettings().indexConvention).toBe('sunday');
 
+    pastExplainer();
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
     for (const value of WALK_ANSWERS.slice(0, 11)) {
       await answerStep(value);
