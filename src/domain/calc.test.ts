@@ -200,7 +200,9 @@ describe('stepsFor', () => {
     expect(sum.answer).toBe(91);
     expect(sum.working).toBe('73 + 18 = 91.');
     expect(mod.answer).toBe(0);
-    expect(mod.working).toBe('91 − 7 × 13 = 0.');
+    expect(mod.working).toBe(
+      '7 fits into 91 13 times: 7 × 13 = 91. Take that away: 91 − 91 = 0. The answer is 0.',
+    );
   });
 
   it('ends at the true code for every one of the 100 years', () => {
@@ -235,7 +237,9 @@ describe('reducedStepsFor', () => {
     expect(leap.answer).toBe(4);
     expect(sum.answer).toBe(21);
     expect(mod.answer).toBe(0);
-    expect(mod.working).toBe('21 − 7 × 3 = 0.');
+    expect(mod.working).toBe(
+      '7 fits into 21 3 times: 7 × 3 = 21. Take that away: 21 − 21 = 0. The answer is 0.',
+    );
   });
 
   it('keeps the reduce step even when nothing comes out', () => {

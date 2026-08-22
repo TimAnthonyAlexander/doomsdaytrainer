@@ -138,18 +138,19 @@ function sumStep(year: YearKey, l: number = leapDays(year)): CalcStep {
 
 function modStep(s: number, reduced: boolean): CalcStep {
   const { multiple, remainder } = sevenStep(s);
+  const times = multiple / 7;
   const why = reduced
-    ? `Seven days is a full week and changes nothing, so only the leftover counts. Reducing first holds the sum at ${MAX_REDUCED_SUM} or below, so ${s} never needs a multiple of 7 past 28.`
-    : `Seven days is a full week and changes nothing, so only the leftover counts. Left unreduced the sum runs as high as ${MAX_RAW_SUM}, so ${s} can need a much larger multiple of 7.`;
+    ? `A week is 7 days long, so taking away a whole 7 lands you back on the same weekday. Only what is left over counts, and that leftover is the code. Reducing first keeps the sum at ${MAX_REDUCED_SUM} or below, so you only ever need 7, 14, 21 or 28.`
+    : `A week is 7 days long, so taking away a whole 7 lands you back on the same weekday. Only what is left over counts, and that leftover is the code. Left unreduced the sum climbs to ${MAX_RAW_SUM}, so the 7s you need to take away can go much higher.`;
   return {
     id: 'mod',
-    question: `Take whole weeks out of ${s}.`,
+    question: `Take 7 away from ${s} as many times as you can. How much is left?`,
     answer: remainder,
     why,
     working:
       multiple === 0
-        ? `${s} is under 7 on its own, so ${remainder}.`
-        : `${s} − 7 × ${multiple / 7} = ${remainder}.`,
+        ? `7 does not fit into ${s} even once, so all ${s} is left. The answer is ${remainder}.`
+        : `7 fits into ${s} ${times} times: 7 × ${times} = ${multiple}. Take that away: ${s} − ${multiple} = ${remainder}. The answer is ${remainder}.`,
   };
 }
 
