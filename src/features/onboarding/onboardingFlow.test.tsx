@@ -65,19 +65,20 @@ const heading = (name: string | RegExp) => screen.queryByRole('heading', { name 
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 
 /**
- * 20 March 1987 walked to Friday: the 1900s anchor, 87 with its 28s taken off,
- * the leap days in what is left, the year code, the year's doomsday, March's
- * doomsday date, the step off it, and the weekday number. Same date and same
- * answers as the Concept screen's own test, because it is the same walk.
+ * 20 March 1987 walked to Friday: 87 with its 28s taken off, the leap days in
+ * what is left, the two added, the sevens off that, the anchor added, the
+ * sevens off that, the day it names, the nearest doomsday date, the count on
+ * from it, that added to the doomsday, the sevens off, and the day it names.
+ * Same date and same answers as the Concept screen's own test, because it is
+ * the same walk. A string is a weekday button.
  */
 const WALK_DATE = '1987-03-20';
-const WALK_ANSWERS = [3, 3, 0, 3, 6, 14, 6, 5] as const;
-const WALK_DAY = 'Fri';
+const WALK_ANSWERS = [3, 0, 3, 3, 6, 6, 'Sat', 14, 6, 12, 5, 'Fri'] as const;
 
-/** Answers the walk step on screen, whichever of its three controls it uses. */
-async function answerStep(value: number): Promise<void> {
+/** Answers the walk step on screen, whichever of its four controls it uses. */
+async function answerStep(value: number | string): Promise<void> {
   await nextPaint();
-  if (screen.queryByRole('button', { name: 'Check' })) {
+  if (typeof value === 'number' && screen.queryByRole('button', { name: 'Check' })) {
     // The date picker is the other input on this screen; the typed answer is
     // whichever text field is not it.
     const field = screen.getAllByRole('textbox').find((element) => element.id !== 'concept-date');
@@ -85,22 +86,20 @@ async function answerStep(value: number): Promise<void> {
     fireEvent.click(screen.getByRole('button', { name: 'Check' }));
     return;
   }
+  const label = String(value);
   fireEvent.click(
-    screen.queryByRole('button', { name: String(value) }) ??
-      screen.getByRole('button', { name: `Day ${value}` }),
+    screen.queryByRole('button', { name: label }) ??
+      screen.getByRole('button', { name: `Day ${label}` }),
   );
 }
 
-/** All nine steps of the guided walk, answered correctly, on a fixed date. */
+/** All twelve steps of the guided walk, answered correctly, on a fixed date. */
 async function finishWalk(): Promise<void> {
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
   for (const value of WALK_ANSWERS) {
     await answerStep(value);
     fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
   }
-  await nextPaint();
-  fireEvent.click(screen.getByRole('button', { name: WALK_DAY }));
-  fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
 }
 
 beforeEach(deleteDb);
@@ -307,7 +306,7 @@ describe('the guided walk at the end of onboarding', () => {
     expect(persistedSettings().indexConvention).toBe('sunday');
 
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
-    for (const value of WALK_ANSWERS) {
+    for (const value of WALK_ANSWERS.slice(0, 11)) {
       await answerStep(value);
       fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
     }
@@ -321,8 +320,8 @@ describe('the guided walk at the end of onboarding', () => {
     ).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 
     // Invariant 8: the buttons moved and the number did not.
-    expect(screen.getByText('Which day is 5?')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: WALK_DAY }));
+    expect(screen.getByText('Which weekday is 5?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Fri' }));
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
   });

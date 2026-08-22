@@ -1,42 +1,43 @@
 /**
- * One date walked all the way to its weekday, nine steps, every step answered
- * by the user.
+ * One date walked all the way to its weekday, twelve steps, every one of them
+ * answered by the user.
  *
- * The rest of the app trains the pieces: `calc.ts` derives a year code,
- * `dayStep.ts` times the last count, `weekday.ts` holds the tables. This file
- * puts the whole chain on one rail so somebody who knows none of it can produce
- * the weekday of their own birthday. It computes nothing new — every number
- * comes out of the functions those files already export — and its only real
- * work is saying, in order, what is being asked and which numbers the asking
- * rests on.
+ * This is a demonstration, not a trainer. Somebody who has never heard of the
+ * Doomsday method has to be able to finish it, so **every question is either
+ * arithmetic on numbers already on the screen, or "which weekday is N"**. The
+ * app supplies every lookup, every table value and every name. The user
+ * supplies sums.
  *
- * Two rules shape it.
+ * That rule is structural rather than a matter of care. Each step carries a
+ * `GuidedAsk` — the sum itself, as data — and the step's `answer` is
+ * `askAnswer(ask)` rather than a number written out beside it. `askOperands`
+ * then names exactly which numbers the question rests on, and every one of them
+ * appears in `givens`, which is what the screen prints. A step that asked for
+ * something the user could not see would fail that check rather than merely
+ * read badly. See `guidedDate.test.ts`.
  *
- * **Nothing is revealed that the user could work out.** The year code in
- * particular is derived here, never handed over, because handing it over turns
- * the whole walk into a lookup with extra steps.
+ * Two more rules shape it.
  *
- * **No step is dropped.** Some dates make a step a no-op: a year under 28 has
- * no whole 28s to take off, and a day that *is* the month's doomsday is nothing
- * to count. Those steps stay, as a line to read rather than a question whose
- * answer is forced. The count is nine for every date in range, so the walk is
- * one shape and the user is never quietly skipped past a piece of the method.
+ * **The rhythm never changes.** Add, then take the sevens off, as two separate
+ * questions, even when the sum is already under seven. A step that sometimes
+ * disappears is a step the hand stops expecting.
  *
- * The leap-day step is asked even when it answers zero. That is not an
- * oversight: `calc.ts`'s own leap step has no degenerate branch, because
- * "3 ÷ 4 = 0 remainder 3, so 0" is a division and a discarding, both of which
- * are work. What `reduce` does for a year under 28 is nothing at all, and
- * `stepDirection` in `dayStep.ts` goes further and *throws* when the target is
- * the doomsday itself, which is that file saying a zero-day move is not a step.
- * Those two are the no-ops; the leap count is not one.
+ * **No step is dropped.** A year under 28 has no whole 28s to take off. That
+ * step stays, as a line to read rather than a question whose answer is forced.
+ * The count is twelve for every date in range, so the progress indicator never
+ * lies and the user is never quietly skipped past a piece of the method.
+ *
+ * The one question that is not arithmetic is step 8, and it is a comparison of
+ * four or five numbers printed on the screen rather than a concept: which of
+ * this month's doomsday dates is closest to your date without going past it.
  *
  * Pure and framework-free. No `Math.random`, no `Date.now` — `guidedClosingLine`
  * takes the clock as an argument so the tense of one sentence cannot smuggle a
  * dependency in here.
  */
 
-import { cyclesRemoved, leapDays, rawSum, reduce28, sevenStep } from './calc';
-import { anchorMonthLabel, ordinal, stepSize } from './dayStep';
+import { CYCLE, cyclesRemoved, leapDays, reduce28, sevenStep } from './calc';
+import { ordinal } from './dayStep';
 import type { CalendarDate, Code, YearKey } from './types';
 import {
   CENTURY_ANCHORS,
@@ -61,27 +62,33 @@ import { formatYear } from './yearCodes';
 /* ------------------------------------------------------------------ */
 
 export type GuidedStepId =
-  | 'anchor'
   | 'reduce'
   | 'leap'
+  | 'sum'
   | 'yearCode'
+  | 'anchorSum'
   | 'yearDoomsday'
-  | 'monthDoomsday'
-  | 'dayStep'
-  | 'final'
-  | 'weekday';
+  | 'doomsdayName'
+  | 'nearest'
+  | 'daysOn'
+  | 'weekdaySum'
+  | 'weekdayCode'
+  | 'weekdayName';
 
-/** In the order they are worked. Nine, for every date in range. */
+/** In the order they are worked. Twelve, for every date in range. */
 export const GUIDED_STEP_IDS: readonly GuidedStepId[] = [
-  'anchor',
   'reduce',
   'leap',
+  'sum',
   'yearCode',
+  'anchorSum',
   'yearDoomsday',
-  'monthDoomsday',
-  'dayStep',
-  'final',
-  'weekday',
+  'doomsdayName',
+  'nearest',
+  'daysOn',
+  'weekdaySum',
+  'weekdayCode',
+  'weekdayName',
 ];
 
 export const GUIDED_STEP_COUNT = GUIDED_STEP_IDS.length;
@@ -90,58 +97,184 @@ export const GUIDED_STEP_COUNT = GUIDED_STEP_IDS.length;
  * Which control can take the answer.
  *
  * `code` is the shared seven-button pad, 0-6. `weekday` is the same pad with
- * the seven weekday names on it. `monthDate` is the twelve-button month pad.
- * `count` is a typed field, for the two answers no pad can hold: a year reduced
- * below 28, and the one date the month pad has no button for (see the note on
- * February in a leap year, below).
+ * the seven weekday names on it. `choice` is one button per doomsday date in
+ * the month, four or five of them. `count` is a typed field, for the four sums
+ * that can run past six.
  */
-export type GuidedInput = 'code' | 'count' | 'monthDate' | 'weekday';
+export type GuidedInput = 'code' | 'count' | 'choice' | 'weekday';
 
 /** The reference table this step needs on screen, or null. */
 export type GuidedTable = 'century' | 'month' | null;
 
+/**
+ * The question itself, as data rather than as a sentence.
+ *
+ * `question` is what the screen prints; this is what the screen prints *about*.
+ * Keeping the two separate is what lets a test assert that no question ever
+ * needs a number the user cannot see: the operands are enumerable.
+ *
+ * The divisor in `quarter` and the modulus in `sevens` are part of the
+ * operation rather than operands taken off the screen. Four is in "divide by
+ * four" and seven is in "a week is seven days"; neither is a value the user has
+ * to have produced.
+ */
+export type GuidedAsk =
+  | { kind: 'add'; left: number; right: number }
+  | { kind: 'subtract'; left: number; right: number }
+  | { kind: 'quarter'; left: number }
+  | { kind: 'sevens'; left: number }
+  | { kind: 'name'; code: Code }
+  | { kind: 'nearest'; options: readonly number[]; ceiling: number };
+
+/** What a question comes out at. Every step's `answer` is this and nothing else. */
+export function askAnswer(ask: GuidedAsk): number {
+  switch (ask.kind) {
+    case 'add':
+      return ask.left + ask.right;
+    case 'subtract':
+      return ask.left - ask.right;
+    case 'quarter':
+      return Math.floor(ask.left / 4);
+    case 'sevens':
+      return sevenStep(ask.left).remainder;
+    case 'name':
+      return ask.code;
+    case 'nearest': {
+      const under = ask.options.filter((option) => option <= ask.ceiling);
+      if (under.length === 0) throw new RangeError(`No option at or below ${ask.ceiling}`);
+      return Math.max(...under);
+    }
+  }
+}
+
+/**
+ * Every number the question rests on. All of them must be printed by the step
+ * that asks it, or the user is being asked to supply something the app never
+ * gave them. That is the property `guidedDate.test.ts` pins.
+ */
+export function askOperands(ask: GuidedAsk): number[] {
+  switch (ask.kind) {
+    case 'add':
+    case 'subtract':
+      return [ask.left, ask.right];
+    case 'quarter':
+    case 'sevens':
+      return [ask.left];
+    case 'name':
+      return [ask.code];
+    case 'nearest':
+      return [...ask.options, ask.ceiling];
+  }
+}
+
 export interface GuidedGiven {
   label: string;
+  /** One number, or a comma-separated list of them. Always printed. */
   value: string;
   /**
-   * The step whose answer this value is, or null when the date itself supplies
-   * it. This is what makes the chain assertable: a given that claims to carry
-   * an earlier answer must actually equal it, or the user has been handed a
-   * number that contradicts what they just said.
+   * The step whose answer this value is, or null when the date or a shipped
+   * table supplies it. This is what makes the chain assertable: a given that
+   * claims to carry an earlier answer must actually equal it, or the user has
+   * been handed a number that contradicts what they just said.
    */
   from: GuidedStepId | null;
 }
 
 export interface GuidedStep {
   id: GuidedStepId;
-  /** 1-based, and always 1..9. No date changes the count. */
+  /** 1-based, and always 1..12. No date changes the count. */
   position: number;
   /** Two or three words naming the step. */
   title: string;
   /**
    * True when this date makes the step a no-op. The screen states `question`
-   * and moves on rather than asking it.
+   * and moves on rather than asking it. Exactly the steps with no `ask`.
    */
   noop: boolean;
   /** The ask, or for a no-op step the statement that stands in its place. */
   question: string;
-  /** Every number the step rests on, each with the label naming it. */
+  /** The sum behind `question`, or null when the step is a line to read. */
+  ask: GuidedAsk | null;
+  /** Every number the step puts on screen, each with the label naming it. */
   givens: readonly GuidedGiven[];
   table: GuidedTable;
   input: GuidedInput;
-  /** The largest answer this kind of step can have. Only `count` reads it. */
+  /** The largest answer this kind of step can have. `count` and `choice` read it. */
   max: number;
+  /** The buttons, for a `choice` step. Empty for every other input. */
+  choices: readonly number[];
   answer: number;
   /** What the answer is. Never omitted; a bare number teaches nothing. */
   answerLabel: string;
   /** The worked line, shown after a wrong answer and after a right one. */
   working: string;
-  /** Why the step exists, in one or two plain sentences. */
+  /** One short line of narration, before the question. */
   why: string;
   /** One sentence naming what the answer has just produced, or null. */
   result: string | null;
   /** Something about this date that changes the step, or null. */
   note: string | null;
+  /** The equation slot this step completes, or null when it is a middle sum. */
+  fills: GuidedSlotId | null;
+  /** The slot the step is working toward. The equation strip marks it. */
+  solving: GuidedSlotId;
+}
+
+/* ------------------------------------------------------------------ */
+/* The equations                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A named place in the three equations.
+ *
+ * The strip shows the whole computation from the first screen, with the pieces
+ * that are not known yet standing empty, so the user can always see the shape
+ * of what they are building and where inside it they are. Which slot holds what,
+ * and when, is derived from the step sequence rather than decided by the
+ * component — the same reason table maths lives here and not in a screen.
+ */
+export type GuidedSlotId =
+  | 'reduced'
+  | 'leapDays'
+  | 'yearCode'
+  | 'day'
+  | 'nearest'
+  | 'daysOn'
+  | 'anchor'
+  | 'weekday';
+
+export interface GuidedTerm {
+  kind: 'term';
+  slot: GuidedSlotId;
+  /** Names the number, per invariant 7. Never empty, filled or not. */
+  label: string;
+  value: string;
+  /** What stands in the slot before it is produced, or null for a plain dash. */
+  pending: string | null;
+  /** The step that produces it, or null when the date or a table supplies it. */
+  from: GuidedStepId | null;
+}
+
+export interface GuidedOperator {
+  kind: 'op';
+  text: string;
+}
+
+export type GuidedPart = GuidedTerm | GuidedOperator;
+
+/** `result = parts`. The result sits on the left, as the three lines read. */
+export interface GuidedEquation {
+  result: GuidedTerm;
+  parts: readonly GuidedPart[];
+}
+
+function isTerm(part: GuidedPart): part is GuidedTerm {
+  return part.kind === 'term';
+}
+
+/** Every slot an equation names, the result first. */
+export function equationTerms(equation: GuidedEquation): GuidedTerm[] {
+  return [equation.result, ...equation.parts.filter(isTerm)];
 }
 
 export interface GuidedWalk {
@@ -155,316 +288,597 @@ export interface GuidedWalk {
   dateLabel: string;
   /** Exactly `GUIDED_STEP_COUNT`, in `GUIDED_STEP_IDS` order. */
   steps: readonly GuidedStep[];
+  /** Year code, days on, weekday. All three visible from the first screen. */
+  equations: readonly GuidedEquation[];
+}
+
+/**
+ * Which slots stand filled once `stepsDone` steps have been answered.
+ *
+ * A slot the date supplies is filled from the start. Everything else appears
+ * exactly when the step that produces it is behind the user, which is the whole
+ * contract of the strip: never filled early, never empty late.
+ */
+export function filledSlots(walk: GuidedWalk, stepsDone: number): Set<GuidedSlotId> {
+  const done = new Set(walk.steps.slice(0, Math.max(0, stepsDone)).map((step) => step.id));
+  const filled = new Set<GuidedSlotId>();
+  for (const equation of walk.equations) {
+    for (const term of equationTerms(equation)) {
+      if (term.from === null || done.has(term.from)) filled.add(term.slot);
+    }
+  }
+  return filled;
 }
 
 /* ------------------------------------------------------------------ */
 /* Copy helpers                                                        */
 /* ------------------------------------------------------------------ */
 
-/** "7 × 3 = 21. 23 − 21 = 2." Or, under seven, that nothing comes off. */
-function sevensLine(sum: number): string {
-  const { multiple, remainder } = sevenStep(sum);
-  if (multiple === 0) return `${sum} is under 7 already, so nothing comes off and the answer is ${sum}.`;
-  return `7 × ${multiple / 7} = ${multiple}. ${sum} − ${multiple} = ${remainder}.`;
-}
-
 /**
- * A signed number with a real minus sign in front of it. The arithmetic above
- * uses U+2212 throughout, and a hyphen next to it reads as a shorter dash on
- * the same line.
- */
-function signed(n: number): string {
-  return n < 0 ? `−${Math.abs(n)}` : String(n);
-}
-
-/** "once", "twice", "3 times". A month is 31 days, so this never runs past 4. */
-function times(n: number): string {
-  if (n === 1) return 'once';
-  if (n === 2) return 'twice';
-  return `${n} times`;
-}
-
-/** "3 + 0 = 3. 3 is under 7 already, ..." */
-function addAndReduce(a: number, b: number): string {
-  return `${a} + ${b} = ${a + b}. ${sevensLine(a + b)}`;
-}
-
-/**
- * A week is seven days, so this reason is the same one four times over. It is
- * repeated rather than cross-referenced because a user on step 8 should not
+ * A week is seven days, so this line is the same one three times over. It is
+ * repeated rather than cross-referenced because a user on step 11 should not
  * have to remember what step 4 said.
  */
-const SEVENS_WHY =
-  'A week is 7 days long, so taking a whole 7 away lands on the same weekday. Only what is left over counts.';
+const SEVENS_WHY = 'A week is 7 days, so whole sevens change nothing.';
+
+const NAMING_WHY = 'The numbers count from Sunday, so 0 is Sunday and 6 is Saturday.';
+
+/** "12 − 7 = 5.", or that nothing comes off. */
+function sevensLine(sum: number): string {
+  const { multiple, remainder } = sevenStep(sum);
+  if (multiple === 0) return `${sum} is under 7, so ${sum}.`;
+  return `${sum} − ${multiple} = ${remainder}.`;
+}
+
+/** "3 ÷ 4 = 0 remainder 3, so 0." */
+function quarterLine(n: number): string {
+  const whole = Math.floor(n / 4);
+  const over = n % 4;
+  return over === 0 ? `${n} ÷ 4 = ${whole}.` : `${n} ÷ 4 = ${whole} remainder ${over}, so ${whole}.`;
+}
+
+/** "7, 14, 21, 28". Commas only, so the numbers parse straight back out. */
+function numberList(values: readonly number[]): string {
+  return values.join(', ');
+}
+
+/* ------------------------------------------------------------------ */
+/* The maths behind one walk                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The first doomsday date in a month: the month's doomsday brought down by
+ * whole weeks until it will not go again. March's doomsday is the 14th, so the
+ * 7th is the first.
+ */
+function firstDoomsdayDate(anchorDay: number): number {
+  return ((anchorDay - 1) % 7) + 1;
+}
+
+/** Every date in the month that falls on the year's doomsday, ascending. */
+function doomsdayDates(fullYear: number, month: number, anchorDay: number): number[] {
+  const length = daysInMonth(fullYear, month);
+  const dates: number[] = [];
+  for (let day = firstDoomsdayDate(anchorDay); day <= length; day += 7) dates.push(day);
+  return dates;
+}
+
+interface WalkNumbers {
+  yy: YearKey;
+  cycles: number;
+  /** 0, 28, 56 or 84. What comes off the year. */
+  taken: number;
+  reduced: YearKey;
+  leaps: number;
+  /** reduced + leaps, before the sevens come off. Never past 33. */
+  sum: number;
+  code: Code;
+  anchor: Code;
+  /** anchor + code, before the sevens come off. Never past 12. */
+  anchorSum: number;
+  doomsday: Code;
+  leapYear: boolean;
+  anchorDay: number;
+  dates: number[];
+  /**
+   * True when the day sits below every doomsday date in the month, so a week is
+   * added to it first. A week either way is the same weekday, and adding one
+   * keeps the subtraction non-negative without introducing direction.
+   */
+  shifted: boolean;
+  /** The day the count is actually done from: the day, or a week on from it. */
+  target: number;
+  nearest: number;
+  daysOn: number;
+  /** doomsday + daysOn, before the sevens come off. Never past 12. */
+  weekdaySum: number;
+  weekday: Code;
+}
+
+function walkNumbers(date: CalendarDate): WalkNumbers {
+  const { fullYear, month, day } = date;
+  const yy = yearKeyOf(fullYear);
+  const cycles = cyclesRemoved(yy);
+  const reduced = reduce28(yy);
+  const leaps = leapDays(reduced);
+  const sum = reduced + leaps;
+  const code = sevenStep(sum).remainder as Code;
+  const anchor = centuryAnchor(fullYear);
+  const anchorSum = anchor + code;
+  const doomsday = sevenStep(anchorSum).remainder as Code;
+  const leapYear = isLeapYear(fullYear);
+  const anchorDay = monthDoomsday(month, leapYear);
+  const dates = doomsdayDates(fullYear, month, anchorDay);
+  const shifted = day < dates[0];
+  const target = shifted ? day + 7 : day;
+  const nearest = Math.max(...dates.filter((candidate) => candidate <= target));
+  const daysOn = target - nearest;
+  const weekdaySum = doomsday + daysOn;
+
+  return {
+    yy,
+    cycles,
+    taken: cycles * CYCLE,
+    reduced,
+    leaps,
+    sum,
+    code,
+    anchor,
+    anchorSum,
+    doomsday,
+    leapYear,
+    anchorDay,
+    dates,
+    shifted,
+    target,
+    nearest,
+    daysOn,
+    weekdaySum,
+    weekday: sevenStep(weekdaySum).remainder as Code,
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /* The steps                                                           */
 /* ------------------------------------------------------------------ */
 
-function anchorStep(fullYear: number): GuidedStep {
-  const century = centuryOf(fullYear);
-  const anchor = centuryAnchor(fullYear);
-  return {
-    id: 'anchor',
-    position: 1,
-    title: 'Century anchor',
-    noop: false,
-    question: `Which anchor does ${fullYear} use?`,
-    givens: [{ label: 'Your year', value: String(fullYear), from: null }],
-    table: 'century',
-    input: 'code',
-    max: 6,
-    answer: anchor,
-    answerLabel: 'Century anchor',
-    working: `${fullYear} is in the ${centuryLabel(century)}. That century's anchor is ${anchor}.`,
-    why: 'Each century counts from its own weekday. The four repeat every 400 years, so there are only ever these four.',
-    result: `The anchor for the ${centuryLabel(century)} is ${anchor}.`,
-    note: null,
-  };
+/** Builds a step around its ask, so the answer can only ever be the sum's own. */
+function asked(
+  step: Omit<GuidedStep, 'answer' | 'noop'> & { ask: GuidedAsk },
+): GuidedStep {
+  return { ...step, noop: false, answer: askAnswer(step.ask) };
 }
 
-function reduceStep(yy: YearKey): GuidedStep {
-  const cycles = cyclesRemoved(yy);
-  const reduced = reduce28(yy);
-  const noop = cycles === 0;
-  return {
-    id: 'reduce',
-    position: 2,
-    title: 'Take off the 28s',
-    noop,
-    question: noop
-      ? `${formatYear(yy)} is under 28 already, so there are no whole 28s to take off. The year to work with is ${reduced}.`
-      : `Take whole 28s out of ${formatYear(yy)}. What is left?`,
-    givens: [{ label: 'Year, last two digits', value: formatYear(yy), from: null }],
-    table: null,
-    input: 'count',
-    max: 27,
-    answer: reduced,
-    answerLabel: 'Year to work with',
-    working: noop
-      ? `${formatYear(yy)} is under 28 on its own, so ${reduced}.`
-      : `${yy} − ${cycles} × 28 = ${reduced}.`,
-    why: 'The codes repeat every 28 years. Twenty-eight years hold exactly 7 leap days, and 28 + 7 = 35, which is five whole weeks. So the smaller year has the same code as the bigger one.',
-    result: null,
-    note: null,
-  };
-}
-
-function leapStep(reduced: YearKey): GuidedStep {
-  const leaps = leapDays(reduced);
-  const over = reduced % 4;
-  return {
-    id: 'leap',
-    position: 3,
-    title: 'Leap days',
-    noop: false,
-    question: `How many leap days have gone by in ${reduced} years? Divide by 4 and drop the remainder.`,
-    givens: [{ label: 'Year to work with', value: String(reduced), from: 'reduce' }],
-    table: null,
-    input: 'code',
-    max: 6,
-    answer: leaps,
-    answerLabel: 'Leap days',
-    working:
-      over === 0
-        ? `${reduced} ÷ 4 = ${leaps} exactly, so ${leaps}.`
-        : `${reduced} ÷ 4 = ${leaps} remainder ${over}, so ${leaps}.`,
-    why: 'Every fourth year carries an extra day, and that day pushes the weekday one further on. Part of a fourth year does not, so the remainder is dropped.',
-    result: null,
-    note: null,
-  };
-}
-
-function yearCodeStep(yy: YearKey, reduced: YearKey): GuidedStep {
-  const leaps = leapDays(reduced);
-  const sum = rawSum(reduced);
-  const code = sevenStep(sum).remainder;
-  return {
-    id: 'yearCode',
-    position: 4,
-    title: 'The year code',
-    noop: false,
-    question: `Add them, then take the sevens off: ${reduced} + ${leaps}.`,
-    givens: [
-      { label: 'Year to work with', value: String(reduced), from: 'reduce' },
-      { label: 'Leap days', value: String(leaps), from: 'leap' },
-    ],
-    table: null,
-    input: 'code',
-    max: 6,
-    answer: code,
-    answerLabel: 'Year code',
-    working: addAndReduce(reduced, leaps),
-    why: `Each year moves the weekday on by one, and each leap day moves it on once more. ${SEVENS_WHY}`,
-    result: `The year code for ${formatYear(yy)} is ${code}.`,
-    note: null,
-  };
-}
-
-function yearDoomsdayStep(fullYear: number): GuidedStep {
-  const century = centuryOf(fullYear);
-  const anchor = centuryAnchor(fullYear);
-  const yy = yearKeyOf(fullYear);
-  const code = sevenStep(rawSum(reduce28(yy))).remainder;
-  const doomsday = sevenStep(anchor + code).remainder;
-  return {
-    id: 'yearDoomsday',
-    position: 5,
-    title: "The year's doomsday",
-    noop: false,
-    question: `Add them, then take the sevens off: ${anchor} + ${code}.`,
-    givens: [
-      { label: `Century anchor, ${centuryLabel(century)}`, value: String(anchor), from: 'anchor' },
-      { label: `Year code, ${formatYear(yy)}`, value: String(code), from: 'yearCode' },
-    ],
-    table: null,
-    input: 'code',
-    max: 6,
-    answer: doomsday,
-    answerLabel: `Doomsday in ${fullYear}`,
-    working: addAndReduce(anchor, code),
-    why: `The anchor says where the century starts and the year code says how far into it you are. ${SEVENS_WHY}`,
-    result: `Every doomsday in ${fullYear} falls on ${doomsday}.`,
-    note: null,
-  };
-}
-
-/**
- * February in a leap year answers the 29th, and the twelve-button month pad has
- * no 29 on it: its buttons are the twelve values the shipped table takes, and
- * the leap doomsdays are the two that move off that table. Rather than growing
- * a thirteenth button — which would change the shape of a pad that exists
- * everywhere else at twelve — that one case is typed, which is what the typed
- * field is for.
- */
-function monthDoomsdayStep(fullYear: number, month: number, leapYear: boolean): GuidedStep {
-  const doomsday = monthDoomsday(month, leapYear);
-  const moves = leapYear && month <= 2;
-  return {
-    id: 'monthDoomsday',
-    position: 6,
-    title: 'The month doomsday',
-    noop: false,
-    question: `Which date in ${monthName(month)} falls on that doomsday?`,
-    givens: [{ label: 'Your month', value: monthName(month), from: null }],
-    table: 'month',
-    input: moves && month === 2 ? 'count' : 'monthDate',
-    max: 29,
-    answer: doomsday,
-    answerLabel: `${monthName(month)} doomsday`,
-    working: `In ${anchorMonthLabel({ month, leapYear, anchorDay: doomsday, anchorWeekday: 0, targetDay: doomsday })}, the doomsday is the ${ordinal(doomsday)}.`,
-    why: 'Every month has one date that lands on the year doomsday. The twelve are on the table, and the table is the same every year.',
-    result: null,
-    note: moves
-      ? `${fullYear} is a leap year. The extra day sits behind January and February, so the dates the table gives for those two months do not hold this year.`
-      : null,
-  };
-}
-
-function dayStepStep(month: number, leapYear: boolean, day: number): GuidedStep {
-  const anchorDay = monthDoomsday(month, leapYear);
-  const offset = day - anchorDay;
-  const size = anchorDay === day ? 0 : stepSize(anchorDay, day);
-  const givens: GuidedGiven[] = [
-    { label: `${monthName(month)} doomsday`, value: String(anchorDay), from: 'monthDoomsday' },
-    { label: 'Day you want', value: String(day), from: null },
-  ];
-
-  if (offset === 0) {
+function reduceStep(n: WalkNumbers): GuidedStep {
+  const year = formatYear(n.yy);
+  if (n.cycles === 0) {
     return {
-      id: 'dayStep',
-      position: 7,
-      title: 'Days from the doomsday',
+      id: 'reduce',
+      position: 1,
+      title: 'Take the 28s off',
       noop: true,
-      question: `The ${ordinal(day)} is ${monthName(month)}'s doomsday itself, so there is nothing to count. The step is 0.`,
-      givens,
+      question: `${year} is under 28, so no 28s come off. The year to work with is ${n.reduced}.`,
+      ask: null,
+      givens: [{ label: 'Year, last two digits', value: year, from: null }],
       table: null,
-      input: 'code',
-      max: 6,
-      answer: 0,
-      answerLabel: 'Days from the doomsday',
-      working: `${day} − ${anchorDay} = 0.`,
-      why: 'Seven days on, or seven days back, is the same weekday. So only what is left after the sevens matters.',
+      input: 'count',
+      max: CYCLE - 1,
+      choices: [],
+      answer: n.reduced,
+      answerLabel: 'Year, 28s off',
+      working: `${year} is under 28, so ${n.reduced}.`,
+      why: 'The codes repeat every 28 years.',
       result: null,
       note: null,
+      fills: 'reduced',
+      solving: 'reduced',
     };
   }
 
-  const sevens = offset > 0 ? Math.floor(offset / 7) : Math.ceil(-offset / 7);
-  const working =
-    offset > 0
-      ? sevens === 0
-        ? `${day} − ${anchorDay} = ${offset}. That is already between 0 and 6, so the step is ${size}.`
-        : `${day} − ${anchorDay} = ${offset}. Take 7 away ${times(sevens)}: ${offset} − ${sevens * 7} = ${size}.`
-      : `${day} − ${anchorDay} = ${signed(offset)}. Add 7 ${times(sevens)}: ${signed(offset)} + ${sevens * 7} = ${size}.`;
+  return asked({
+    id: 'reduce',
+    position: 1,
+    title: 'Take the 28s off',
+    question: `${n.yy} − ${n.taken} = ?`,
+    ask: { kind: 'subtract', left: n.yy, right: n.taken },
+    givens: [
+      { label: 'Year, last two digits', value: year, from: null },
+      { label: '28s to take off', value: String(n.taken), from: null },
+    ],
+    table: null,
+    input: 'count',
+    max: CYCLE - 1,
+    choices: [],
+    answerLabel: 'Year, 28s off',
+    working: `${n.yy} − ${n.taken} = ${n.reduced}.`,
+    why: `The codes repeat every 28 years. 28 × ${n.cycles} = ${n.taken}.`,
+    result: null,
+    note: null,
+    fills: 'reduced',
+    solving: 'reduced',
+  });
+}
 
-  return {
-    id: 'dayStep',
-    position: 7,
-    title: 'Days from the doomsday',
-    noop: false,
-    question: `Work out ${day} − ${anchorDay}, then add or take away sevens until you have a number from 0 to 6.`,
-    givens,
+function leapStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'leap',
+    position: 2,
+    title: 'Leap days',
+    question: `${n.reduced} ÷ 4 = ?`,
+    ask: { kind: 'quarter', left: n.reduced },
+    givens: [{ label: 'Year, 28s off', value: String(n.reduced), from: 'reduce' }],
     table: null,
     input: 'code',
     max: 6,
-    answer: size,
-    answerLabel: 'Days from the doomsday',
-    working,
-    why: 'Seven days on, or seven days back, is the same weekday. So only what is left after the sevens matters.',
+    choices: [],
+    answerLabel: 'Leap days',
+    working: quarterLine(n.reduced),
+    why: 'A leap day lands every fourth year. Divide by four and drop the remainder.',
     result: null,
     note: null,
-  };
+    fills: 'leapDays',
+    solving: 'leapDays',
+  });
 }
 
-function finalStep(fullYear: number, month: number, leapYear: boolean, day: number): GuidedStep {
-  const anchor = centuryAnchor(fullYear);
-  const code = sevenStep(rawSum(reduce28(yearKeyOf(fullYear)))).remainder;
-  const doomsday = sevenStep(anchor + code).remainder;
-  const anchorDay = monthDoomsday(month, leapYear);
-  const size = anchorDay === day ? 0 : stepSize(anchorDay, day);
-  const weekday = sevenStep(doomsday + size).remainder;
-  return {
-    id: 'final',
-    position: 8,
-    title: 'The weekday number',
-    noop: false,
-    question: `Add them, then take the sevens off: ${doomsday} + ${size}.`,
+function sumStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'sum',
+    position: 3,
+    title: 'Add them',
+    question: `${n.reduced} + ${n.leaps} = ?`,
+    ask: { kind: 'add', left: n.reduced, right: n.leaps },
     givens: [
-      { label: `Doomsday in ${fullYear}`, value: String(doomsday), from: 'yearDoomsday' },
-      { label: 'Days from the doomsday', value: String(size), from: 'dayStep' },
+      { label: 'Year, 28s off', value: String(n.reduced), from: 'reduce' },
+      { label: 'Leap days', value: String(n.leaps), from: 'leap' },
+    ],
+    table: null,
+    input: 'count',
+    max: CYCLE - 1 + 6,
+    choices: [],
+    answerLabel: 'Year plus leap days',
+    working: `${n.reduced} + ${n.leaps} = ${n.sum}.`,
+    why: 'Each year moves the weekday on by one, and each leap day by one more.',
+    result: null,
+    note: null,
+    fills: null,
+    solving: 'yearCode',
+  });
+}
+
+function yearCodeStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'yearCode',
+    position: 4,
+    title: 'Take the sevens off',
+    question: `${n.sum} mod 7 = ?`,
+    ask: { kind: 'sevens', left: n.sum },
+    givens: [{ label: 'Year plus leap days', value: String(n.sum), from: 'sum' }],
+    table: null,
+    input: 'code',
+    max: 6,
+    choices: [],
+    answerLabel: 'Year code',
+    working: sevensLine(n.sum),
+    why: SEVENS_WHY,
+    result: `That is the year code for ${formatYear(n.yy)}.`,
+    note: null,
+    fills: 'yearCode',
+    solving: 'yearCode',
+  });
+}
+
+function anchorSumStep(fullYear: number, n: WalkNumbers): GuidedStep {
+  const century = centuryLabel(centuryOf(fullYear));
+  return asked({
+    id: 'anchorSum',
+    position: 5,
+    title: 'Add the anchor',
+    question: `${n.anchor} + ${n.code} = ?`,
+    ask: { kind: 'add', left: n.anchor, right: n.code },
+    givens: [
+      { label: `Century anchor, ${century}`, value: String(n.anchor), from: null },
+      { label: `Year code, ${formatYear(n.yy)}`, value: String(n.code), from: 'yearCode' },
+    ],
+    table: 'century',
+    input: 'count',
+    max: 12,
+    choices: [],
+    answerLabel: 'Anchor plus year code',
+    working: `${n.anchor} + ${n.code} = ${n.anchorSum}.`,
+    why: `The ${century} anchor is ${n.anchor}.`,
+    result: null,
+    note: null,
+    fills: null,
+    solving: 'weekday',
+  });
+}
+
+function yearDoomsdayStep(fullYear: number, n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'yearDoomsday',
+    position: 6,
+    title: 'Take the sevens off',
+    question: `${n.anchorSum} mod 7 = ?`,
+    ask: { kind: 'sevens', left: n.anchorSum },
+    givens: [{ label: 'Anchor plus year code', value: String(n.anchorSum), from: 'anchorSum' }],
+    table: null,
+    input: 'code',
+    max: 6,
+    choices: [],
+    answerLabel: `Doomsday in ${fullYear}`,
+    working: sevensLine(n.anchorSum),
+    why: SEVENS_WHY,
+    result: `Every doomsday in ${fullYear} falls on ${n.doomsday}.`,
+    note: null,
+    fills: null,
+    solving: 'weekday',
+  });
+}
+
+function doomsdayNameStep(fullYear: number, n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'doomsdayName',
+    position: 7,
+    title: 'Name it',
+    question: `Which weekday is ${n.doomsday}?`,
+    ask: { kind: 'name', code: n.doomsday },
+    givens: [{ label: `Doomsday in ${fullYear}`, value: String(n.doomsday), from: 'yearDoomsday' }],
+    table: null,
+    input: 'weekday',
+    max: 6,
+    choices: [],
+    answerLabel: `Doomsday in ${fullYear}`,
+    working: `${n.doomsday} is ${trueWeekdayName(n.doomsday)}.`,
+    why: NAMING_WHY,
+    result: `Every doomsday in ${fullYear} is a ${trueWeekdayName(n.doomsday)}.`,
+    note: null,
+    fills: null,
+    solving: 'weekday',
+  });
+}
+
+/**
+ * The one question in the walk that is not arithmetic, and it is a comparison
+ * of numbers on the screen rather than a concept.
+ *
+ * A day below every doomsday date in the month — 3 March, where the doomsdays
+ * are the 7th, 14th, 21st and 28th — gets a week added to it first, stated as a
+ * line rather than asked. The alternative is counting backwards, and direction
+ * is exactly the kind of idea this screen exists not to require.
+ */
+function nearestStep(month: number, day: number, n: WalkNumbers): GuidedStep {
+  const name = monthName(month);
+  const givens: GuidedGiven[] = [
+    { label: `${name} doomsday`, value: String(n.anchorDay), from: null },
+    { label: `Doomsdays in ${name}`, value: numberList(n.dates), from: null },
+    { label: 'Your date', value: String(day), from: null },
+  ];
+  if (n.shifted) {
+    givens.push({ label: 'Date, a week on', value: String(n.target), from: null });
+  }
+
+  return asked({
+    id: 'nearest',
+    position: 8,
+    title: 'The nearest doomsday',
+    question: `Which of those is closest to the ${ordinal(n.target)} without going past it?`,
+    ask: { kind: 'nearest', options: n.dates, ceiling: n.target },
+    givens,
+    table: 'month',
+    input: 'choice',
+    max: n.dates[n.dates.length - 1],
+    choices: n.dates,
+    answerLabel: 'Nearest doomsday',
+    working: `The ${ordinal(n.nearest)} is the closest doomsday at or before the ${ordinal(n.target)}.`,
+    why: `${name}'s doomsday is the ${ordinal(n.anchorDay)}, and every 7 days from it is another one.`,
+    result: null,
+    note: n.shifted
+      ? `The ${ordinal(day)} has no doomsday at or before it. A week either way is the same weekday, so use the ${ordinal(n.target)}.`
+      : null,
+    fills: 'nearest',
+    solving: 'nearest',
+  });
+}
+
+function daysOnStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'daysOn',
+    position: 9,
+    title: 'Count on',
+    question: `${n.target} − ${n.nearest} = ?`,
+    ask: { kind: 'subtract', left: n.target, right: n.nearest },
+    givens: [
+      {
+        label: n.shifted ? 'Date, a week on' : 'Your date',
+        value: String(n.target),
+        from: null,
+      },
+      { label: 'Nearest doomsday', value: String(n.nearest), from: 'nearest' },
     ],
     table: null,
     input: 'code',
     max: 6,
-    answer: weekday,
-    answerLabel: 'Weekday number',
-    working: addAndReduce(doomsday, size),
-    why: `The doomsday number says where the year sits, and the step moves you off it to your day. ${SEVENS_WHY}`,
+    choices: [],
+    answerLabel: 'Days on',
+    working: `${n.target} − ${n.nearest} = ${n.daysOn}.`,
+    why: 'Count on from that doomsday to your date.',
     result: null,
     note: null,
-  };
+    fills: 'daysOn',
+    solving: 'daysOn',
+  });
 }
 
-function weekdayStep(fullYear: number, month: number, day: number): GuidedStep {
-  const weekday = weekdayFor(fullYear, month, day);
-  return {
-    id: 'weekday',
-    position: 9,
-    title: 'The day',
-    noop: false,
-    question: `Which day is ${weekday}?`,
-    givens: [{ label: 'Weekday number', value: String(weekday), from: 'final' }],
+function weekdaySumStep(fullYear: number, n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'weekdaySum',
+    position: 10,
+    title: 'Add them',
+    question: `${n.doomsday} + ${n.daysOn} = ?`,
+    ask: { kind: 'add', left: n.doomsday, right: n.daysOn },
+    givens: [
+      { label: `Doomsday in ${fullYear}`, value: String(n.doomsday), from: 'yearDoomsday' },
+      { label: 'Days on', value: String(n.daysOn), from: 'daysOn' },
+    ],
+    table: null,
+    input: 'count',
+    max: 12,
+    choices: [],
+    answerLabel: 'Doomsday plus days on',
+    working: `${n.doomsday} + ${n.daysOn} = ${n.weekdaySum}.`,
+    why: 'The doomsday says where the year sits. The days move you off it.',
+    result: null,
+    note: null,
+    fills: null,
+    solving: 'weekday',
+  });
+}
+
+function weekdayCodeStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'weekdayCode',
+    position: 11,
+    title: 'Take the sevens off',
+    question: `${n.weekdaySum} mod 7 = ?`,
+    ask: { kind: 'sevens', left: n.weekdaySum },
+    givens: [{ label: 'Doomsday plus days on', value: String(n.weekdaySum), from: 'weekdaySum' }],
+    table: null,
+    input: 'code',
+    max: 6,
+    choices: [],
+    answerLabel: 'Weekday number',
+    working: sevensLine(n.weekdaySum),
+    why: SEVENS_WHY,
+    result: null,
+    note: null,
+    fills: 'weekday',
+    solving: 'weekday',
+  });
+}
+
+function weekdayNameStep(n: WalkNumbers): GuidedStep {
+  return asked({
+    id: 'weekdayName',
+    position: 12,
+    title: 'Name it',
+    question: `Which weekday is ${n.weekday}?`,
+    ask: { kind: 'name', code: n.weekday },
+    givens: [{ label: 'Weekday number', value: String(n.weekday), from: 'weekdayCode' }],
     table: null,
     input: 'weekday',
     max: 6,
-    answer: weekday,
+    choices: [],
     answerLabel: 'The day',
-    working: `${weekday} is ${trueWeekdayName(weekday)}.`,
-    why: 'Every number in these steps counts from Sunday, so 0 is Sunday and 6 is Saturday. The buttons can start the week on Sunday or on Monday. That moves the buttons and nothing else.',
+    working: `${n.weekday} is ${trueWeekdayName(n.weekday)}.`,
+    why: NAMING_WHY,
     result: null,
     note: null,
+    fills: null,
+    solving: 'weekday',
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* The equations                                                       */
+/* ------------------------------------------------------------------ */
+
+function equationsFor(fullYear: number, n: WalkNumbers): GuidedEquation[] {
+  const yearCode: GuidedTerm = {
+    kind: 'term',
+    slot: 'yearCode',
+    label: `Year code, ${formatYear(n.yy)}`,
+    value: String(n.code),
+    pending: null,
+    from: 'yearCode',
   };
+  const daysOn: GuidedTerm = {
+    kind: 'term',
+    slot: 'daysOn',
+    label: 'Days on',
+    value: String(n.daysOn),
+    pending: null,
+    from: 'daysOn',
+  };
+
+  return [
+    {
+      result: yearCode,
+      parts: [
+        { kind: 'op', text: '(' },
+        {
+          kind: 'term',
+          slot: 'reduced',
+          label: 'Year, 28s off',
+          value: String(n.reduced),
+          // The sum that will fill it, since both its numbers are already
+          // known. Every other slot has nothing truthful to show until its step.
+          pending: n.cycles === 0 ? null : `${n.yy} − ${n.taken}`,
+          from: 'reduce',
+        },
+        { kind: 'op', text: '+' },
+        {
+          kind: 'term',
+          slot: 'leapDays',
+          label: 'Leap days',
+          value: String(n.leaps),
+          pending: null,
+          from: 'leap',
+        },
+        { kind: 'op', text: ')' },
+        { kind: 'op', text: 'mod 7' },
+      ],
+    },
+    {
+      result: daysOn,
+      parts: [
+        {
+          kind: 'term',
+          slot: 'day',
+          label: n.shifted ? 'Date, a week on' : 'Your date',
+          value: String(n.target),
+          pending: null,
+          from: null,
+        },
+        { kind: 'op', text: '−' },
+        {
+          kind: 'term',
+          slot: 'nearest',
+          label: 'Nearest doomsday',
+          value: String(n.nearest),
+          pending: null,
+          from: 'nearest',
+        },
+      ],
+    },
+    {
+      result: {
+        kind: 'term',
+        slot: 'weekday',
+        label: 'Weekday number',
+        value: String(n.weekday),
+        pending: null,
+        from: 'weekdayCode',
+      },
+      parts: [
+        { kind: 'op', text: '(' },
+        {
+          kind: 'term',
+          slot: 'anchor',
+          label: `Century anchor, ${centuryLabel(centuryOf(fullYear))}`,
+          value: String(n.anchor),
+          pending: null,
+          from: null,
+        },
+        { kind: 'op', text: '+' },
+        yearCode,
+        { kind: 'op', text: '+' },
+        daysOn,
+        { kind: 'op', text: ')' },
+        { kind: 'op', text: 'mod 7' },
+      ],
+    },
+  ];
 }
 
 /* ------------------------------------------------------------------ */
@@ -472,7 +886,7 @@ function weekdayStep(fullYear: number, month: number, day: number): GuidedStep {
 /* ------------------------------------------------------------------ */
 
 /**
- * The whole method for one date, as nine labelled steps.
+ * The whole method for one date, as twelve labelled steps and three equations.
  *
  * Throws for a date outside 1800-2199 or for a day the month does not have,
  * which is `weekdayFor`'s range and the only range the calendar maths is tested
@@ -481,27 +895,29 @@ function weekdayStep(fullYear: number, month: number, day: number): GuidedStep {
 export function guidedWalk(date: CalendarDate): GuidedWalk {
   const { fullYear, month, day } = date;
   const weekday = weekdayFor(fullYear, month, day);
-  const leapYear = isLeapYear(fullYear);
-  const yy = yearKeyOf(fullYear);
-  const reduced = reduce28(yy);
+  const n = walkNumbers(date);
 
   return {
     date,
-    leapYear,
+    leapYear: n.leapYear,
     weekday,
     weekdayName: trueWeekdayName(weekday),
     dateLabel: formatDate(fullYear, month, day),
     steps: [
-      anchorStep(fullYear),
-      reduceStep(yy),
-      leapStep(reduced),
-      yearCodeStep(yy, reduced),
-      yearDoomsdayStep(fullYear),
-      monthDoomsdayStep(fullYear, month, leapYear),
-      dayStepStep(month, leapYear, day),
-      finalStep(fullYear, month, leapYear, day),
-      weekdayStep(fullYear, month, day),
+      reduceStep(n),
+      leapStep(n),
+      sumStep(n),
+      yearCodeStep(n),
+      anchorSumStep(fullYear, n),
+      yearDoomsdayStep(fullYear, n),
+      doomsdayNameStep(fullYear, n),
+      nearestStep(month, day, n),
+      daysOnStep(n),
+      weekdaySumStep(fullYear, n),
+      weekdayCodeStep(n),
+      weekdayNameStep(n),
     ],
+    equations: equationsFor(fullYear, n),
   };
 }
 
@@ -520,7 +936,7 @@ export function guidedClosingLine(walk: GuidedWalk, now: number): string {
   return `${walk.dateLabel} ${verb} a ${walk.weekdayName}.`;
 }
 
-/** The four century anchors, in order, for the table on step 1. */
+/** The four century anchors, in order, for the table on step 5. */
 export function centuryAnchorRows(): { century: number; label: string; anchor: Code }[] {
   return Object.keys(CENTURY_ANCHORS)
     .map(Number)

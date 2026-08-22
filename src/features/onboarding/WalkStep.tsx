@@ -26,9 +26,9 @@ interface WalkStepProps {
  * It is the only step with no way past it, which is the point. The four before
  * it are read; this one is done, and the app opens on the other side of a
  * weekday the user produced themselves. It is safe to make it compulsory
- * because a wrong answer prints the working, and the working contains the
- * number that was wanted, so somebody who knows nothing can still finish by
- * answering with what is on screen.
+ * because nothing on it requires having understood anything: every question is
+ * a sum on numbers already on screen, and a wrong answer prints the working
+ * rather than moving on, so somebody who knows nothing can still finish.
  *
  * Nothing here is timed and nothing here is written.
  */
@@ -37,8 +37,9 @@ export function WalkStep({ date, onDate, convention, keyboard, footer }: WalkSte
     <>
       <PageTitle>One whole date</PageTitle>
       <Typography variant="body1" color="text.secondary">
-        Pick a date and work out which day of the week it falls on, one question at a time. The
-        tables you need are on screen, and a wrong answer shows the working rather than moving on.
+        Pick a date and work out which day of the week it falls on. The app looks everything up.
+        Every question is a sum on numbers already on screen, and a wrong answer shows the working
+        rather than moving on.
       </Typography>
 
       <DatePick date={date} onDate={onDate} />

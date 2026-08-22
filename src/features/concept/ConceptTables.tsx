@@ -7,13 +7,14 @@ import { ALL_MONTHS, MONTH_DOOMSDAYS, monthName } from '@/domain/weekday';
 import { space, stroke } from '@/theme/tokens';
 
 /**
- * The two shipped tables, on screen for the one step that needs each.
+ * The two shipped tables, on screen for the step that uses each.
  *
- * They are handed over rather than asked for, and that is the whole difference
- * between this screen and the trainers: the anchors and the month doomsdays are
- * lookups, so reading one off a table is the real skill on a first pass. The
- * year code is not a lookup here — it is derived, four steps at a time — which
- * is why there is no year-code table in this file.
+ * Nothing on this screen asks the user to read one. The walk states the anchor
+ * and states the month's doomsday, and the table sits beside the statement so
+ * the number has somewhere it visibly came from. That is the whole difference
+ * between this screen and the trainers: here a lookup is supplied, and the only
+ * thing asked for is arithmetic. The year code has no table because it is not a
+ * lookup here — it is derived, four steps at a time.
  */
 
 function TableFrame({ heading, children }: { heading: string; children: ReactNode }) {

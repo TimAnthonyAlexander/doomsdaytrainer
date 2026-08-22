@@ -14,7 +14,8 @@ import { useAppState } from '@/state/useAppState';
  * It opens on a random date rather than on today, because today is the one date
  * whose weekday the user already knows. Nothing on this screen is timed and
  * nothing on it is written: it is a demonstration of how the answer is
- * produced, not practice at producing it.
+ * produced, not practice at producing it. Nothing on it needs to be understood
+ * first either — every question is a sum on numbers already printed above it.
  */
 export function ConceptScreen() {
   const { settings } = useAppState();
@@ -22,7 +23,7 @@ export function ConceptScreen() {
 
   return (
     <Screen gap={3}>
-      <PageTitle subtitle="Pick any date and work out which day of the week it falls on, one question at a time. The two tables you need are on screen. You do the arithmetic.">
+      <PageTitle subtitle="Pick any date and work out which day of the week it falls on. The app looks everything up. Every question is a sum on numbers already on screen.">
         Concept
       </PageTitle>
 

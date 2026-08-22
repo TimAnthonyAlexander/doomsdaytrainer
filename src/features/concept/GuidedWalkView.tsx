@@ -13,11 +13,12 @@ import {
 import type { CalendarDate, Code, IndexConvention } from '@/domain/types';
 import { trueWeekdayName } from '@/domain/weekday';
 import { LabelledValues } from '@/features/calc/LabelledValues';
-import { MonthPad } from '@/features/weekday/MonthPad';
 import { NumberInput } from '@/features/calc/NumberInput';
 import { weekdayOptions } from '@/features/weekday/weekdayPad';
 import { space } from '@/theme/tokens';
+import { ChoicePad } from './ChoicePad';
 import { CenturyAnchorTable, MonthDoomsdayTable } from './ConceptTables';
+import { EquationStrip } from './EquationStrip';
 import { toDateInput } from './conceptDate';
 
 const CODE_OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
@@ -52,7 +53,7 @@ export interface GuidedWalkViewProps {
 /**
  * The answer, once it is right, in the face it belongs in: mono for a number,
  * because every numeral in the app is mono and tabular, and the text face for
- * the one step whose answer is a word.
+ * the two steps whose answer is a word.
  */
 function SolvedValue({ step }: { step: GuidedStep }) {
   if (step.input === 'weekday') {
@@ -70,18 +71,20 @@ function SolvedValue({ step }: { step: GuidedStep }) {
 }
 
 /**
- * One date taken all the way to its weekday, nine steps, the user answering
+ * One date taken all the way to its weekday, twelve steps, the user answering
  * every one.
  *
- * Nothing here is timed and nothing here is written. It is a demonstration, so
- * there is no latency to grade, no attempt to record and no item to schedule —
- * `AnswerPad` measures a latency because that is what it does, and this screen
- * throws it away.
+ * It is a demonstration rather than practice, so no question on it can be got
+ * wrong through not having followed an explanation: every one is arithmetic on
+ * numbers already on the screen, or which weekday a number names. The app hands
+ * over every lookup. See `guidedDate.ts`, which is where that rule is enforced.
+ *
+ * Nothing here is timed and nothing here is written. `AnswerPad` measures a
+ * latency because that is what it does, and this screen throws it away.
  *
  * A wrong answer never advances. The working appears, which contains the value
  * that was wanted, and the way on is answering with it. That is also why there
- * is no skip: whatever the user does not know, the screen ends up showing them,
- * and they can finish by answering with what is in front of them.
+ * is no skip: whatever the user does not know, the screen ends up showing them.
  */
 export function GuidedWalkView({ date, convention, keyboard = true, footer }: GuidedWalkViewProps) {
   const walk = useMemo(() => guidedWalk(date), [date]);
@@ -91,8 +94,8 @@ export function GuidedWalkView({ date, convention, keyboard = true, footer }: Gu
   const [progress, setProgress] = useState<Progress>(START);
 
   // A new date is a new walk. Adjusting during render rather than in an effect
-  // keeps the first paint correct: an effect would show step 9 of the old date
-  // for one frame.
+  // keeps the first paint correct: an effect would show the last step of the old
+  // date for one frame.
   if (seen !== dateId) {
     setSeen(dateId);
     setProgress(START);
@@ -107,12 +110,13 @@ export function GuidedWalkView({ date, convention, keyboard = true, footer }: Gu
   if (progress.index >= GUIDED_STEP_COUNT) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[4]}px` }}>
+        <EquationStrip walk={walk} stepsDone={GUIDED_STEP_COUNT} active={null} />
         <Typography variant="h1" component="p">
           {guidedClosingLine(walk, Date.now())}
         </Typography>
         <Typography variant="body1" sx={{ color: 'var(--text-secondary)' }}>
-          The century anchor and the month doomsday came off a table. Every other number on the way
-          here you worked out.
+          The anchor and the doomsday dates came off a table. Every other number on the way here you
+          worked out.
         </Typography>
         {footer}
       </Box>
@@ -133,7 +137,8 @@ export function GuidedWalkView({ date, convention, keyboard = true, footer }: Gu
     }));
   };
 
-  const next = () => setProgress((current) => ({ index: current.index + 1, attempts: 0, chosen: null }));
+  const next = () =>
+    setProgress((current) => ({ index: current.index + 1, attempts: 0, chosen: null }));
   const last = progress.index === GUIDED_STEP_COUNT - 1;
 
   return (
@@ -159,43 +164,50 @@ export function GuidedWalkView({ date, convention, keyboard = true, footer }: Gu
         </Typography>
       </Box>
 
-      {step.table === 'century' ? <CenturyAnchorTable /> : null}
-      {step.table === 'month' ? <MonthDoomsdayTable /> : null}
+      <EquationStrip walk={walk} stepsDone={progress.index} active={step.solving} />
 
-      <LabelledValues lines={step.givens} />
+      <Box data-testid="concept-ask" sx={{ display: 'flex', flexDirection: 'column', gap: `${space[4]}px` }}>
+        {step.table === 'century' ? <CenturyAnchorTable /> : null}
+        {step.table === 'month' ? <MonthDoomsdayTable /> : null}
 
-      {step.note ? (
-        <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
-          {step.note}
-        </Typography>
-      ) : null}
+        <LabelledValues lines={step.givens} />
 
-      <Typography variant="body1">{step.question}</Typography>
-      <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
-        {step.why}
-      </Typography>
-
-      <Box aria-live="polite">
-        {solved ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[2]}px` }}>
-            <Box>
-              <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
-                {step.answerLabel}
-              </Typography>
-              <SolvedValue step={step} />
-            </Box>
-            <Typography variant="body1">{step.working}</Typography>
-            {step.result ? <Typography variant="body1">{step.result}</Typography> : null}
-          </Box>
-        ) : wrong ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[2]}px` }}>
-            <Typography variant="body2" sx={{ color: 'var(--grade-wrong)' }}>
-              <Numeral color="inherit">{progress.chosen}</Numeral>
-              {' is not it.'}
+        <Box>
+          <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+            {step.why}
+          </Typography>
+          {step.note ? (
+            <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+              {step.note}
             </Typography>
-            <Typography variant="body1">{step.working}</Typography>
-          </Box>
-        ) : null}
+          ) : null}
+          <Typography variant="body1" data-testid="concept-question">
+            {step.question}
+          </Typography>
+        </Box>
+
+        <Box aria-live="polite">
+          {solved ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[2]}px` }}>
+              <Box>
+                <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+                  {step.answerLabel}
+                </Typography>
+                <SolvedValue step={step} />
+              </Box>
+              <Typography variant="body1">{step.working}</Typography>
+              {step.result ? <Typography variant="body1">{step.result}</Typography> : null}
+            </Box>
+          ) : wrong ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[2]}px` }}>
+              <Typography variant="body2" sx={{ color: 'var(--grade-wrong)' }}>
+                <Numeral color="inherit">{progress.chosen}</Numeral>
+                {' is not it.'}
+              </Typography>
+              <Typography variant="body1">{step.working}</Typography>
+            </Box>
+          ) : null}
+        </Box>
       </Box>
 
       {step.noop || solved ? (
@@ -210,18 +222,23 @@ export function GuidedWalkView({ date, convention, keyboard = true, footer }: Gu
           onAnswer={answer}
           wrong={wrong}
         />
-      ) : step.input === 'monthDate' ? (
-        <MonthPad
+      ) : step.input === 'choice' ? (
+        <ChoicePad
+          options={step.choices}
           onAnswer={answer}
           promptKey={promptKey}
-          feedback={progress.chosen === null ? null : { chosen: progress.chosen, correct: step.answer }}
+          feedback={
+            progress.chosen === null ? null : { chosen: progress.chosen, correct: step.answer }
+          }
         />
       ) : (
         <AnswerPad
           options={step.input === 'weekday' ? weekdayPad : CODE_OPTIONS}
           onAnswer={answer}
           promptKey={promptKey}
-          feedback={progress.chosen === null ? null : { chosen: progress.chosen, correct: step.answer }}
+          feedback={
+            progress.chosen === null ? null : { chosen: progress.chosen, correct: step.answer }
+          }
           keyboard={keyboard}
         />
       )}
