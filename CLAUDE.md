@@ -115,10 +115,24 @@ change ships a dead link.
 
 ### The shell is a frame, not a page
 
-`AppShell` is exactly `100dvh` with `overflow: hidden`, and `main` is the only
-scroller in the app. The rail, the phone's title bar, the notice bar and the
-bottom bar are rows of that frame, so all four are subtracted from the scroll
-area by the layout and none of them can move.
+`AppShell` is exactly one window tall with `overflow: hidden`, and `main` is the
+only scroller in the app. The rail, the phone's title bar, the notice bar and
+the bottom bar are rows of that frame, so all four are subtracted from the
+scroll area by the layout and none of them can move.
+
+That height is `var(--app-height)`, not `100dvh`, and the difference is a bug
+that took an installed app to see. `dvh` is right in a browser tab, where the
+toolbar comes and goes. On an iOS home screen it is short by about fifty pixels
+— WebKit reports a `dvh` that still allows for a toolbar that is not there — so
+the frame ended above the bottom of the screen and the nav bar floated over a
+band of background, exactly as though Safari's address bar were still down
+there. Nothing showed it while the bar was `position: fixed`, because fixed
+pinned it to the window whatever `dvh` claimed; making the bar a row of the
+frame handed it the frame's wrong height. So `--app-height` is `100dvh`
+normally and `100%` under `display-mode: standalone`, where there is no browser
+chrome to be dynamic about and the percentage chain is the window. `html`,
+`body` and `#root` all carry a definite height for that percentage to resolve
+against.
 
 It used to be a page: `minHeight: 100dvh`, a `sticky` title bar, a `fixed`
 bottom bar paid for a second time as bottom padding on the content, and
@@ -705,6 +719,24 @@ service worker is served `no-store`, because a client that caches `sw.js` can pi
 itself to an old precache manifest and stop taking updates. `index.html` is
 `no-cache`, since it carries the asset hashes. Missing files under `/assets/`
 return 404 rather than falling back to `index.html`.
+
+**A new build applies itself, and the app never says so.** `sw.ts` calls
+`skipWaiting()` during install and claims its clients, so the worker that
+installed is the worker the next load gets. There is no update prompt, and
+there is nothing to accept: the bar that used to ask could not be cleared by a
+refresh, because the old worker was still controlling the page and still
+serving the old precache, so the same "a new version is ready" line came back
+after every reload the user did themselves. Its Reload button was the only
+thing that applied an update, which made a reload look like a decision.
+
+Nothing reloads a live page either. `registerType` stays `'prompt'` — not
+`'autoUpdate'`, whose generated registration reloads the window the moment a
+new worker activates — and `onNeedReload` is passed as an empty function, which
+is what stops a second tab reloading itself when this one installs an update.
+Old code runs until the user navigates or refreshes. That is safe here only
+because the bundle is not code-split: there is no chunk a live page could ask
+for after `cleanupOutdatedCaches` removed the cache holding it. Introduce
+`React.lazy` and this needs thinking about again.
 
 Note that `/fonts/` and `/audio/` filenames are not content-hashed, since Vite
 copies `public/` verbatim. Both are cached a year as immutable, which is correct

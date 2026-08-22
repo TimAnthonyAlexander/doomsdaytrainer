@@ -12,6 +12,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
+      // Not 'autoUpdate', which is the one that sounds right: it makes the
+      // generated registration reload the window the moment a new worker
+      // activates, which is a page pulled out from under whoever is mid-answer.
+      // 'prompt' only means the registration adds no reload of its own — the
+      // app has no update prompt at all. `src/sw.ts` skips waiting during
+      // install, so a new build is live for the next load either way.
       registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {

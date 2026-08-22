@@ -57,14 +57,14 @@ function useDueCount(): number {
  * bottom bar; from 900px up, a left rail instead of both. The only line drawn
  * anywhere is a 1px rule between the frame and the content.
  *
- * A frame, not a page: it is exactly one viewport tall and never scrolls, and
+ * A frame, not a page: it is exactly one window tall and never scrolls, and
  * `main` is the only thing inside it that moves. That is what makes the notice
  * bar cheap. When the shell was `minHeight: 100dvh` with the bar above it, a
- * "new version is ready" line added its own height to a full viewport, so the
- * document grew past the window, a scrollbar appeared on desktop and shifted
- * the centred column sideways, and every screen gained 52px of scroll it did
- * not have a second earlier. Now the bar takes its height out of the scroll
- * area and the rail, the title bar and the bottom bar do not move at all.
+ * "a reminder was due at 19:00" line added its own height to a full viewport,
+ * so the document grew past the window, a scrollbar appeared on desktop and
+ * shifted the centred column sideways, and every screen gained 52px of scroll
+ * it did not have a second earlier. Now the bar takes its height out of the
+ * scroll area and the rail, the title bar and the bottom bar do not move at all.
  */
 export function AppShell() {
   const { pathname } = useLocation();
@@ -88,7 +88,10 @@ export function AppShell() {
   return (
     <Box
       sx={{
-        height: '100dvh',
+        // The window, and never more. `--app-height` is `100dvh` in a browser
+        // tab and the percentage chain in an installed app, where iOS's `dvh`
+        // is short by a toolbar that is not there. See src/index.css.
+        height: 'var(--app-height)',
         overflow: 'hidden',
         display: 'flex',
         pl: 'var(--safe-left)',

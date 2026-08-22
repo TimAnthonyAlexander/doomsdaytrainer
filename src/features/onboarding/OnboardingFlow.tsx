@@ -76,7 +76,7 @@ export function OnboardingFlow() {
     <Screen
       gap={4}
       sx={{
-        minHeight: '100dvh',
+        minHeight: 'var(--app-height)',
         pt: { xs: 'calc(24px + var(--safe-top))', sm: 'calc(32px + var(--safe-top))' },
         pb: { xs: 'calc(24px + var(--safe-bottom))', sm: 'calc(32px + var(--safe-bottom))' },
       }}

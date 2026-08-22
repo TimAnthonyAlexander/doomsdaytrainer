@@ -18,10 +18,3 @@ export const REMINDER_MIN_INTERVAL_MS = 12 * 60 * 60_000;
  */
 export const REMINDER_PROBE_REQUEST = 'doomsday-reminder-probe';
 export const REMINDER_PROBE_REPLY = 'doomsday-reminder-probe-ok';
-
-/**
- * Page → waiting worker. Sent by `workbox-window` when the user accepts the
- * update prompt; the worker never calls `skipWaiting()` on its own, because the
- * page owns that decision.
- */
-export const SKIP_WAITING = 'SKIP_WAITING';

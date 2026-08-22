@@ -28,7 +28,6 @@ import {
   REMINDER_PROBE_REPLY,
   REMINDER_PROBE_REQUEST,
   REMINDER_SYNC_TAG,
-  SKIP_WAITING,
 } from '@/features/pwa/swMessages';
 
 declare const self: ServiceWorkerGlobalScope & {
@@ -50,6 +49,35 @@ cleanupOutdatedCaches();
 // Deep links have to resolve offline: /year-codes/learn is served by the
 // cached shell.
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
+
+/**
+ * A new build takes over as soon as it is installed, and the next load is the
+ * new one. No prompt, no bar, nothing to accept.
+ *
+ * Without this the worker sat in `waiting` until every tab of the app was
+ * closed, so a refresh was served the old precache by the old worker and the
+ * app told the user about the same update again. The one way to apply it was
+ * the button in the notice, which is a reload that reports itself as a
+ * decision.
+ *
+ * The running page is left alone: nothing here reloads a window, and this
+ * worker is not built with `registerType: 'autoUpdate'`, whose registration
+ * code does exactly that. Old code keeps running until the user navigates or
+ * refreshes, which costs nothing here because the bundle is not code-split —
+ * there is no chunk a live page could ask for after the cache holding it was
+ * cleaned.
+ *
+ * `workbox-window` waits a task before calling a worker waiting, precisely so
+ * that a worker which skips waiting during install is never announced as one.
+ * So the page's registration never hears about the update at all.
+ */
+self.addEventListener('install', () => {
+  void self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 /* ------------------------------------------------------------------ */
 /* Spoken clips                                                        */
@@ -243,12 +271,6 @@ self.addEventListener('periodicsync', (event) => {
 self.addEventListener('message', (event) => {
   const data = event.data as { type?: string } | null;
   if (!data) return;
-
-  // The page owns the update prompt; a waiting worker never activates itself.
-  if (data.type === SKIP_WAITING) {
-    void self.skipWaiting();
-    return;
-  }
 
   if (data.type === REMINDER_PROBE_REQUEST) {
     event.ports[0]?.postMessage({ type: REMINDER_PROBE_REPLY });

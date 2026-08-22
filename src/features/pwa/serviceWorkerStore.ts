@@ -1,25 +1,24 @@
 /**
- * Service worker registration and the two states worth surfacing.
+ * Service worker registration, and the one state worth surfacing.
  *
- * `registerType` is 'prompt', so a new build never swaps itself in mid-session.
- * The user is told a version is ready and reloads when they choose.
+ * There is no update state here on purpose. The worker skips waiting during
+ * install and claims its clients, so a new build is simply the one the next
+ * load gets. Nothing asks the user to accept it and nothing reloads a window
+ * out from under them. See the comment in `src/sw.ts`.
  */
 
 export interface ServiceWorkerState {
-  /** A new build is installed and waiting. */
-  needRefresh: boolean;
   /** Everything the app needs is cached; it will open with no network. */
   offlineReady: boolean;
 }
 
-let snapshot: ServiceWorkerState = { needRefresh: false, offlineReady: false };
-let applyUpdate: ((reload?: boolean) => Promise<void>) | null = null;
+let snapshot: ServiceWorkerState = { offlineReady: false };
 let started = false;
 
 const listeners = new Set<() => void>();
 
 function set(next: ServiceWorkerState): void {
-  if (next.needRefresh === snapshot.needRefresh && next.offlineReady === snapshot.offlineReady) return;
+  if (next.offlineReady === snapshot.offlineReady) return;
   snapshot = next;
   for (const listener of listeners) listener();
 }
@@ -46,13 +45,15 @@ export function startServiceWorker(): void {
 
   void import('virtual:pwa-register')
     .then(({ registerSW }) => {
-      applyUpdate = registerSW({
+      registerSW({
         immediate: true,
-        onNeedRefresh() {
-          set({ ...snapshot, needRefresh: true });
-        },
+        // "The worker has taken control and the page would normally reload."
+        // It should not: a second tab that hears about an update installed by
+        // this one would otherwise reload itself mid-answer. Empty is the whole
+        // policy — the page the user is on keeps its code until they leave it.
+        onNeedReload() {},
         onOfflineReady() {
-          set({ ...snapshot, offlineReady: true });
+          set({ offlineReady: true });
         },
       });
     })
@@ -61,19 +62,6 @@ export function startServiceWorker(): void {
     });
 }
 
-/** Activates the waiting worker and reloads. */
-export async function reloadWithUpdate(): Promise<void> {
-  if (!applyUpdate) {
-    window.location.reload();
-    return;
-  }
-  await applyUpdate(true);
-}
-
-export function dismissUpdate(): void {
-  set({ ...snapshot, needRefresh: false });
-}
-
 export function dismissOfflineReady(): void {
-  set({ ...snapshot, offlineReady: false });
+  set({ offlineReady: false });
 }
