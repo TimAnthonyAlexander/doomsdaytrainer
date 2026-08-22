@@ -226,8 +226,11 @@ numbers, and the numbers were wrong.
 ### Storage
 
 One IndexedDB database, one object store, the whole `AppData` document under a
-single key. This is deliberate and commented in `db.ts`: the document is a few
-hundred kilobytes at its largest, and per-record stores would buy nothing.
+single key. This is deliberate and commented in `db.ts`: a fresh document is
+about 34 KB and every log inside it is capped, so the worst case is bounded at
+roughly 3.6 MB — 200 attempts on each of the 116 items, which is most of it,
+plus the full weekday, day-step, calculation and verify logs. Per-record stores
+would buy nothing.
 
 Every write goes through one promise chain, so concurrent `patchAppData` callers
 cannot interleave a read-modify-write. There is a test that fires 50 concurrent

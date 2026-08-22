@@ -28,8 +28,11 @@ import {
 
 /**
  * The whole AppData document lives under a single key in a single store.
- * 100 items plus a drill log is a few kilobytes; splitting it into per-record
- * stores would buy nothing and cost transactions, indexes and merge logic.
+ * A fresh document is about 34KB, and every log in it is capped, so the size is
+ * bounded: filling all of them — 200 attempts on each of the 116 items, which is
+ * most of it, plus the full weekday, day-step, calc and verify logs — comes to
+ * about 3.6MB. Splitting it into per-record stores would buy nothing and cost
+ * transactions, indexes and merge logic.
  * This is deliberate — please do not "fix" it into a normalised schema.
  */
 const DB_NAME = 'doomsday-trainer';

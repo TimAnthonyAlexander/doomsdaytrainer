@@ -12,14 +12,19 @@ calls at all. Progress moves between devices through a JSON export.
 
 ```
 bun install
-bun run dev        # vite dev server
-bun run test       # vitest, 750 tests
-bun run build      # tsc -b, then vite build
-bun run preview    # serve the production build
+bun run dev        # 127.0.0.1:47318, strictPort, loopback only
+bun run test       # vitest, 1364 tests
+bun run build      # vite build. The typecheck is separate, on purpose
+bun run preview    # 127.0.0.1:47319, the only way to exercise the service worker
 ```
 
+`bun run build` does not typecheck. That is deliberate — it lets a build be
+produced while another change is mid-flight — so run `bunx tsc -b --noEmit`
+yourself, and do it before anything ships.
+
 Stack: Bun, Vite, React 19, TypeScript (strict), React Router 7, MUI 7,
-lucide-react, idb, Vitest with Testing Library. `@/` resolves to `src/`.
+lucide-react, idb, Vitest with Testing Library and fake-indexeddb. `@/` resolves
+to `src/`.
 
 ## Writing
 
@@ -32,12 +37,17 @@ in `docs/tasks/open/` and move to `docs/tasks/done/` when they ship.
 
 ```
 src/domain/      pure, framework-free: the code table, SM-2, scopes, weekday maths
-src/storage/     IndexedDB, defaults, export/import
+src/storage/     IndexedDB, defaults, migrations, export/import
 src/state/       the one provider every screen reads
-src/features/    onboarding, learn, review, drills, trouble, weekday, stats,
-                 settings, notifications, pwa
+src/components/  the answer pad, the app shell and the shared UI primitives
+src/features/    one folder per surface: onboarding, concept, learn, revise,
+                 review, drills, trouble, calc, yearCodes, doomsdays, weekday,
+                 stats, settings, notifications, pwa
+src/features/audio/  not a surface: the spoken year clips, shared by Learn and Revise
 src/routes/      one file per screen, each one a thin assembly of feature parts
-src/components/  the answer pad and the shared UI primitives
+src/theme/       the design tokens and the MUI theme, light and dark
+src/test/        Vitest setup and the paint helper the latency tests need
+src/sw.ts        the hand-written service worker, built via injectManifest
 ```
 
 `src/domain/` is the only place scheduling, grading and the tables live, and it
@@ -45,8 +55,11 @@ holds no React and no randomness. Components must not reimplement any of it.
 
 ## Three decisions worth knowing before you change anything
 
-**The whole store is one document under one IndexedDB key.** A hundred items
-plus a drill log is a few kilobytes. Splitting it into per-record stores would
+**The whole store is one document under one IndexedDB key.** A fresh document is
+about 34 KB, and every log inside it is capped, so it cannot grow without bound:
+saturate all of them — 200 attempts on each of the 116 items, plus the full
+weekday, day-step, calculation and verify logs — and it comes to about 3.6 MB,
+most of that the per-item history. Splitting it into per-record stores would
 buy nothing and cost transactions, indexes and merge logic. Every read and write
 goes through `src/storage/db.ts`, which serialises them behind a promise chain so
 two answers a millisecond apart cannot clobber each other. `patchAppData` is the
