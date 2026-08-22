@@ -116,7 +116,7 @@ export function MethodIntro({ onStart }: MethodIntroProps) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[5]}px` }}>
-      <PageTitle subtitle="A dozen easy dates all fall on the same weekday every year. Which weekday it is changes from year to year. Find that weekday, hop to the date you want, and you are done. Here is the whole thing on one date.">
+      <PageTitle subtitle="In any one year, a dozen easy dates all land on the same weekday as each other. Which weekday that is depends on the year. Work it out, then hop from the nearest of those dates to the one you want.">
         How it works
       </PageTitle>
 
