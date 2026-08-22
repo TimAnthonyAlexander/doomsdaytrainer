@@ -17,7 +17,6 @@ import { radius, space, stroke } from '@/theme/tokens';
 import { ChoicePad } from './ChoicePad';
 import { DatePick } from './DatePick';
 import { GoalLedger } from './GoalLedger';
-import { MethodIntro } from './MethodIntro';
 import { toDateInput } from './conceptDate';
 
 const CODE_OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
@@ -117,10 +116,6 @@ export function GuidedWalkView({
   const [seen, setSeen] = useState(dateId);
   const [progress, setProgress] = useState<Progress>(START);
   const [picking, setPicking] = useState(false);
-  // The explainer comes first on every mount rather than being remembered as
-  // seen. It is one screen with the way on at the bottom, and a returning user
-  // scrolls past it; a flag in storage would buy a second and cost a setting.
-  const [explained, setExplained] = useState(false);
 
   // A new date is a new walk. Adjusting during render rather than in an effect
   // keeps the first paint correct: an effect would show the last step of the old
@@ -136,8 +131,6 @@ export function GuidedWalkView({
       weekdayOptions(convention).map((option) => ({ value: option.value, label: option.short })),
     [convention],
   );
-
-  if (!explained) return <MethodIntro onStart={() => setExplained(true)} />;
 
   const finished = progress.index >= GUIDED_STEP_COUNT;
   const started = progress.index > 0 || progress.chosen !== null;

@@ -173,6 +173,35 @@ describe('the explainer in front of the walk', () => {
     expect(screen.getByLabelText('Date')).toBeInTheDocument();
   });
 
+  it('names the date it is working before the first sum, and names every number', async () => {
+    await seed();
+    mount();
+    await screen.findByRole('heading', { name: 'How it works' });
+
+    // The worked date used to appear only as the third section's title, so the
+    // first sum on the screen was 26 + 6 against no stated year.
+    expect(screen.getByText('Those three moves, on one date')).toBeInTheDocument();
+    expect(screen.getAllByText('20 March 2026').length).toBeGreaterThan(0);
+
+    // Invariant 7, on the one screen in the app that is nothing but numbers.
+    for (const label of [
+      'Year, last two digits',
+      'A quarter of it, remainder dropped',
+      'The two added',
+      'Year code',
+      'Century anchor, 2000s',
+      'Doomsday number',
+      'Doomsday of 2026',
+      "March's doomsday date",
+      'Your date',
+      'Days on',
+      'Doomsday plus days on',
+      'Weekday number',
+    ]) {
+      expect(screen.getByText(label), label).toBeInTheDocument();
+    }
+  });
+
   it('shows the doomsday dates grouped the way they are remembered', async () => {
     await seed();
     mount();

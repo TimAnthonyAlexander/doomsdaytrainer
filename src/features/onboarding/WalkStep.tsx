@@ -1,8 +1,9 @@
 import Typography from '@mui/material/Typography';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import type { CalendarDate, IndexConvention } from '@/domain/types';
 import { GuidedWalkView } from '@/features/concept/GuidedWalkView';
+import { MethodIntro } from '@/features/concept/MethodIntro';
 
 interface WalkStepProps {
   date: CalendarDate;
@@ -38,6 +39,10 @@ interface WalkStepProps {
  * Nothing here is timed and nothing here is written.
  */
 export function WalkStep({ date, onDate, convention, keyboard, footer }: WalkStepProps) {
+  const [explained, setExplained] = useState(false);
+
+  if (!explained) return <MethodIntro onStart={() => setExplained(true)} />;
+
   return (
     <GuidedWalkView
       date={date}
