@@ -46,6 +46,7 @@ export function useTroubleSession(): TroubleSession {
   const { itemList, items, settings, recordReview, noteSessionActivity } = useAppState();
 
   const [answered, setAnswered] = useState<AnsweredState | null>(null);
+  const [retries, setRetries] = useState(0);
   const [seen, setSeen] = useState<YearKey[]>([]);
   const [round, setRound] = useState(0);
   const [results, setResults] = useState<SessionResult[]>([]);
@@ -62,9 +63,25 @@ export function useTroubleSession(): TroubleSession {
 
   const hint = useMemo(() => (item ? structuralHint(item.yy) : null), [item]);
 
+  const advance = useCallback(() => {
+    setAnswered(null);
+    setRetries(0);
+    setRound((value) => value + 1);
+  }, []);
+
   const answer = useCallback(
     (value: number, latencyMs: number) => {
-      if (!item || answered) return;
+      if (!item) return;
+
+      // Same rule as review: a wrong answer keeps the year on screen, and the
+      // way on is tapping the code it actually has. Not recorded — already graded.
+      if (answered) {
+        if (!answered.correct) {
+          if (value === codeFor(item.yy)) advance();
+          else setRetries((count) => count + 1);
+        }
+        return;
+      }
 
       const correct = value === codeFor(item.yy);
       const latency = Math.round(latencyMs);
@@ -84,13 +101,8 @@ export function useTroubleSession(): TroubleSession {
 
       void recordReview(item.yy, attempt).then(() => noteSessionActivity('review', 1));
     },
-    [item, answered, recordReview, noteSessionActivity],
+    [item, answered, recordReview, noteSessionActivity, advance],
   );
-
-  const advance = useCallback(() => {
-    setAnswered(null);
-    setRound((value) => value + 1);
-  }, []);
 
   const phase: ReviewPhase = answered ? (answered.correct ? 'correct' : 'wrong') : 'prompt';
 
@@ -99,7 +111,7 @@ export function useTroubleSession(): TroubleSession {
     phase,
     chosen: answered ? answered.chosen : null,
     correctCode: item ? codeFor(item.yy) : null,
-    promptKey: `${item ? item.yy : 'none'}#${round}`,
+    promptKey: `${item ? item.yy : 'none'}#${round}#${phase}#${retries}`,
     hint,
     answer,
     advance,

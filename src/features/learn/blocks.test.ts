@@ -6,6 +6,7 @@ import { dayKey } from '@/domain/time';
 import { DEFAULT_SETTINGS, itemKey } from '@/storage/defaults';
 import {
   BLOCK_SIZE,
+  DECADES,
   blockStatus,
   dailyAllowance,
   decadeBlocks,
@@ -13,6 +14,7 @@ import {
   decadeYears,
   introducedCount,
   leapRuns,
+  learnGroups,
   newItemsIntroducedToday,
   newlyIntroducedCount,
   nextBlock,
@@ -262,5 +264,42 @@ describe('newItemsIntroducedToday', () => {
 
   it('is zero when today has no entry', () => {
     expect(newItemsIntroducedToday({}, now)).toBe(0);
+  });
+});
+
+describe('learnGroups', () => {
+  it('splits a decade at its leap boundaries', () => {
+    // 00-09 is the case the user sees first: four, four, then the two that
+    // belong to the run continuing into the next decade.
+    expect(learnGroups(0)).toEqual([
+      [0, 1, 2, 3],
+      [4, 5, 6, 7],
+      [8, 9],
+    ]);
+  });
+
+  it('puts the short group first when a decade opens mid-run', () => {
+    expect(learnGroups(1)).toEqual([
+      [10, 11],
+      [12, 13, 14, 15],
+      [16, 17, 18, 19],
+    ]);
+  });
+
+  it('covers every year of the decade exactly once, for all ten decades', () => {
+    for (const decade of DECADES) {
+      expect(learnGroups(decade).flat()).toEqual(decadeYears(decade));
+    }
+  });
+
+  it('never emits a group that spans a leap boundary', () => {
+    for (const decade of DECADES) {
+      for (const group of learnGroups(decade)) {
+        // Inside a group every step is +1. A +2 would mean the split is wrong.
+        for (let i = 0; i < group.length - 1; i++) {
+          expect(stepAfter(group[i])).toBe(1);
+        }
+      }
+    }
   });
 });

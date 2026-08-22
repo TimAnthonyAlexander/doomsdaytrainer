@@ -75,9 +75,9 @@ describe('hint previews', () => {
   it('renders one real, distinct example per type', () => {
     const choices = hintChoices();
     expect(choices.map((choice) => choice.type)).toEqual(['structural', 'arithmetic', 'anchor']);
-    expect(choices[0].hint.text).toBe('Block 72–75, starts at 6.');
+    expect(choices[0].hint.text).toBe('73 sits in the block 72–75.');
     expect(choices[1].hint.text).toBe('73 + 18 = 91');
-    expect(choices[2].hint.text).toBe('72 → 6, so 73 → ?');
+    expect(choices[2].hint.text).toBe('You already know 72.');
   });
 
   it('does not let the anchor example collapse into the structural one', () => {

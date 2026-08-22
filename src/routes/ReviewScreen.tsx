@@ -112,19 +112,12 @@ export function ReviewScreen() {
           yy={session.item.yy}
           phase={phase}
           correctCode={session.correctCode ?? 0}
+          chosen={session.chosen}
           hint={session.hint}
           autoHint={session.autoHint}
           onOpenHint={session.openHint}
         />
       </Box>
-
-      {phase === 'wrong' ? (
-        // Deliberately above the pad: a fast second tap in the thumb zone must
-        // land on a dead button, never on "continue".
-        <Button fullWidth variant="outlined" color="inherit" autoFocus onClick={advance} sx={{ mb: 1 }}>
-          Continue
-        </Button>
-      ) : null}
 
       <AnswerPad
         options={OPTIONS}
@@ -135,7 +128,10 @@ export function ReviewScreen() {
             ? null
             : { chosen: session.chosen, correct: session.correctCode }
         }
-        disabled={phase !== 'prompt'}
+        // Live during 'wrong': tapping the right code is how the user moves on,
+        // which puts the correct pairing under their thumb instead of a
+        // meaningless "continue".
+        disabled={phase === 'correct'}
         keyboard={settings.keyboardInput}
       />
     </Screen>

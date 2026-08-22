@@ -2,10 +2,10 @@ import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import { Lightbulb } from 'lucide-react';
+import { Fragment } from 'react';
 import type { Code, YearKey } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
 import { Numeral } from '@/components/ui/Numeral';
-import { palette } from '@/theme/palette';
 import type { Hint } from './hints';
 import type { ReviewPhase } from './useReviewSession';
 
@@ -13,6 +13,8 @@ interface ReviewPromptProps {
   yy: YearKey;
   phase: ReviewPhase;
   correctCode: Code;
+  /** What the user tapped, once they have. */
+  chosen: Code | null;
   hint: Hint | null;
   /** The hint appeared on its own, so the button must not offer it again. */
   autoHint: boolean;
@@ -27,6 +29,7 @@ export function ReviewPrompt({
   yy,
   phase,
   correctCode,
+  chosen,
   hint,
   autoHint,
   onOpenHint,
@@ -47,14 +50,24 @@ export function ReviewPrompt({
         }}
       >
         <Box />
-        <Box
-          component="h1"
-          aria-label={`Year ${formatYear(yy)}`}
-          sx={{ m: 0, fontSize: { xs: 88, sm: 104 }, lineHeight: 1 }}
-        >
-          <Numeral size="inherit" weight={600}>
-            {formatYear(yy)}
-          </Numeral>
+        <Box>
+          <Typography
+            variant="caption"
+            component="div"
+            color="text.secondary"
+            sx={{ textAlign: 'center' }}
+          >
+            Year
+          </Typography>
+          <Box
+            component="h1"
+            aria-label={`Year ${formatYear(yy)}`}
+            sx={{ m: 0, fontSize: { xs: 88, sm: 104 }, lineHeight: 1 }}
+          >
+            <Numeral size="inherit" weight={600}>
+              {formatYear(yy)}
+            </Numeral>
+          </Box>
         </Box>
         <Box sx={{ justifySelf: 'start', pl: 2 }}>
           {showHintButton ? (
@@ -79,23 +92,81 @@ export function ReviewPrompt({
       </Box>
 
       {hint ? (
-        <Box sx={{ textAlign: 'center', maxWidth: 340 }}>
-          <Numeral size={16} color={palette.greenDeep}>
+        <Box sx={{ maxWidth: 340, width: '100%' }}>
+          <Typography variant="body2" sx={{ textAlign: 'center', mb: 1 }}>
             {hint.text}
-          </Numeral>
+          </Typography>
+          {/* Every number is named. A row of bare arithmetic teaches nothing
+              about which value came from where. */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto',
+              columnGap: 2,
+              rowGap: 0.5,
+              alignItems: 'baseline',
+            }}
+          >
+            {hint.steps.map((step) => (
+              <Fragment key={step.label}>
+                <Typography variant="caption" color="text.secondary">
+                  {step.label}
+                </Typography>
+                <Numeral size={15} weight={600}>
+                  {step.value}
+                </Numeral>
+              </Fragment>
+            ))}
+          </Box>
           {hint.note ? (
-            <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 0.75 }}>
+            <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 1 }}>
               {hint.note}
             </Typography>
           ) : null}
         </Box>
       ) : null}
 
-      {phase === 'wrong' ? (
-        <Numeral size={22} weight={600} color={palette.green}>
-          {`${formatYear(yy)} → ${correctCode}`}
-        </Numeral>
-      ) : null}
+      {/* Fixed height, so the pad below never moves between prompt and answer. */}
+      <Box sx={{ minHeight: 96, textAlign: 'center' }}>
+        {phase === 'correct' && chosen !== null ? (
+          <>
+            <Typography variant="caption" component="div" color="text.secondary">
+              Code
+            </Typography>
+            <Numeral size={40} weight={600}>
+              {chosen}
+            </Numeral>
+          </>
+        ) : null}
+
+        {phase === 'wrong' ? (
+          <>
+            <Typography variant="caption" component="div" color="text.secondary">
+              Code
+            </Typography>
+            <Numeral size={40} weight={600}>
+              {correctCode}
+            </Numeral>
+            <Typography variant="body2" component="div" color="text.secondary" sx={{ mt: 0.5 }}>
+              {chosen !== null ? (
+                <>
+                  {'You tapped '}
+                  <Numeral color="inherit">{chosen}</Numeral>
+                  {'. Tap '}
+                  <Numeral color="inherit">{correctCode}</Numeral>
+                  {' to go on.'}
+                </>
+              ) : (
+                <>
+                  {'Tap '}
+                  <Numeral color="inherit">{correctCode}</Numeral>
+                  {' to go on.'}
+                </>
+              )}
+            </Typography>
+          </>
+        ) : null}
+      </Box>
     </Box>
   );
 }

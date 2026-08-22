@@ -55,6 +55,7 @@ export function useReviewSession(): ReviewSession {
   const [round, setRound] = useState(0);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [hintOpen, setHintOpen] = useState(false);
+  const [retries, setRetries] = useState(0);
 
   const scope = useMemo(() => resolveScope(settings), [settings]);
 
@@ -96,9 +97,30 @@ export function useReviewSession(): ReviewSession {
 
   const openHint = useCallback(() => setHintOpen(true), []);
 
+  const advance = useCallback(() => {
+    setAnswered(null);
+    setHintOpen(false);
+    setRetries(0);
+    setRound((value) => value + 1);
+  }, []);
+
   const answer = useCallback(
     (value: number, latencyMs: number) => {
-      if (!item || answered) return;
+      if (!item) return;
+
+      // After a wrong answer the year stays put. The only way on is to tap the
+      // code it actually has, so the right pairing is the last thing the hand
+      // does before the next prompt. Nothing is recorded here: the attempt was
+      // already graded, and a correction is not a second review.
+      if (answered) {
+        if (!answered.correct) {
+          if (value === codeFor(item.yy)) advance();
+          // Counted so the pad, which answers once per prompt key, will take
+          // the next correction tap.
+          else setRetries((count) => count + 1);
+        }
+        return;
+      }
 
       const correctCode = codeFor(item.yy);
       const correct = value === correctCode;
@@ -121,14 +143,8 @@ export function useReviewSession(): ReviewSession {
 
       void recordReview(item.yy, attempt).then(() => noteSessionActivity('review', 1));
     },
-    [item, answered, hintOpen, recordReview, noteSessionActivity],
+    [item, answered, hintOpen, recordReview, noteSessionActivity, advance],
   );
-
-  const advance = useCallback(() => {
-    setAnswered(null);
-    setHintOpen(false);
-    setRound((value) => value + 1);
-  }, []);
 
   const phase: ReviewPhase = answered ? (answered.correct ? 'correct' : 'wrong') : 'prompt';
 
@@ -137,7 +153,10 @@ export function useReviewSession(): ReviewSession {
     phase,
     chosen: answered ? answered.chosen : null,
     correctCode: item ? codeFor(item.yy) : null,
-    promptKey: `${item ? item.yy : 'none'}#${round}`,
+    // Phase is in the key so the correction tap after a wrong answer is a fresh
+    // prompt to the pad. Without it the pad, which answers once per key, would
+    // swallow it.
+    promptKey: `${item ? item.yy : 'none'}#${round}#${phase}#${retries}`,
     hint,
     autoHint,
     openHint,

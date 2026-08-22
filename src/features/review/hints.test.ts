@@ -16,16 +16,27 @@ function item(overrides: Partial<ItemState> = {}): ItemState {
 }
 
 describe('structuralHint', () => {
-  it('names the block and where it starts', () => {
-    expect(structuralHint(73).text).toBe('Block 72–75, starts at 6.');
-    expect(structuralHint(72).text).toBe('Block 72–75, starts at 6.');
-    expect(structuralHint(7).text).toBe('Block 04–07, starts at 5.');
+  it('names the block and labels every number it shows', () => {
+    const hint = structuralHint(73);
+    expect(hint.text).toBe('73 sits in the block 72–75.');
+    expect(hint.steps).toEqual([
+      { label: 'Block', value: '72–75' },
+      { label: 'Code of 72', value: '6' },
+      { label: 'Years from 72 to 73', value: '1' },
+    ]);
+    expect(structuralHint(7).steps[1]).toEqual({ label: 'Code of 04', value: '5' });
   });
 
-  it('never contains the answer for a year past the start of its block', () => {
+  it('never states the answer for a year past the start of its block', () => {
     for (let yy = 0; yy < 100; yy++) {
       if (yy % 4 === 0) continue;
-      expect(structuralHint(yy).text).not.toContain(`starts at ${codeFor(yy)}.`);
+      const hint = structuralHint(yy);
+      // The block's own starting code is fair game; this year's is not.
+      expect(hint.steps.some((step) => step.label.startsWith('Code of'))).toBe(true);
+      expect(hint.steps).not.toContainEqual({
+        label: `Code of ${String(yy).padStart(2, '0')}`,
+        value: String(codeFor(yy)),
+      });
     }
   });
 });
@@ -35,6 +46,18 @@ describe('arithmeticHint', () => {
     expect(arithmeticHint(73).text).toBe('73 + 18 = 91');
     expect(arithmeticHint(0).text).toBe('00 + 0 = 0');
     expect(arithmeticHint(99).text).toBe('99 + 24 = 123');
+  });
+
+  it('says what the middle number actually is', () => {
+    // The unexplained "+ 18" is the whole reason this hint used to teach
+    // nothing: it is the leap-day count, and the label has to say so.
+    const hint = arithmeticHint(73);
+    expect(hint.steps).toEqual([
+      { label: 'The year', value: '73' },
+      { label: 'Leap days since 00 (73 ÷ 4, rounded down)', value: '18' },
+      { label: 'Year plus leap days', value: '91' },
+    ]);
+    expect(hint.note).toBe('Divide 91 by 7 and keep the remainder. That remainder is the code.');
   });
 
   it('leaves the last step to the user', () => {
@@ -47,16 +70,27 @@ describe('arithmeticHint', () => {
 });
 
 describe('anchorHint', () => {
-  it('uses the nearest known year below', () => {
+  it('uses the nearest known year below, with each number named', () => {
     const hint = anchorHint(73, (yy) => yy === 72);
     expect(hint.type).toBe('anchor');
-    expect(hint.text).toBe('72 → 6, so 73 → ?');
+    expect(hint.text).toBe('You already know 72.');
+    expect(hint.steps).toEqual([
+      { label: 'Nearest code you know', value: '72' },
+      { label: 'Code of 72', value: '6' },
+      { label: 'Year you want', value: '73' },
+    ]);
+  });
+
+  it('never names the gap, which would finish the derivation', () => {
+    const hint = anchorHint(73, (yy) => yy === 72);
+    expect(JSON.stringify(hint)).not.toContain('1 year');
+    expect(hint.steps.map((step) => step.value)).not.toContain(String(codeFor(73)));
   });
 
   it('falls back to structural rather than showing nothing', () => {
     const hint = anchorHint(73, () => false);
     expect(hint.type).toBe('structural');
-    expect(hint.text).toBe('Block 72–75, starts at 6.');
+    expect(hint.text).toBe('73 sits in the block 72–75.');
   });
 });
 
@@ -87,7 +121,7 @@ describe('hintFor', () => {
   it('dispatches on the user preference', () => {
     expect(hintFor(73, 'structural', lookup).type).toBe('structural');
     expect(hintFor(73, 'arithmetic', lookup).type).toBe('arithmetic');
-    expect(hintFor(73, 'anchor', lookup).text).toBe('72 → 6, so 73 → ?');
+    expect(hintFor(73, 'anchor', lookup).text).toBe('You already know 72.');
   });
 
   it('falls back to structural when no anchor is known yet', () => {

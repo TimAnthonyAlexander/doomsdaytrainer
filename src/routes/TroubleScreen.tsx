@@ -116,18 +116,13 @@ export function TroubleScreen() {
           yy={session.item.yy}
           phase={phase}
           correctCode={session.correctCode ?? 0}
+          chosen={session.chosen}
           hint={session.hint}
           // The hint is never asked for here, so the button must never appear.
           autoHint
           onOpenHint={() => undefined}
         />
       </Box>
-
-      {phase === 'wrong' ? (
-        <Button fullWidth variant="outlined" color="inherit" autoFocus onClick={advance} sx={{ mb: 1 }}>
-          Continue
-        </Button>
-      ) : null}
 
       <AnswerPad
         options={OPTIONS}
@@ -138,7 +133,7 @@ export function TroubleScreen() {
             ? null
             : { chosen: session.chosen, correct: session.correctCode }
         }
-        disabled={phase !== 'prompt'}
+        disabled={phase === 'correct'}
         keyboard={settings.keyboardInput}
       />
     </Screen>

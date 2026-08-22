@@ -11,6 +11,10 @@ import { BLOCK_SIZE, decadeLabel, decadeYears, leapRuns, stepAfter } from './blo
 
 interface RecognitionPassProps {
   decade: number;
+  /** Which years to show. Defaults to the whole decade. */
+  years?: YearKey[];
+  /** What the header calls this step. */
+  stepLabel?: string;
   onDone: () => void;
   onExit: () => void;
 }
@@ -45,6 +49,37 @@ function Jump({ value }: { value: number }) {
         {`+${value}`}
       </Numeral>
       <Box sx={{ flex: 1, height: '1px', bgcolor: palette.rule }} />
+    </Box>
+  );
+}
+
+/**
+ * One labelled example, so the stacked pairs below are never two unexplained
+ * numbers. It uses a year from outside any decade block's own run so it cannot
+ * be mistaken for one of the ten being taught.
+ */
+function Legend() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+        <Numeral size={13} color={palette.inkMuted}>
+          04
+        </Numeral>
+        <Numeral size={26} weight={600}>
+          5
+        </Numeral>
+      </Box>
+      <Box>
+        <Typography variant="body2" color="text.secondary">
+          Top number is the year.
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Bottom number is its code.
+        </Typography>
+        <Typography variant="caption" color="text.disabled">
+          So the year 04 has code 5.
+        </Typography>
+      </Box>
     </Box>
   );
 }
@@ -93,9 +128,19 @@ function Pair({
  * decade that opens mid-run starts indented. The +1 steps sit between the pairs
  * and the +2 jump gets a rule of its own. Nothing is scored here.
  */
-export function RecognitionPass({ decade, onDone, onExit }: RecognitionPassProps) {
-  const years = decadeYears(decade);
-  const runs = leapRuns(decade);
+export function RecognitionPass({
+  decade,
+  years: only,
+  stepLabel,
+  onDone,
+  onExit,
+}: RecognitionPassProps) {
+  const years = only ?? decadeYears(decade);
+  const shown = new Set(years);
+  // Keep the run grouping, but drop anything this step is not teaching yet.
+  const runs = leapRuns(decade)
+    .map((run) => ({ ...run, years: run.years.filter((yy) => shown.has(yy)) }))
+    .filter((run) => run.years.length > 0);
   const [index, setIndex] = useState(0);
 
   const advance = () => {
@@ -110,13 +155,21 @@ export function RecognitionPass({ decade, onDone, onExit }: RecognitionPassProps
     <>
       <SessionHeader
         label={decadeLabel(decade)}
-        pass="Pass 1 of 2"
+        pass={stepLabel ?? 'All ten · pass 1 of 2'}
         position={index + 1}
-        total={BLOCK_SIZE}
+        total={years.length}
         onExit={onExit}
       />
 
       <Typography variant="body1" color="text.secondary">
+        {years.length === BLOCK_SIZE
+          ? 'All ten together now, with the structure in view. You will be asked for them on their own next.'
+          : `Every year from 00 to 99 has one code, a number from 0 to 6. Here are ${years.length}. You will be asked for them on their own next.`}
+      </Typography>
+
+      <Legend />
+
+      <Typography variant="body2" color="text.secondary">
         Inside a run of four years the code goes up by one. Crossing into the next run it goes up by
         two.
       </Typography>

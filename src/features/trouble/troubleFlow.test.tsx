@@ -76,7 +76,7 @@ describe('Trouble spots', () => {
     mount();
 
     await screen.findByLabelText('Year 40');
-    expect(screen.getByText('Block 40–43, starts at 1.')).toBeInTheDocument();
+    expect(screen.getByText('40 sits in the block 40–43.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument();
     expect(screen.getByText('0 / 2')).toBeInTheDocument();
   });
@@ -119,7 +119,7 @@ describe('Trouble spots', () => {
     });
   });
 
-  it('counts a wrong answer as another lapse and waits for Continue', async () => {
+  it('counts a wrong answer as another lapse and waits for the right code', async () => {
     await seed([{ yy: 73, lapses: 6, leech: true }]);
     mount();
 
@@ -127,14 +127,17 @@ describe('Trouble spots', () => {
     await tap('5');
 
     expect(screen.getByRole('status')).toHaveTextContent('Incorrect. The answer is 0.');
-    const cont = await screen.findByRole('button', { name: 'Continue' });
+    expect(screen.getByText(/You tapped/)).toBeInTheDocument();
 
     await waitFor(async () => {
       const stored = await loadAppData();
       expect(stored.items[itemKey(73)].lapses).toBe(7);
     });
 
-    fireEvent.click(cont);
+    // Another wrong code holds; only the right one moves on.
+    await tap('4');
+    expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
+    await tap('0');
     // One pass per session: the item does not come straight back.
     await waitFor(() => expect(screen.queryByLabelText('Year 73')).not.toBeInTheDocument());
     expect(screen.getByText(/answered,/)).toBeInTheDocument();

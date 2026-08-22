@@ -101,7 +101,7 @@ describe('Review loop', () => {
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
   });
 
-  it('holds an error on screen until the user taps Continue', async () => {
+  it('holds an error on screen until the user taps the right code', async () => {
     await seed([{ yy: 73, dueAgo: 4000 }]);
     mount();
 
@@ -109,17 +109,21 @@ describe('Review loop', () => {
     await tap('5');
 
     expect(screen.getByRole('status')).toHaveTextContent('Incorrect. The answer is 0.');
-    expect(screen.getByText('73 → 0')).toBeInTheDocument();
+    // The answer is shown under a label, and so is what the user tapped.
+    expect(screen.getByText(/You tapped/)).toBeInTheDocument();
 
     // Well past the auto-advance delay: an error must never advance itself.
     await wait(400);
     expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
-    const cont = screen.getByRole('button', { name: 'Continue' });
 
-    fireEvent.click(cont);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument(),
-    );
+    // A wrong code does not move on either. Only the right one does.
+    await tap('4');
+    await wait(200);
+    expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
+    expect(screen.getByText(/You tapped/)).toBeInTheDocument();
+
+    await tap('0');
+    await waitFor(() => expect(screen.queryByText(/You tapped/)).not.toBeInTheDocument());
     // A lapse resets the interval, so the same year comes straight back.
     expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
 
@@ -137,7 +141,7 @@ describe('Review loop', () => {
 
     await screen.findByLabelText('Year 73');
     fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
-    expect(screen.getByText(/Block 72/)).toBeInTheDocument();
+    expect(screen.getByText(/sits in the block 72–75/)).toBeInTheDocument();
 
     await tap('0');
 
@@ -155,7 +159,7 @@ describe('Review loop', () => {
     mount();
 
     await screen.findByLabelText('Year 73');
-    expect(screen.getByText(/Block 72/)).toBeInTheDocument();
+    expect(screen.getByText(/sits in the block 72–75/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument();
 
     await tap('0');

@@ -31,6 +31,16 @@ export interface DecadeBlock {
   available: boolean;
   /** One plain line, set only when `available` is false. */
   reason: string | null;
+  /**
+   * True when an earlier block is still unfinished. Blocks are taught in order:
+   * the table is one continuous run and learning 20-29 before 10-19 leaves the
+   * user guessing at a structure they have not been shown yet.
+   *
+   * A finished block is never locked, so any block already learned can be redone.
+   */
+  locked: boolean;
+  /** One plain line, set only when `locked` is true. */
+  lockReason: string | null;
 }
 
 export function decadeYears(decade: number): YearKey[] {
@@ -64,7 +74,7 @@ export function blockStatus(years: YearKey[], items: Record<string, ItemState>):
  */
 export function decadeBlocks(items: Record<string, ItemState>, scope: Scope): DecadeBlock[] {
   const bound = `${formatYear(scope.from)}–${formatYear(scope.to)}`;
-  return DECADES.map((decade) => {
+  const built = DECADES.map((decade) => {
     const years = decadeYears(decade);
     const available = years.some((yy) => inScope(yy, scope));
     return {
@@ -79,11 +89,27 @@ export function decadeBlocks(items: Record<string, ItemState>, scope: Scope): De
       reason: available ? null : `Outside ${scope.label} (${bound})`,
     };
   });
+
+  // Walk in order. The first unfinished block is the one to do next; everything
+  // unfinished after it waits its turn.
+  let openLabel: string | null = null;
+  return built.map((block) => {
+    if (!block.available || block.status === 'introduced') {
+      return { ...block, locked: false, lockReason: null };
+    }
+    if (openLabel === null) {
+      openLabel = block.label;
+      return { ...block, locked: false, lockReason: null };
+    }
+    return { ...block, locked: true, lockReason: `Finish ${openLabel} first` };
+  });
 }
 
 /** First block the user could sensibly start next, or null when there is none. */
 export function nextBlock(blocks: DecadeBlock[]): DecadeBlock | null {
-  return blocks.find((block) => block.available && block.status !== 'introduced') ?? null;
+  return (
+    blocks.find((block) => block.available && !block.locked && block.status !== 'introduced') ?? null
+  );
 }
 
 export interface LeapRun {
@@ -113,6 +139,19 @@ export function leapRuns(decade: number): LeapRun[] {
     }
   }
   return runs.map((run) => ({ ...run, partial: run.years.length < 4 }));
+}
+
+/**
+ * The decade split into the groups learn mode teaches one at a time, before it
+ * ever asks for all ten.
+ *
+ * The split is the leap runs, not an arbitrary four/four/two, because the run
+ * boundary is exactly where the code jumps by two. Learning a group means
+ * learning one unbroken +1 sequence. For 00–09 that gives 00–03, 04–07, 08–09;
+ * for a decade that opens mid-run it gives the short group first.
+ */
+export function learnGroups(decade: number): YearKey[][] {
+  return leapRuns(decade).map((run) => run.years);
 }
 
 /** Code delta from `yy` to `yy + 1`: 1 inside a run, 2 across the leap boundary. */

@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight, Lock } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Numeral } from '@/components/ui/Numeral';
@@ -30,7 +30,18 @@ function StateLabel({ block }: { block: DecadeBlock }) {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'primary.main' }}>
         <Check size={16} strokeWidth={2} aria-hidden />
         <Typography component="span" variant="body2" color="inherit">
-          Introduced
+          Learned · redo
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (block.locked) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.disabled' }}>
+        <Lock size={14} strokeWidth={1.75} aria-hidden />
+        <Typography component="span" variant="body2" color="inherit">
+          {block.lockReason}
         </Typography>
       </Box>
     );
@@ -63,7 +74,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
 
   return (
     <>
-      <PageTitle subtitle="Ten codes at a time. See them with their structure, then say them back.">
+      <PageTitle subtitle="Ten codes at a time, in order. See them with their structure, then say all ten back without a mistake.">
         Learn
       </PageTitle>
 
@@ -101,7 +112,10 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
 
       <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {blocks.map((block, index) => {
-          const startable = block.available && block.status !== 'introduced' && allowance.canStart;
+          // Redoing a learned block introduces nothing new, so the daily cap
+          // has no business blocking it.
+          const isRedo = block.status === 'introduced';
+          const startable = block.available && !block.locked && (isRedo || allowance.canStart);
           return (
             <Box
               component="li"
@@ -111,7 +125,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
               <ButtonBase
                 disabled={!startable}
                 onClick={() => onStart(block.decade)}
-                aria-label={`Learn ${block.label}`}
+                aria-label={`${isRedo ? 'Redo' : 'Learn'} ${block.label}`}
                 sx={{
                   width: '100%',
                   minHeight: 56,
