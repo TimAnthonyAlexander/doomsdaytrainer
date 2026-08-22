@@ -249,6 +249,15 @@ Placed last it can only be an explanation of a table the user already has.
 reason: where the structure lesson sits is a claim about how the table gets
 learned, and a claim like that should be assertable without walking sixty taps.
 
+After all of it comes a pass that does not end. The block's criterion — every
+year clean twice in varied order — is the right place to stop *teaching* and
+the wrong place to stop *practising*, and the first user to finish a decade
+said so straight away: the codes were nearly there and the screen took them
+away. So the block finishes, writes its ten and charges the daily cap, and then
+keeps asking. It introduces nothing, it draws from every introduced year in
+scope so it widens as blocks are finished, and the user leaves it rather than
+completing it. Leaving shows the block's summary.
+
 **Calculate** is the other path to the same 100 codes, and does not replace
 memorisation. It teaches `(yy + floor(yy / 4)) mod 7` one step at a time with the
 reason attached to each: divide by four because a leap day lands every fourth

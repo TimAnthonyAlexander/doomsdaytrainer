@@ -14,6 +14,7 @@ describe('the shape of a block', () => {
       'batch-study',
       'batch-recall',
       'all-ten',
+      'keep-going',
       'done',
     ]);
   });
@@ -49,17 +50,21 @@ describe('the structure lesson', () => {
     const at = phases.indexOf('structure');
     expect(at).toBeGreaterThan(-1);
     expect(phases.slice(0, at)).toContain('all-ten');
-    expect(phases.slice(at + 1)).toEqual(['done']);
+    // Only the endless pass follows it, and that one asks for codes the user
+    // already has rather than teaching any.
+    expect(phases.slice(at + 1)).toEqual(['keep-going', 'done']);
   });
 
-  it('leads to the end of the block and to nothing else', () => {
-    expect(nextPhase({ kind: 'structure' }, { structureSeen: false })).toEqual({ kind: 'done' });
+  it('leads to the endless pass and to nothing else', () => {
+    expect(nextPhase({ kind: 'structure' }, { structureSeen: false })).toEqual({
+      kind: 'keep-going',
+    });
   });
 
   it('cannot repeat once the flag is set', () => {
     // The session freezes the flag at mount, so writing it at the end of this
     // block cannot change this block. The next block reads it as seen.
-    expect(nextPhase({ kind: 'all-ten' }, { structureSeen: true })).toEqual({ kind: 'done' });
+    expect(nextPhase({ kind: 'all-ten' }, { structureSeen: true })).toEqual({ kind: 'keep-going' });
     expect(nextPhase({ kind: 'all-ten' }, { structureSeen: false })).toEqual({ kind: 'structure' });
   });
 });
@@ -74,7 +79,34 @@ describe('termination', () => {
       'batch-study',
       'batch-recall',
       'all-ten',
+      'keep-going',
       'done',
     ]);
+  });
+});
+
+describe('the endless pass', () => {
+  it('is the last phase before the block is over, however the block ran', () => {
+    for (const structureSeen of [true, false]) {
+      const phases = kinds(phaseSequence({ structureSeen }));
+      expect(phases.slice(-2)).toEqual(['keep-going', 'done']);
+    }
+  });
+
+  it('comes after every phase that introduces anything', () => {
+    // It must not be reachable before the block is written, or it would be
+    // asking for codes the user has not been shown.
+    const phases = kinds(phaseSequence({ structureSeen: false }));
+    const at = phases.indexOf('keep-going');
+    for (const taught of ['batch-study', 'batch-recall', 'all-ten']) {
+      expect(phases.slice(0, at)).toContain(taught);
+      expect(phases.slice(at + 1)).not.toContain(taught);
+    }
+  });
+
+  it('is left rather than finished, so nothing follows it on its own', () => {
+    // The sequence terminates for the test's sake; in the session the phase
+    // only advances when the user stops it.
+    expect(nextPhase({ kind: 'keep-going' }, { structureSeen: true })).toEqual({ kind: 'done' });
   });
 });

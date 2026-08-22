@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { resolveScope } from '@/domain/scope';
+import { inScope, resolveScope } from '@/domain/scope';
 import { useAppState } from '@/state/useAppState';
 import { BlockDone } from './BlockDone';
+import { KeepGoing } from './KeepGoing';
 import { RecallPass } from './RecallPass';
 import { StructureCheck } from './StructureCheck';
 import { StudyPass } from './StudyPass';
@@ -45,7 +46,8 @@ interface LearnSessionProps {
  * writes nothing, so coming back simply starts the block again.
  */
 export function LearnSession({ decade, blocks, allowance, onStart, onExit }: LearnSessionProps) {
-  const { items, settings, introduceItems, noteSessionActivity, updateSettings } = useAppState();
+  const { items, itemList, settings, introduceItems, noteSessionActivity, updateSettings } =
+    useAppState();
   const [phase, setPhase] = useState<LearnPhase>(firstPhase);
   const [wrongTaps, setWrongTaps] = useState(0);
   const [introduced, setIntroduced] = useState(0);
@@ -122,6 +124,24 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
 
   if (phase.kind === 'structure') {
     return <StructureCheck decade={decade} onDone={() => advance(0)} />;
+  }
+
+  if (phase.kind === 'keep-going') {
+    // Everything introduced and in scope, which by now includes this block's
+    // ten. It widens as blocks are finished, so the pass gets better the more
+    // of the table the user has, and it never introduces anything: `advance`
+    // has already written the block and charged the daily cap.
+    const pool = itemList
+      .filter((item) => item.introduced && inScope(item.yy, scope))
+      .map((item) => item.yy);
+    return (
+      <KeepGoing
+        decade={decade}
+        pool={pool.length > 0 ? pool : years}
+        seed={seed}
+        onStop={advance}
+      />
+    );
   }
 
   return (

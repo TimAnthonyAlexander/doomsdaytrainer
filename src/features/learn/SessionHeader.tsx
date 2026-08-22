@@ -10,7 +10,8 @@ interface SessionHeaderProps {
   /** "Pass 1 of 2" */
   pass: string;
   position: number;
-  total: number;
+  /** Null for a pass that has no end, where the count stands on its own. */
+  total: number | null;
   onExit: () => void;
 }
 
@@ -62,8 +63,10 @@ export function SessionHeader({ label, pass, position, total, onExit }: SessionH
         <Numeral weight={600} color="inherit">
           {position}
         </Numeral>
-        {' of '}
-        <Numeral color="inherit">{total}</Numeral>
+        {/* A bare number would be an unlabelled number on screen. When there is
+            no total to measure it against, the word has to do that job. */}
+        {total === null ? ' answered' : ' of '}
+        {total === null ? null : <Numeral color="inherit">{total}</Numeral>}
       </Typography>
     </Box>
   );
