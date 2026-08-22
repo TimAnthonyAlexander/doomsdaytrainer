@@ -6,7 +6,7 @@ import { useAppState } from '@/state/useAppState';
 /**
  * The router sends first-run users here and never sends them away again, so the
  * guard lives on this side: someone who already finished onboarding gets bounced
- * to review unless they asked for another run with `?rerun=1` (Settings links
+ * to Weekday unless they asked for another run with `?rerun=1` (Settings links
  * there). The decision is taken once, on mount, so committing the flow at the
  * last step cannot bounce the user mid-navigation.
  */

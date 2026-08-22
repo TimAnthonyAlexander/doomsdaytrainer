@@ -106,7 +106,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
             </Button>
           }
         >
-          Every block in scope is introduced. The rest is review.
+          Every block in scope is introduced. The rest is on Revise.
         </EmptyState>
       )}
 

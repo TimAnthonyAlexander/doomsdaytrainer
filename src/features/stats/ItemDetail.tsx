@@ -23,7 +23,7 @@ import { dueLabel, medianItemLatency, recentAttempts } from './statsSelectors';
  */
 
 const SOURCE_LABEL: Record<Attempt['source'], string> = {
-  review: 'Review',
+  review: 'Revise',
   learn: 'Learn',
   sprint: 'Sprint',
   gauntlet: 'Gauntlet',

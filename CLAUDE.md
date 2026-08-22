@@ -62,7 +62,7 @@ src/storage/     one IndexedDB document, migrations, export/import
 src/state/       one React context over the document, with actions
 src/components/  AnswerPad, the app shell, shared UI primitives
 src/features/    one folder per surface, each owning its own logic and tests
-src/features/audio/  not a surface: the spoken clips, shared by Learn and Review
+src/features/audio/  not a surface: the spoken clips, shared by Learn and Revise
 src/routes/      one screen component per route, thin
 src/test/        setup and the paint helper the latency tests need
 src/theme/       design tokens, MUI theme, light and dark
@@ -73,6 +73,37 @@ The rule that keeps this honest: **no scheduling, grading, or table maths lives
 in a component.** If a screen needs a number derived from the method, the
 derivation is a tested function in `src/domain/` and the screen calls it. The
 domain layer has no `Math.random` at all, so its ordering is deterministic.
+
+### Navigation
+
+Four destinations, and the whole table is in `src/router.tsx`:
+
+```
+/                       Weekday          the index route, and the point of the app
+/year-codes             the grid         Learn, Revise, Calc, Trouble when flagged
+/year-codes/learn       Learn
+/year-codes/revise      Revise           the due queue and the three drills
+/year-codes/calc        Calc
+/year-codes/trouble     Trouble spots    off the nav, and off the grid until flagged
+/stats                  Progress
+/settings               Settings
+/welcome                Onboarding       outside the shell
+```
+
+The nesting is load-bearing rather than tidy. `isNavActive` matches a `${path}/`
+prefix, so one `/year-codes` entry lights up on all four children with no extra
+rule, and the due count hangs off that one entry through `DUE_COUNT_PATH` rather
+than being written out in the bottom bar and the rail separately, which is how
+the two drifted apart before.
+
+`screenTitle` has to work the other way round, and this is the part that will
+catch the next person. Prefix matching gives the wrong answer for a title: it
+would name the phone's top bar "Year codes" while the user is on Learn. So
+`SCREEN_TITLES` is consulted first and a child always wins.
+
+`routes` is exported so the table can be asserted without a browser. It had no
+test at all until the nav was restructured, which is exactly how that kind of
+change ships a dead link.
 
 ### The domain layer
 
@@ -214,8 +245,56 @@ violation, and several were bugs before they were rules.
 
 ## Surfaces
 
-**Review** is the main loop: the due queue, one year at a time, seven buttons,
-hints behind a button and shown unasked after two consecutive failures.
+**Weekday** is the index route and the primary destination. Give it a full date,
+pick the weekday, seven buttons. Unassisted is the default. Assisted hands over
+the year code, which is the part ten decade blocks exist to teach, so a primary
+screen that opened in assisted mode would skip the thing it is for.
+
+Both the help toggle and the date range are remembered in `localStorage`, beside
+the theme preference. A picker that resets on every visit is a picker the user
+sets on every visit. They are device state rather than user data, so neither is
+in `AppData` and neither needed a schema bump, and an unrecognised stored value
+falls back to the default rather than reaching the screen. That last part is not
+defensive habit: `rangeById` resolves an unknown id to the full range, so a
+corrupt value would quietly widen the pool instead of failing.
+
+Dates never enter spaced repetition, because they are not a fixed item set. Month
+doomsdays and century anchors do, because they are 12 and 4 fixed items. A wrong
+weekday answer does not punish either, since which step failed is unknowable.
+
+**Day step** is the last step of that method timed on its own, and it sits on
+the Weekday screen beside the dates and the tables. "In March, the 14th is a
+Tuesday. What is the 5th?" — one addition, seven buttons. It exists because a
+whole date cannot say where the time went: an answer that took six seconds spent
+them on the century anchor, the year code, the month doomsday or this final
+count, and the full-date trainer cannot tell those apart. David Turner's
+doomsday writeup memorises day-of-month mod 7 for 1 to 31 outright, precisely
+because this step is done while the rest of the date is still being read out.
+
+The anchor is always the real doomsday of the month named, so the step drilled
+is the step the method needs, and January and February get their leap case drawn
+too since those are the only two doomsdays that move. The weekday of that
+doomsday is stated rather than taken from a real year: a real year would let the
+answer be recalled instead of counted, and the count is what is being timed.
+
+Nothing here schedules anything. A (doomsday, day) pair is not a fixed item set,
+and the month doomsday is handed over rather than recalled, so the answer says
+nothing about that item either. The totals are cut by step size and by
+direction, because "I am slow at this" is not actionable and "the +5 steps cost
+twice what the +1 steps do" is. Both cuts cover every attempt, so either one
+sums to the overall figures and there is no third stored copy of them.
+
+### Year codes
+
+The 100 codes are one step of the method, not the subject of the app, so
+everything that teaches or keeps them sits behind a single destination presented
+as a grid: Learn, Revise and Calc, with Trouble spots joining them when
+something is flagged. Each tile carries one line of real status, so the grid
+answers "what is there to do" without being entered.
+
+They used to be three top-level entries called Review, Learn and Drills. All
+three names meant roughly "practise", they sat above the thing being practised
+for, and the first one the app opened on was Review.
 
 **Learn** teaches the table one decade at a time, and it teaches pairs rather
 than the run. A decade is introduced in three batches split by position mod
@@ -309,34 +388,22 @@ value. Without that, a miscounted leap day is silently replaced by the correct
 sum at the next question, the derivation can only fail on its last step, and
 "calculation was right" stops meaning anything.
 
-**Weekday** trains full dates, assisted (the year code is given) and unassisted.
-Dates never enter spaced repetition, because they are not a fixed item set. Month
-doomsdays and century anchors do, because they are 12 and 4 fixed items. A wrong
-weekday answer does not punish either, since which step failed is unknowable.
+**Revise** is where the codes are kept, and it is one surface with a mode
+already chosen. The default mode is the due queue: one year at a time, seven
+buttons, hints behind a button and shown unasked after two consecutive failures.
+The other three are sprint, gauntlet and decade, timed and outside spaced
+repetition entirely. A row selects, and one Start button begins the run.
 
-**Day step** is the last step of that method timed on its own, and it sits on
-the Weekday screen beside the dates and the tables. "In March, the 14th is a
-Tuesday. What is the 5th?" — one addition, seven buttons. It exists because a
-whole date cannot say where the time went: an answer that took six seconds spent
-them on the century anchor, the year code, the month doomsday or this final
-count, and the full-date trainer cannot tell those apart. David Turner's
-doomsday writeup memorises day-of-month mod 7 for 1 to 31 outright, precisely
-because this step is done while the rest of the date is still being read out.
+That costs reviewing a tap it did not cost before, when the screen was the run
+and began timing on mount. The tap is the price of a screen that can be read
+before it starts measuring you, and it was chosen knowingly rather than
+inherited from the merge.
 
-The anchor is always the real doomsday of the month named, so the step drilled
-is the step the method needs, and January and February get their leap case drawn
-too since those are the only two doomsdays that move. The weekday of that
-doomsday is stated rather than taken from a real year: a real year would let the
-answer be recalled instead of counted, and the count is what is being timed.
-
-Nothing here schedules anything. A (doomsday, day) pair is not a fixed item set,
-and the month doomsday is handed over rather than recalled, so the answer says
-nothing about that item either. The totals are cut by step size and by
-direction, because "I am slow at this" is not actionable and "the +5 steps cost
-twice what the +1 steps do" is. Both cuts cover every attempt, so either one
-sums to the overall figures and there is no third stored copy of them.
-
-**Drills** are sprint, gauntlet and decade, outside spaced repetition entirely.
+Only two things here write to the schedule, and both say so on screen: the due
+queue, and Trouble spots. Trouble spots is not a mode and is not in the list. It
+has no best to beat, it always runs with the block on screen and therefore
+always at a grade-3 ceiling, and for a user with nothing flagged it is not on
+the screen at all.
 
 **Progress** centres on the mastery grid, a 10x10 heatmap on a single-hue ramp so
 mastery reads as one thing getting stronger. Cell text colour is chosen by
@@ -358,7 +425,7 @@ derivation's sum (calculating), and compares answers that followed a neighbour
 against answers that did not. Recall is flat on all three. Nothing there feeds
 the scheduler.
 
-**Settings**, **Onboarding** and **Trouble spots** round it out. Notifications
+**Settings** and **Onboarding** round it out. Notifications
 are handled honestly: a local-first app with no server cannot do Web Push, the
 Notification Triggers API was removed from Chrome, and iOS gives nothing when the
 app is closed. So the capability layer reports what the browser can actually do,
@@ -485,9 +552,21 @@ Tests to know about, because they encode decisions rather than behaviour:
 - a missing or failed audio clip never blocking an answer or changing what is
   recorded, asserted both as a unit and through a rendered pass
 - import rejection paths, each with the message the UI will show
+- every nav path and every linked path resolving to a real route, and the paths
+  the restructure retired falling through to the catch-all
+- `screenTitle('/year-codes/learn')` being `Learn` rather than `Year codes`,
+  which is the one way the prefix matching goes wrong and the one way it goes
+  wrong silently
+- a stored weekday preference that is not a legal value falling back to the
+  default instead of reaching the screen
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.
+
+`localStorage` is cleared in the global `afterEach` in `src/test/setup.ts`. It
+was not, so a file's first case started on whatever the file above it had left
+behind, and the weekday preference tests would have passed or failed by file
+order. If you add device state, it belongs behind that reset.
 
 One test draws real randomness: `datePool.test.ts` checks that a 31-day month is
 sampled more often than February. Its bound is deliberately loose — the true

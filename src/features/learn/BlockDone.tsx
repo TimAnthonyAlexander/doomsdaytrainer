@@ -45,14 +45,14 @@ export function BlockDone({
         <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
           {introduced === 0 ? (
             <>
-              {'Already in review. '}
+              {'Already in the queue. '}
               <Taps count={wrongTaps} />
               {'.'}
             </>
           ) : (
             <>
               <Numeral color="inherit">{introduced}</Numeral>
-              {introduced === 1 ? ' code now in review, ' : ' codes now in review, '}
+              {introduced === 1 ? ' code now in the queue, ' : ' codes now in the queue, '}
               <Taps count={wrongTaps} />
               {'.'}
             </>

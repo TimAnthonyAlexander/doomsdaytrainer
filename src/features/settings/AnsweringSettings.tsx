@@ -120,7 +120,7 @@ export function AnsweringSettings({ settings, onChange }: AnsweringSettingsProps
 
       <Field
         label="Answer window"
-        note="Off by default. A time limit reliably pushes you off a procedure and onto recall for years you already know, but there is no evidence it helps you learn a new one, and some that it hurts: a forced guess on seven buttons is wrong six times in seven, and the wrong answer is what gets reinforced. So in Review, running out shows the hint and waits — it never records an answer you did not give. In Drills, which write no scheduling, running out is a miss."
+        note="Off by default. A time limit reliably pushes you off a procedure and onto recall for years you already know, but there is no evidence it helps you learn a new one, and some that it hurts: a forced guess on seven buttons is wrong six times in seven, and the wrong answer is what gets reinforced. So in Revise, running out shows the hint and waits — it never records an answer you did not give. In a drill, which writes no scheduling, running out is a miss."
       >
         <ToggleButtonGroup
           exclusive

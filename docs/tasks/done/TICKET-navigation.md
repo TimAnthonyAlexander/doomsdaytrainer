@@ -1,7 +1,7 @@
 # Navigation and labelling restructure
 
 **Raised by:** Tim (PM)
-**Status:** Open
+**Status:** Done, 22 August 2026
 
 ## The problem
 
@@ -48,3 +48,27 @@ one ready-to-start UI.
   default mode, the rest as options chosen before starting.
 - The names tell a person who has never used the app what each screen does, and
   no two names mean the same thing.
+
+## What shipped
+
+The nav went from seven entries to four: Weekday, Year codes, Progress,
+Settings. Weekday is the index route.
+
+`/` is Weekday. `/year-codes` is a grid of Learn, Revise and Calc, with Trouble
+spots joining them when something is flagged; each tile carries one line of real
+status, so the grid answers "what is there to do" without being entered. Review
+and Drills are gone as names and as destinations, merged into Revise: one
+surface, the due queue preselected, sprint, gauntlet and decade as the other
+modes, one Start button.
+
+Reviewing costs one tap it did not cost before, since the screen used to be the
+run and began timing on mount. That was accepted deliberately.
+
+Unassisted is the Weekday default. Both of that screen's pickers are remembered
+in `localStorage`, so it comes back on whatever was last chosen.
+
+Two things fell out of the work rather than being asked for. The route table had
+no test at all, which is how a restructure like this ships a dead link, so
+`routes` is exported and asserted. And `localStorage` was not being cleared
+between tests, so a file's first case started on whatever the file above it left
+behind.

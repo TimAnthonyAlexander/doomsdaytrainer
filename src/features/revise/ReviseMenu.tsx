@@ -265,7 +265,8 @@ export function ReviseMenu({
             Drill latency
           </Typography>
           <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 0.5 }}>
-            Median of each drill, per day. Review latency is a separate number, on Stats.
+            Median of each drill, per day. Latency on the scheduled queue is a separate number,
+            on Stats.
           </Typography>
         </Box>
         <DrillLatencyChart records={records} now={now} />

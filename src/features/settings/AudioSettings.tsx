@@ -11,7 +11,7 @@ interface AudioSettingsProps {
  * The two spoken-prompt switches.
  *
  * They are separate because they cost different things. Learn is not timed, so
- * speaking there is free. Review is the app's measuring instrument, so speaking
+ * speaking there is free. Revise is the app's measuring instrument, so speaking
  * there puts listening time inside every latency it grades on, and the note
  * says so in the plainest words available rather than leaving the user to
  * discover it in a median that moved.
@@ -32,12 +32,12 @@ export function AudioSettings({ settings, onChange }: AudioSettingsProps) {
       />
 
       <SwitchField
-        label="Spoken years in Review"
-        note="Says the year on a review prompt. Latency is measured from the prompt appearing to your tap, so the second the clip takes sits inside every review answer you give with this on, and that latency is what sets the grade, the fluency decision and the mastery grid. Stats says how many of your recent answers had it. The speaker button on the review screen is this same setting."
+        label="Spoken years in Revise"
+        note="Says the year on a Revise prompt. Latency is measured from the prompt appearing to your tap, so the second the clip takes sits inside every answer you give with this on, and that latency is what sets the grade, the fluency decision and the mastery grid. Stats says how many of your recent answers had it. The speaker button on the Revise screen is this same setting."
         control={
           <Switch
             checked={settings.spokenReviewPrompts}
-            slotProps={{ input: { 'aria-label': 'Spoken years in Review' } }}
+            slotProps={{ input: { 'aria-label': 'Spoken years in Revise' } }}
             onChange={(event) => onChange({ spokenReviewPrompts: event.target.checked })}
           />
         }

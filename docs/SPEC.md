@@ -1,12 +1,34 @@
-# Year Code Trainer — Product Spec
+# Doomsday Trainer — Product Spec
+
+> This file was written when the app was only the year-code table, and parts of
+> it still read that way. `CLAUDE.md` in the repo root is the description kept
+> current; where the two disagree, that one is right.
 
 ## Purpose
 
-A single-purpose trainer for memorizing the 100 year codes (00-99) used in the Doomsday method. Not a weekday calculator, not a full method tutor. Only the lookup table.
+A trainer for the Doomsday method: full dates to weekdays, and the tables the
+method runs on. The 100 year codes are the largest of those tables and the one
+that takes longest to acquire, but they are a step of the method rather than the
+subject of the app.
 
 ## Success criterion
 
-User can produce any of the 100 codes from memory in under 1 second, with 95%+ accuracy, and retain that after 30 days without daily practice.
+User can name the weekday of an arbitrary date without help. Underneath that,
+the enabling criterion the app spends most of its screens on: producing any of
+the 100 codes from memory in under 1 second, with 95%+ accuracy, and retaining
+that after 30 days without daily practice.
+
+## Navigation
+
+Four destinations. Weekday is the index route and the primary one. Everything
+that teaches or keeps the 100 codes sits behind **Year codes**, presented as a
+grid of Learn, Revise and Calc, with Trouble spots joining them when an item has
+been flagged. **Progress** and **Settings** are the other two.
+
+**Revise** is one surface with a mode already selected and a Start button. The
+default mode is the scheduled due queue, which is the only mode there that
+writes to the schedule; sprint, gauntlet and decade are timed and leave it
+alone.
 
 ---
 
@@ -206,6 +228,12 @@ fixed positions, same interaction contract as the code pad.
 2. **Unassisted.** Nothing is shown. The whole computation.
 
 Both modes are always available. Mode is a toggle on the trainer, not a setting.
+**Unassisted is the default**: assisted hands over the year code, which is the
+part the rest of the app exists to teach.
+
+The mode and the range filter are both remembered on the device, so the screen
+comes back on whatever was last chosen. They live in `localStorage` rather than
+in the user's data, because they are device state, like the theme.
 
 ### Supporting data
 
