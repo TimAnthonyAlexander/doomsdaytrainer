@@ -73,7 +73,7 @@ export function ReviewRun({ onDone }: ReviewRunProps) {
   const whatNext = (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5 }}>
       {session.unlearnedCount > 0 ? (
-        <Button component={RouterLink} to="/learn" variant="contained">
+        <Button component={RouterLink} to="/year-codes/learn" variant="contained">
           Go to Learn
         </Button>
       ) : null}

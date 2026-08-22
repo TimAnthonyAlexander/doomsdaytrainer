@@ -32,8 +32,9 @@ const PRIMARY_LABEL: Record<OnboardingStep, string> = {
  * Four steps, one commit. Choices live in local state until the last button, so
  * a run that is abandoned halfway leaves nothing behind and starts clean.
  *
- * It finishes on Learn rather than Review because nothing has been introduced
- * yet, and an empty review queue is a poor first screen.
+ * It finishes on Learn rather than on Weekday, which is otherwise the app's
+ * first destination: nothing has been introduced yet, so there is no code to
+ * recall and nothing due to revise. Learn is the only screen with work on it.
  */
 export function OnboardingFlow() {
   const { settings, updateSettings } = useAppState();
@@ -51,7 +52,7 @@ export function OnboardingFlow() {
     setSaving(true);
     try {
       await updateSettings(settingsFromDraft(draft));
-      navigate('/learn', { replace: true });
+      navigate('/year-codes/learn', { replace: true });
     } catch {
       setSaving(false);
     }

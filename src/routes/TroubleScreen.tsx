@@ -62,7 +62,7 @@ export function TroubleScreen() {
             {RECOVERY_LINE}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            <Button component={RouterLink} to="/" variant="contained">
+            <Button component={RouterLink} to="/year-codes/revise" variant="contained">
               Go to Revise
             </Button>
           </Box>
@@ -75,7 +75,7 @@ export function TroubleScreen() {
         <EmptyState
           icon={CircleSlash}
           action={
-            <Button component={RouterLink} to="/" variant="outlined" color="inherit">
+            <Button component={RouterLink} to="/year-codes/revise" variant="outlined" color="inherit">
               Go to Revise
             </Button>
           }

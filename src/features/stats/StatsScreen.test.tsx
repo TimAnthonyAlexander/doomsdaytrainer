@@ -247,7 +247,7 @@ describe('StatsScreen and the trouble drill', () => {
     await mount();
 
     const link = screen.getByRole('link', { name: 'Trouble spots' });
-    expect(link).toHaveAttribute('href', '/trouble');
+    expect(link).toHaveAttribute('href', '/year-codes/trouble');
     expect(screen.getByText(/1 code is waiting in the trouble drill/)).toBeInTheDocument();
   });
 });

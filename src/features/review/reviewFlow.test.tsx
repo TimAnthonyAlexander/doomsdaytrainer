@@ -103,7 +103,7 @@ describe('Review loop', () => {
     mountScreen();
 
     const link = await screen.findByRole('link', { name: 'Go to Learn' });
-    expect(link).toHaveAttribute('href', '/learn');
+    expect(link).toHaveAttribute('href', '/year-codes/learn');
     expect(screen.queryByRole('radiogroup', { name: 'Mode' })).not.toBeInTheDocument();
   });
 

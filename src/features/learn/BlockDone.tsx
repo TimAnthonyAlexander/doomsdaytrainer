@@ -69,7 +69,7 @@ export function BlockDone({
             </Numeral>
           </Button>
         ) : null}
-        <Button component={RouterLink} to="/" variant="outlined">
+        <Button component={RouterLink} to="/year-codes/revise" variant="outlined">
           Go to Revise
         </Button>
         <Button onClick={onExit} color="inherit" sx={{ color: 'text.secondary' }}>

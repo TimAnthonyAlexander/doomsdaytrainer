@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { BarChart3, BookOpen, Calculator, CalendarDays, Repeat, Settings } from 'lucide-react';
+import { BarChart3, CalendarDays, Hash, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
@@ -14,23 +14,27 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { path: '/', label: 'Revise', icon: Repeat },
-  { path: '/learn', label: 'Learn', icon: BookOpen },
-  { path: '/weekday', label: 'Weekday', icon: CalendarDays },
-  // "Calc", not "Calculate": at 375px six columns are still narrow enough that
-  // the longer word wraps, which would grow the bar on every screen.
-  { path: '/calc', label: 'Calc', icon: Calculator },
+  { path: '/', label: 'Weekday', icon: CalendarDays },
+  { path: '/year-codes', label: 'Year codes', icon: Hash },
   { path: '/stats', label: 'Stats', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 /**
- * Screens that are reachable but deliberately kept out of the nav. They still
- * have to name themselves in the phone's top bar, or the bar calls them "Not
- * found" while the screen underneath works perfectly.
+ * Screens that name themselves, because the nav cannot name them.
+ *
+ * `isNavActive` matches the whole subtree under a path, which is what lights
+ * one nav entry on all four year-code screens. Read for a title it gives the
+ * wrong answer: the bar would say "Year codes" while the user is on Learn. So
+ * this map is consulted first and a child always wins. A screen kept out of the
+ * bar entirely needs an entry here too, or the bar calls it "Not found" while
+ * it works perfectly.
  */
-const OFF_NAV_TITLES: Readonly<Record<string, string>> = {
-  '/trouble': 'Trouble spots',
+const SCREEN_TITLES: Readonly<Record<string, string>> = {
+  '/year-codes/learn': 'Learn',
+  '/year-codes/revise': 'Revise',
+  '/year-codes/calc': 'Calc',
+  '/year-codes/trouble': 'Trouble spots',
 };
 
 export const ICON_SIZE = 20;
@@ -43,13 +47,17 @@ export function isNavActive(pathname: string, path: string): boolean {
 
 /** What the top bar calls the current screen. */
 export function screenTitle(pathname: string): string {
+  const named = SCREEN_TITLES[pathname];
+  if (named) return named;
   const item = NAV_ITEMS.find((entry) => isNavActive(pathname, entry.path));
-  if (item) return item.label;
-  return OFF_NAV_TITLES[pathname] ?? 'Not found';
+  return item?.label ?? 'Not found';
 }
 
+/** The one nav entry the due count belongs to. Codes are what fall due. */
+export const DUE_COUNT_PATH = '/year-codes';
+
 interface BottomNavProps {
-  /** Shown next to "Revise" when above zero. A real number, not a badge dot. */
+  /** Shown next to "Year codes" when above zero. A real number, not a badge dot. */
   dueCount: number;
 }
 
@@ -84,7 +92,7 @@ export function BottomNav({ dueCount }: BottomNavProps) {
         {NAV_ITEMS.map((item) => {
           const active = isNavActive(pathname, item.path);
           const Icon = item.icon;
-          const count = item.path === '/' ? dueCount : 0;
+          const count = item.path === DUE_COUNT_PATH ? dueCount : 0;
           return (
             <ButtonBase
               key={item.path}

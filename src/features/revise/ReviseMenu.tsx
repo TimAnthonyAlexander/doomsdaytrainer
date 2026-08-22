@@ -232,7 +232,7 @@ export function ReviseMenu({
         <Box sx={{ borderTop: `1px solid ${palette.rule}` }}>
           <ButtonBase
             component={RouterLink}
-            to="/trouble"
+            to="/year-codes/trouble"
             sx={{
               width: '100%',
               minHeight: 64,

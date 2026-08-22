@@ -104,13 +104,13 @@ export function StatsScreen() {
                 a longer drill than the user gets. */}
             {`${trouble.length} ${trouble.length === 1 ? 'code is' : 'codes are'} waiting in the trouble drill. It asks them worst first, with the block on screen.`}
           </Typography>
-          <Button component={RouterLink} to="/trouble" variant="outlined" color="inherit">
+          <Button component={RouterLink} to="/year-codes/trouble" variant="outlined" color="inherit">
             Trouble spots
           </Button>
         </Box>
       ) : null}
 
-      <Section title="Latency by decade" note="Median of review attempts. Drill times are on the Drills screen.">
+      <Section title="Latency by decade" note="Median of review attempts. Drill times are on Revise.">
         <Stat
           label="Overall median"
           size="lg"

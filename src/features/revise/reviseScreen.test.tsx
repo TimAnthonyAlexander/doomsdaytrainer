@@ -66,7 +66,7 @@ describe('ReviseScreen before anything has been learned', () => {
     render(<ReviseScreen />, { wrapper });
     expect(await screen.findByText(/Nothing to revise yet/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Go to Learn' });
-    expect(link).toHaveAttribute('href', '/learn');
+    expect(link).toHaveAttribute('href', '/year-codes/learn');
     expect(screen.queryByRole('heading', { name: 'Revise' })).not.toBeInTheDocument();
   });
 });
@@ -292,7 +292,7 @@ describe('ReviseScreen and the trouble drill', () => {
     await screen.findByRole('heading', { name: 'Revise' });
 
     const link = screen.getByRole('link', { name: /Trouble spots/ });
-    expect(link).toHaveAttribute('href', '/trouble');
+    expect(link).toHaveAttribute('href', '/year-codes/trouble');
     expect(link).toHaveTextContent('2 codes flagged after six lapses');
     // The one drill that does reschedule says so where the others say they do not.
     expect(link).toHaveTextContent('This one does change your schedule.');

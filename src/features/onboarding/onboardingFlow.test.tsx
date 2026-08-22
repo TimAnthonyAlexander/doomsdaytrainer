@@ -47,8 +47,8 @@ async function mount(entry = '/welcome') {
           <MemoryRouter initialEntries={[entry]}>
             <Routes>
               <Route path="/welcome" element={<WelcomeScreen />} />
-              <Route path="/learn" element={<div>learn screen</div>} />
-              <Route path="/" element={<div>review screen</div>} />
+              <Route path="/year-codes/learn" element={<div>learn screen</div>} />
+              <Route path="/" element={<div>weekday screen</div>} />
             </Routes>
           </MemoryRouter>
           <SettingsProbe />
@@ -196,7 +196,7 @@ describe('onboarding flow', () => {
     await seedSettings({ onboardingComplete: true });
     await mount();
 
-    expect(await screen.findByText('review screen')).toBeInTheDocument();
+    expect(await screen.findByText('weekday screen')).toBeInTheDocument();
     expect(heading('100 number pairs')).toBeNull();
   });
 

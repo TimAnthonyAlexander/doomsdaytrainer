@@ -3,7 +3,15 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import { useMemo } from 'react';
 import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { BottomNav, ICON_SIZE, ICON_STROKE, NAV_ITEMS, isNavActive, screenTitle } from './BottomNav';
+import {
+  BottomNav,
+  DUE_COUNT_PATH,
+  ICON_SIZE,
+  ICON_STROKE,
+  NAV_ITEMS,
+  isNavActive,
+  screenTitle,
+} from './BottomNav';
 import { Numeral } from '@/components/ui/Numeral';
 import { dueItems } from '@/domain/scheduler';
 import { resolveScope } from '@/domain/scope';
@@ -105,7 +113,7 @@ export function AppShell() {
         {NAV_ITEMS.map((item) => {
           const active = isNavActive(pathname, item.path);
           const Icon = item.icon;
-          const count = item.path === '/' ? dueCount : 0;
+          const count = item.path === DUE_COUNT_PATH ? dueCount : 0;
           return (
             <ButtonBase
               key={item.path}

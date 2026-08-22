@@ -101,7 +101,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
         <EmptyState
           icon={Check}
           action={
-            <Button component={RouterLink} to="/" variant="outlined">
+            <Button component={RouterLink} to="/year-codes/revise" variant="outlined">
               Go to Revise
             </Button>
           }

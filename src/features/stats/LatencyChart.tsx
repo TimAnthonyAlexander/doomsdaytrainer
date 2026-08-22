@@ -14,7 +14,7 @@ import { contiguousRuns, niceLatencyCeiling, type LatencyPoint } from './statsSe
  * *break* on days with no data rather than interpolate through them. That is a
  * dozen prop overrides against its defaults, or twenty lines of path maths.
  *
- * The chart plots review latency on Stats and drill latency on Drills, so the
+ * The chart plots review latency on Stats and drill latency on Revise, so the
  * two strings a screen reader and an empty screen depend on are props. `label`
  * is a function because only this component knows how many of the days it was
  * handed actually carry a number.

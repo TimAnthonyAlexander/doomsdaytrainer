@@ -14,7 +14,7 @@ export function NotFoundScreen() {
       </Typography>
       <Box>
         <Button component={RouterLink} to="/" variant="outlined">
-          Go to Revise
+          Go to Weekday
         </Button>
       </Box>
     </Screen>

@@ -109,7 +109,7 @@ export function ReviseScreen() {
         <EmptyState
           icon={BookOpen}
           action={
-            <Button component={RouterLink} to="/learn" variant="contained">
+            <Button component={RouterLink} to="/year-codes/learn" variant="contained">
               Go to Learn
             </Button>
           }

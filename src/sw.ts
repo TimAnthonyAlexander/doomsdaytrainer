@@ -47,7 +47,8 @@ interface PeriodicSyncEvent extends ExtendableEvent {
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// Deep links have to resolve offline: /weekday is served by the cached shell.
+// Deep links have to resolve offline: /year-codes/learn is served by the
+// cached shell.
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
 
 /* ------------------------------------------------------------------ */
@@ -261,7 +262,9 @@ async function openApp(): Promise<void> {
     await existing.focus();
     return;
   }
-  await self.clients.openWindow('/');
+  // The reminder is about codes that have fallen due, so it opens the queue
+  // rather than the app's front door.
+  await self.clients.openWindow('/year-codes/revise');
 }
 
 self.addEventListener('notificationclick', (event) => {
