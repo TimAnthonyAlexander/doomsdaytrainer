@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS } from '@/storage/defaults';
  * only interesting thing to test, and it lives here.
  */
 
-export const ONBOARDING_STEPS = ['intro', 'why', 'index', 'scope'] as const;
+export const ONBOARDING_STEPS = ['intro', 'why', 'index', 'scope', 'walk'] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

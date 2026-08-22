@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -7,8 +7,9 @@ import type { Settings } from '@/domain/types';
 import { WelcomeScreen } from '@/routes/WelcomeScreen';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { useAppState } from '@/state/useAppState';
-import { closeDb, saveAppData } from '@/storage/db';
+import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData } from '@/storage/defaults';
+import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
 
 /** Renders the live settings document so assertions read what was persisted. */
@@ -63,6 +64,45 @@ async function mount(entry = '/welcome') {
 const heading = (name: string | RegExp) => screen.queryByRole('heading', { name });
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 
+/**
+ * 20 March 1987 walked to Friday: the 1900s anchor, 87 with its 28s taken off,
+ * the leap days in what is left, the year code, the year's doomsday, March's
+ * doomsday date, the step off it, and the weekday number. Same date and same
+ * answers as the Concept screen's own test, because it is the same walk.
+ */
+const WALK_DATE = '1987-03-20';
+const WALK_ANSWERS = [3, 3, 0, 3, 6, 14, 6, 5] as const;
+const WALK_DAY = 'Fri';
+
+/** Answers the walk step on screen, whichever of its three controls it uses. */
+async function answerStep(value: number): Promise<void> {
+  await nextPaint();
+  if (screen.queryByRole('button', { name: 'Check' })) {
+    // The date picker is the other input on this screen; the typed answer is
+    // whichever text field is not it.
+    const field = screen.getAllByRole('textbox').find((element) => element.id !== 'concept-date');
+    fireEvent.change(field as HTMLInputElement, { target: { value: String(value) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    return;
+  }
+  fireEvent.click(
+    screen.queryByRole('button', { name: String(value) }) ??
+      screen.getByRole('button', { name: `Day ${value}` }),
+  );
+}
+
+/** All nine steps of the guided walk, answered correctly, on a fixed date. */
+async function finishWalk(): Promise<void> {
+  fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
+  for (const value of WALK_ANSWERS) {
+    await answerStep(value);
+    fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
+  }
+  await nextPaint();
+  fireEvent.click(screen.getByRole('button', { name: WALK_DAY }));
+  fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+}
+
 beforeEach(deleteDb);
 
 describe('onboarding flow', () => {
@@ -88,6 +128,8 @@ describe('onboarding flow', () => {
     // Two digits maximum: "250" can never become year 250.
     expect(from).toHaveValue('25');
 
+    await user.click(button('Next'));
+    await finishWalk();
     await user.click(button('Start learning'));
 
     expect(await screen.findByText('learn screen')).toBeInTheDocument();
@@ -107,6 +149,8 @@ describe('onboarding flow', () => {
     await user.click(button('Next'));
     await user.click(button('Skip'));
     await user.click(button('Next'));
+    await user.click(button('Next'));
+    await finishWalk();
     await user.click(button('Start learning'));
 
     await screen.findByText('learn screen');
@@ -123,7 +167,7 @@ describe('onboarding flow', () => {
 
     expect(heading('Which day is code 0?')).not.toBeNull();
     expect(heading('Where the codes come from')).toBeNull();
-    expect(screen.getByRole('group', { name: 'Step 3 of 4' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Step 3 of 5' })).toBeInTheDocument();
   });
 
   it('holds the year codes still while the weekday names change', async () => {
@@ -157,6 +201,8 @@ describe('onboarding flow', () => {
     await user.click(button('Next'));
     expect(button(/Living memory/)).toHaveAttribute('aria-pressed', 'true');
 
+    await user.click(button('Next'));
+    await finishWalk();
     await user.click(button('Start learning'));
     await screen.findByText('learn screen');
     expect(persistedSettings().scopeId).toBe('living');
@@ -218,5 +264,82 @@ describe('onboarding flow', () => {
     expect(button(/Custom range/)).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('From')).toHaveValue('30');
     expect(screen.getByLabelText('To')).toHaveValue('40');
+  });
+});
+
+type User = ReturnType<typeof userEvent.setup>;
+
+/** The four read steps, tapped through, leaving the walk on screen. */
+async function reachWalk(user: User, convention: 'sunday' | 'monday' = 'sunday'): Promise<void> {
+  await user.click(button('Next'));
+  await user.click(button('Skip'));
+  if (convention === 'monday') await user.click(button('0 = Monday'));
+  await user.click(button('Next'));
+  await user.click(button('Next'));
+}
+
+describe('the guided walk at the end of onboarding', () => {
+  it('comes after the scope choice and cannot be stepped past', async () => {
+    const { user } = await mount();
+    await reachWalk(user);
+
+    expect(heading('One whole date')).not.toBeNull();
+    expect(screen.getByRole('group', { name: 'Step 5 of 5' })).toBeInTheDocument();
+    // The only way on is through the walk: the button that opens the app is not
+    // on screen until the last step has been answered.
+    expect(screen.queryByRole('button', { name: 'Start learning' })).toBeNull();
+    expect(persistedSettings().onboardingComplete).toBe(false);
+
+    await finishWalk();
+    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
+
+    await user.click(button('Start learning'));
+    expect(await screen.findByText('learn screen')).toBeInTheDocument();
+  });
+
+  it('orders the last pad by the convention picked in this run', async () => {
+    const { user } = await mount();
+    await reachWalk(user, 'monday');
+
+    // The choice is two steps back and still only in the draft. A read of the
+    // stored settings here would open the pad on Sunday, which is what the
+    // document still says.
+    expect(persistedSettings().indexConvention).toBe('sunday');
+
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
+    for (const value of WALK_ANSWERS) {
+      await answerStep(value);
+      fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
+    }
+    await nextPaint();
+
+    const pad = screen.getByRole('button', { name: 'Mon' }).parentElement as HTMLElement;
+    expect(
+      within(pad)
+        .getAllByRole('button')
+        .map((element) => element.getAttribute('aria-label')),
+    ).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+
+    // Invariant 8: the buttons moved and the number did not.
+    expect(screen.getByText('Which day is 5?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: WALK_DAY }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
+  });
+
+  it('writes nothing of its own, then commits the run at the end', async () => {
+    const { user } = await mount();
+    await reachWalk(user, 'monday');
+
+    const before = JSON.stringify(await loadAppData());
+    await finishWalk();
+    expect(JSON.stringify(await loadAppData())).toBe(before);
+
+    await user.click(button('Start learning'));
+    await screen.findByText('learn screen');
+
+    const settings = persistedSettings();
+    expect(settings.indexConvention).toBe('monday');
+    expect(settings.onboardingComplete).toBe(true);
   });
 });

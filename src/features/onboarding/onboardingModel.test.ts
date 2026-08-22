@@ -31,22 +31,24 @@ const draft = (overrides: Partial<OnboardingDraft> = {}): OnboardingDraft => ({
 });
 
 describe('steps', () => {
-  it('has the four steps from the spec, in order', () => {
-    expect(ONBOARDING_STEPS).toEqual(['intro', 'why', 'index', 'scope']);
-    expect(STEP_COUNT).toBe(4);
+  it('has the five steps, in order, the walk last', () => {
+    expect(ONBOARDING_STEPS).toEqual(['intro', 'why', 'index', 'scope', 'walk']);
+    expect(STEP_COUNT).toBe(5);
   });
 
   it('numbers steps from one', () => {
     expect(stepNumber('intro')).toBe(1);
-    expect(stepNumber('scope')).toBe(4);
+    expect(stepNumber('walk')).toBe(5);
   });
 
   it('walks forward and back', () => {
     expect(nextStep('intro')).toBe('why');
     expect(nextStep('why')).toBe('index');
     expect(nextStep('index')).toBe('scope');
-    expect(nextStep('scope')).toBeNull();
+    expect(nextStep('scope')).toBe('walk');
+    expect(nextStep('walk')).toBeNull();
 
+    expect(previousStep('walk')).toBe('scope');
     expect(previousStep('scope')).toBe('index');
     expect(previousStep('intro')).toBeNull();
   });
