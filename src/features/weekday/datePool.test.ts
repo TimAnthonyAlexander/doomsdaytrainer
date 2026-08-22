@@ -119,9 +119,15 @@ describe('randomDateIn', () => {
     const range = rangeById('century', NOW);
     const byMonth = new Array<number>(13).fill(0);
     for (let i = 0; i < 60_000; i += 1) byMonth[randomDateIn(range).month] += 1;
-    // January has 31 days and February 28: roughly a tenth more draws, and
-    // nothing like the equal split a month-first draw would give.
-    expect(byMonth[1]).toBeGreaterThan(byMonth[2] * 1.05);
+    // January has 31 days and February 28.25, so the true ratio is about 1.097
+    // and the equal split a month-first draw would give is 1.0.
+    //
+    // The lower bound is 1.02 rather than something nearer the real ratio
+    // because this draws real randomness: at 60,000 draws the ratio's standard
+    // error is about 0.022, so a 1.05 bound sits only two standard errors below
+    // the truth and failed roughly one run in fifty. 1.02 is three and a half
+    // standard errors out and still rules out the thing the test is for.
+    expect(byMonth[1]).toBeGreaterThan(byMonth[2] * 1.02);
     expect(byMonth[1]).toBeLessThan(byMonth[2] * 1.2);
   });
 });
