@@ -6,8 +6,9 @@ import type { AppData, Settings } from '@/domain/types';
 import { codeFor } from '@/domain/yearCodes';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, itemKey } from '@/storage/defaults';
-import { AppStateProvider } from '@/state/AppStateProvider';
-import { ReviewScreen } from '@/routes/ReviewScreen';
+import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
+import { ReviewRun } from '@/features/review/ReviewRun';
+import { ReviseScreen } from '@/routes/ReviseScreen';
 import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
 
@@ -46,12 +47,32 @@ async function seed(items: SeedItem[], settings: Partial<Settings> = {}): Promis
   await closeDb();
 }
 
+/**
+ * The run on its own. Whether it should be running at all is the Revise
+ * screen's decision now, so the loop is mounted directly rather than through a
+ * menu and a Start tap that would sit in front of every assertion below.
+ */
 function mount() {
   return render(
     <ThemeProvider theme={theme}>
       <AppStateProvider>
         <MemoryRouter>
-          <ReviewScreen />
+          <ReviewRun onDone={() => undefined} />
+        </MemoryRouter>
+      </AppStateProvider>
+    </ThemeProvider>,
+  );
+}
+
+/** The whole surface: the mode list, and the run behind Start. */
+function mountScreen() {
+  return render(
+    <ThemeProvider theme={theme}>
+      <AppStateProvider>
+        <MemoryRouter>
+          <AppStateGate>
+            <ReviseScreen />
+          </AppStateGate>
         </MemoryRouter>
       </AppStateProvider>
     </ThemeProvider>,
@@ -79,10 +100,32 @@ beforeEach(deleteDb);
 describe('Review loop', () => {
   it('points at Learn while nothing has been introduced', async () => {
     await seed([]);
-    mount();
+    mountScreen();
 
     const link = await screen.findByRole('link', { name: 'Go to Learn' });
     expect(link).toHaveAttribute('href', '/learn');
+    expect(screen.queryByRole('radiogroup', { name: 'Mode' })).not.toBeInTheDocument();
+  });
+
+  it('opens on the mode list with Revise chosen, and reaches the first year on Start', async () => {
+    // The queue used to run the moment the screen mounted. It costs a tap now,
+    // and that tap is the point of the change: the same surface offers the
+    // three drills, so the mode has to be chosen before anything is timed.
+    await seed([{ yy: 73, dueAgo: 4000 }]);
+    mountScreen();
+
+    await screen.findByRole('heading', { name: 'Revise' });
+    expect(screen.getByRole('radio', { name: /^Revise/ })).toBeChecked();
+    expect(screen.queryByLabelText('Year 73')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(await screen.findByLabelText('Year 73')).toBeInTheDocument();
+
+    await tap(String(codeFor(73)));
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.items[itemKey(73)].attemptHistory).toHaveLength(1);
+    });
   });
 
   it('shows the oldest due item first and moves on after a correct answer', async () => {

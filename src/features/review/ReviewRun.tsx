@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import { BookOpen, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
@@ -22,7 +22,17 @@ const OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
   label: String(value),
 }));
 
-export function ReviewScreen() {
+interface ReviewRunProps {
+  /** Back to the mode list. Offered on the summary and on an empty queue. */
+  onDone: () => void;
+}
+
+/**
+ * The due queue, one year at a time. This is the only surface in the app that
+ * schedules, and it owns nothing else: whether it should be running at all is
+ * the caller's decision, and so is where the user goes afterwards.
+ */
+export function ReviewRun({ onDone }: ReviewRunProps) {
   const { settings, updateSettings } = useAppState();
   const session = useReviewSession();
   const { phase, advance } = session;
@@ -58,8 +68,8 @@ export function ReviewScreen() {
   const summary = useMemo(() => summarise(session.results), [session.results]);
 
   // Where a finished queue leaves the user. Learn is offered only while the
-  // scope still holds a code they have never seen; drills are always something
-  // to do, and they cannot disturb what was just scheduled.
+  // scope still holds a code they have never seen; the mode list is always
+  // there, and picking a drill from it cannot disturb what was just scheduled.
   const whatNext = (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1.5 }}>
       {session.unlearnedCount > 0 ? (
@@ -67,28 +77,11 @@ export function ReviewScreen() {
           Go to Learn
         </Button>
       ) : null}
-      <Button component={RouterLink} to="/drills" variant="outlined" color="inherit">
-        Go to Drills
+      <Button variant="outlined" color="inherit" onClick={onDone}>
+        Back to modes
       </Button>
     </Box>
   );
-
-  if (session.introducedCount === 0) {
-    return (
-      <Screen>
-        <EmptyState
-          icon={BookOpen}
-          action={
-            <Button component={RouterLink} to="/learn" variant="contained">
-              Go to Learn
-            </Button>
-          }
-        >
-          Nothing to review yet. Learn a decade block and those ten codes enter the queue.
-        </EmptyState>
-      </Screen>
-    );
-  }
 
   if (session.item === null) {
     if (summary.total > 0) {

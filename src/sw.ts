@@ -47,7 +47,7 @@ interface PeriodicSyncEvent extends ExtendableEvent {
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// Deep links have to resolve offline: /drills is served by the cached shell.
+// Deep links have to resolve offline: /weekday is served by the cached shell.
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
 
 /* ------------------------------------------------------------------ */

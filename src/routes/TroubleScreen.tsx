@@ -63,10 +63,7 @@ export function TroubleScreen() {
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
             <Button component={RouterLink} to="/" variant="contained">
-              Go to Review
-            </Button>
-            <Button component={RouterLink} to="/drills" variant="outlined" color="inherit">
-              Go to Drills
+              Go to Revise
             </Button>
           </Box>
         </Screen>
@@ -78,8 +75,8 @@ export function TroubleScreen() {
         <EmptyState
           icon={CircleSlash}
           action={
-            <Button component={RouterLink} to="/drills" variant="outlined" color="inherit">
-              Go to Drills
+            <Button component={RouterLink} to="/" variant="outlined" color="inherit">
+              Go to Revise
             </Button>
           }
         >

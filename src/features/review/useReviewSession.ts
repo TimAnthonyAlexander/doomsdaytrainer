@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Attempt, Code, ItemState, YearKey } from '@/domain/types';
-import { dueItems, nextDueItem } from '@/domain/scheduler';
+import { dueItems, nextDueItem, soonestDueAt } from '@/domain/scheduler';
 import { LOOKBACK } from '@/domain/rotation';
 import { inScope, resolveScope } from '@/domain/scope';
 import { codeFor } from '@/domain/yearCodes';
@@ -89,16 +89,7 @@ export function useReviewSession(): ReviewSession {
     [itemList, scope],
   );
 
-  const nextDueAt = useMemo(() => {
-    const now = Date.now();
-    let soonest: number | null = null;
-    for (const entry of itemList) {
-      if (!entry.introduced || !inScope(entry.yy, scope)) continue;
-      if (entry.dueAt <= now) continue;
-      if (soonest === null || entry.dueAt < soonest) soonest = entry.dueAt;
-    }
-    return soonest;
-  }, [itemList, scope]);
+  const nextDueAt = useMemo(() => soonestDueAt(itemList, scope, Date.now()), [itemList, scope]);
 
   const autoHint = answered ? answered.autoHint : item !== null && shouldAutoHint(item);
   const hintVisible = hintOpen || autoHint || timedOut > 0;

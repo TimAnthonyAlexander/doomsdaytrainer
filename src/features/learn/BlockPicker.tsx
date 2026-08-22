@@ -102,7 +102,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
           icon={Check}
           action={
             <Button component={RouterLink} to="/" variant="outlined">
-              Go to Review
+              Go to Revise
             </Button>
           }
         >

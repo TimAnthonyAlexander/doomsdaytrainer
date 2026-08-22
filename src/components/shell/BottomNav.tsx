@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { BarChart3, BookOpen, Calculator, CalendarDays, Repeat, Settings, Timer } from 'lucide-react';
+import { BarChart3, BookOpen, Calculator, CalendarDays, Repeat, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
@@ -14,12 +14,11 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { path: '/', label: 'Review', icon: Repeat },
+  { path: '/', label: 'Revise', icon: Repeat },
   { path: '/learn', label: 'Learn', icon: BookOpen },
-  { path: '/drills', label: 'Drills', icon: Timer },
   { path: '/weekday', label: 'Weekday', icon: CalendarDays },
-  // "Calc", not "Calculate": at 375px seven columns give 45.6px each and the
-  // longer word wraps, which would grow the bar on every screen.
+  // "Calc", not "Calculate": at 375px six columns are still narrow enough that
+  // the longer word wraps, which would grow the bar on every screen.
   { path: '/calc', label: 'Calc', icon: Calculator },
   { path: '/stats', label: 'Stats', icon: BarChart3 },
   { path: '/settings', label: 'Settings', icon: Settings },
@@ -50,7 +49,7 @@ export function screenTitle(pathname: string): string {
 }
 
 interface BottomNavProps {
-  /** Shown next to "Review" when above zero. A real number, not a badge dot. */
+  /** Shown next to "Revise" when above zero. A real number, not a badge dot. */
   dueCount: number;
 }
 

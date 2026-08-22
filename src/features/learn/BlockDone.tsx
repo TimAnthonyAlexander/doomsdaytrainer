@@ -70,7 +70,7 @@ export function BlockDone({
           </Button>
         ) : null}
         <Button component={RouterLink} to="/" variant="outlined">
-          Go to Review
+          Go to Revise
         </Button>
         <Button onClick={onExit} color="inherit" sx={{ color: 'text.secondary' }}>
           Blocks

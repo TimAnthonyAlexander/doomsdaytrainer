@@ -168,6 +168,24 @@ export function dueItems(items: ItemState[], scope: Scope, now: number): ItemSta
 }
 
 /**
+ * When the soonest item that is *not* yet due comes back, or null when nothing
+ * in scope is waiting.
+ *
+ * Items already due are skipped on purpose: they are the queue, not the wait.
+ * Both the review session and the Revise menu report this number, so it lives
+ * here rather than in two components that could drift apart.
+ */
+export function soonestDueAt(items: ItemState[], scope: Scope, now: number): number | null {
+  let soonest: number | null = null;
+  for (const item of items) {
+    if (!item.introduced || !inScope(item.yy, scope)) continue;
+    if (item.dueAt <= now) continue;
+    if (soonest === null || item.dueAt < soonest) soonest = item.dueAt;
+  }
+  return soonest;
+}
+
+/**
  * The next due item, skipping years made easy by what was just asked.
  *
  * `recent` is the years already answered this session, oldest first.
