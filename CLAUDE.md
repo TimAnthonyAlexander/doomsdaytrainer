@@ -6,10 +6,15 @@ offline, no server, no accounts, no analytics.
 
 Production: https://doomsday.timanthonyalexander.de
 
-This file is for whoever works on the codebase next. `SPEC.md` is the product
-spec, `BRIEF.md` is the build contract every contributor works to, and
-`STYLEGUIDE.md` is the visual language. Where this file and those disagree,
-they win.
+This file is for whoever works on the codebase next. The rest of the writing
+lives in `docs/`: `docs/SPEC.md` is the product spec, `docs/BRIEF.md` is the
+build contract every contributor works to, and `docs/STYLEGUIDE.md` is the
+visual language. `STYLEGUIDE.md` is authoritative on anything visual. `SPEC.md`
+and `BRIEF.md` predate a good deal of the code and drift from it; where they
+disagree with this file, this file is the one that has been kept current.
+
+Work items live in `docs/tasks/open/` and move to `docs/tasks/done/` when they
+ship.
 
 ---
 

@@ -1,7 +1,8 @@
 # Build brief — Doomsday Trainer
 
 Every subagent working on this repo reads this file first. It is the contract.
-`SPEC.md` in the repo root is the product spec and is authoritative on behaviour.
+`docs/SPEC.md` is the product spec. Both files predate a good deal of the code;
+`CLAUDE.md` in the repo root is the description that has been kept current.
 
 ## Stack (fixed, do not change)
 

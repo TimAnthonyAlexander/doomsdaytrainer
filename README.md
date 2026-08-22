@@ -21,6 +21,13 @@ bun run preview    # serve the production build
 Stack: Bun, Vite, React 19, TypeScript (strict), React Router 7, MUI 7,
 lucide-react, idb, Vitest with Testing Library. `@/` resolves to `src/`.
 
+## Writing
+
+`CLAUDE.md` describes the codebase as it currently stands and is the file kept
+current. `docs/` holds the rest: `SPEC.md` (product spec), `BRIEF.md` (the build
+contract), `STYLEGUIDE.md` (the visual language, authoritative). Work items sit
+in `docs/tasks/open/` and move to `docs/tasks/done/` when they ship.
+
 ## Layout
 
 ```
