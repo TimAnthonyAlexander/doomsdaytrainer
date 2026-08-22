@@ -56,28 +56,25 @@ export function parseDateInput(value: string): CalendarDate | null {
 }
 
 /**
- * Pulled into range by year.
+ * The date this string names, if the walk can actually take it. Null otherwise.
  *
- * The ends of the range are 1 January and 31 December, so comparing years is
- * exact and there is no day arithmetic to get wrong. Day arithmetic would also
- * be quietly hostile here: `Date.UTC` maps a two-digit year onto the 1900s, so
- * a typed year of 0099 would land inside the range instead of below it.
+ * Out of range returns null rather than being pulled to the nearest end, and
+ * that is a fix rather than a simplification. A `<input type="date">` reports
+ * every keystroke, and a year is typed a digit at a time, so typing 2012 offers
+ * up 0002, 0020 and 0201 on the way. Those are indistinguishable from a
+ * deliberate out-of-range year, so clamping turned each of them into 1800-01-01
+ * and wrote it back into a controlled field — which ate the digit the user had
+ * just typed and made the year impossible to enter at all.
+ *
+ * The range floor being 1800 is what makes this safe: every prefix of a
+ * four-digit year is under 1000, so no half-typed year is ever in range and no
+ * half-typed year is ever mistaken for a finished one.
  */
-export function clampDate(date: CalendarDate): CalendarDate {
-  if (date.fullYear < MIN_YEAR) return CONCEPT_MIN;
-  if (date.fullYear > MAX_YEAR) return CONCEPT_MAX;
-  return date;
-}
-
-/**
- * What the walk should use after the picker changes. Anything unparseable
- * leaves the walk where it was rather than emptying the screen.
- */
-export function readDateInput(value: string, fallback: CalendarDate): CalendarDate {
+export function usableDate(value: string): CalendarDate | null {
   const parsed = parseDateInput(value);
-  if (parsed === null) return fallback;
-  const clamped = clampDate(parsed);
-  return isWalkableDate(clamped) ? clamped : fallback;
+  if (parsed === null) return null;
+  if (parsed.fullYear < MIN_YEAR || parsed.fullYear > MAX_YEAR) return null;
+  return isWalkableDate(parsed) ? parsed : null;
 }
 
 /** Uniform over every day in range. Randomness lives here, never in the domain. */

@@ -6,14 +6,11 @@ import {
   CONCEPT_MAX_INPUT,
   CONCEPT_MIN,
   CONCEPT_MIN_INPUT,
-  clampDate,
   parseDateInput,
   randomConceptDate,
-  readDateInput,
   toDateInput,
+  usableDate,
 } from './conceptDate';
-
-const FALLBACK = { fullYear: 1987, month: 3, day: 20 };
 
 describe('the range the picker offers', () => {
   it('is the range the calendar maths is tested across', () => {
@@ -53,37 +50,41 @@ describe('parseDateInput', () => {
   });
 });
 
-describe('clampDate', () => {
-  it('leaves a date in range alone', () => {
-    expect(clampDate(FALLBACK)).toEqual(FALLBACK);
+describe('usableDate', () => {
+  it('takes a date the walk can stand on', () => {
+    expect(usableDate('1987-03-20')).toEqual({ fullYear: 1987, month: 3, day: 20 });
+    expect(usableDate(CONCEPT_MIN_INPUT)).toEqual(CONCEPT_MIN);
+    expect(usableDate(CONCEPT_MAX_INPUT)).toEqual(CONCEPT_MAX);
   });
 
-  it('pulls a date below the range to the first day of it', () => {
-    expect(clampDate({ fullYear: 1799, month: 12, day: 31 })).toEqual(CONCEPT_MIN);
-    // Two-digit years are the trap: day arithmetic would map 0099 into 1999.
-    expect(clampDate({ fullYear: 99, month: 6, day: 1 })).toEqual(CONCEPT_MIN);
+  it('refuses rather than pulls a year outside the range', () => {
+    // It used to clamp, and the clamp is what broke typing. A year is entered a
+    // digit at a time, so 2012 arrives as 0002, then 0020, then 0201. Clamping
+    // turned each of those into 1800-01-01 and wrote it back into the field,
+    // eating the digit that had just been typed.
+    expect(usableDate('1799-06-05')).toBeNull();
+    expect(usableDate('2200-06-05')).toBeNull();
   });
 
-  it('pulls a date above the range to the last day of it', () => {
-    expect(clampDate({ fullYear: 2200, month: 1, day: 1 })).toEqual(CONCEPT_MAX);
+  it('refuses every prefix of a year being typed', () => {
+    // The range floor is 1800, so no prefix of a four-digit year can be in
+    // range. That is what makes half-typed and finished years distinguishable.
+    for (const value of ['0002-06-09', '0020-06-09', '0201-06-09']) {
+      expect(usableDate(value), value).toBeNull();
+    }
+    expect(usableDate('2012-06-09')).toEqual({ fullYear: 2012, month: 6, day: 9 });
   });
-});
 
-describe('readDateInput', () => {
-  it('keeps the walk where it was when the value is unusable', () => {
-    for (const value of ['', 'nonsense', '1987-02-31']) {
-      expect(readDateInput(value, FALLBACK), value).toEqual(FALLBACK);
+  it('refuses what is not a date at all', () => {
+    for (const value of ['', 'nonsense', '1987-02-31', '1900-02-29']) {
+      expect(usableDate(value), value).toBeNull();
     }
   });
 
-  it('clamps rather than handing the maths a date it would throw on', () => {
-    expect(readDateInput('1799-06-05', FALLBACK)).toEqual(CONCEPT_MIN);
-    expect(readDateInput('2200-06-05', FALLBACK)).toEqual(CONCEPT_MAX);
-  });
-
   it('only ever returns a date the walk can take', () => {
-    for (const value of ['', '1799-01-01', '9999-12-31', '2000-02-29', 'x']) {
-      expect(isWalkableDate(readDateInput(value, FALLBACK)), value).toBe(true);
+    for (const value of ['', '1799-01-01', '9999-12-31', '2000-02-29', 'x', '2012-06-09']) {
+      const date = usableDate(value);
+      if (date !== null) expect(isWalkableDate(date), value).toBe(true);
     }
   });
 });

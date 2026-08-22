@@ -376,7 +376,34 @@ describe('the concept walkthrough', () => {
       fireEvent.change(screen.getByLabelText('Date'), { target: { value } });
     }
     expect(stepsDone()).toBe(0);
-    expect(screen.getByLabelText('Date')).toHaveValue('1800-01-01');
+    expect(goalTitle()).toBe('The year code for 87');
+
+    // Leaving the field puts back the date the walk is actually standing on,
+    // rather than the last thing typed at it.
+    fireEvent.blur(screen.getByLabelText('Date'));
+    expect(screen.getByLabelText('Date')).toHaveValue(EXAMPLE);
+  });
+
+  it('lets a year be typed a digit at a time', async () => {
+    await seed();
+    mount();
+    await open();
+
+    // A date input reports every keystroke, so 2012 arrives as 0002, then 0020,
+    // then 0201, then 2012. The field used to be bound straight to the walk's
+    // date, which resolved each of those to 1800-01-01 and wrote it back before
+    // the next digit could be pressed: the year could not be typed at all.
+    const field = screen.getByLabelText('Date');
+    for (const value of ['0002-06-09', '0020-06-09', '0201-06-09']) {
+      fireEvent.change(field, { target: { value } });
+      expect(field, value).toHaveValue(value);
+      // And none of them reaches the walk.
+      expect(goalTitle()).toBe('The year code for 87');
+    }
+
+    fireEvent.change(field, { target: { value: '2012-06-09' } });
+    expect(field).toHaveValue('2012-06-09');
+    expect(goalTitle()).toBe('The year code for 12');
   });
 });
 
