@@ -5,7 +5,7 @@ import { useMemo, type ReactNode } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { radius, space, stroke } from '@/theme/tokens';
-import { introExample, introGroups, type IntroMonth } from './introContent';
+import { introCenturies, introExample, introGroups, type IntroMonth } from './introContent';
 
 /** A section of the explainer: a quiet heading, then one idea under it. */
 function Part({ title, children }: { title: string; children: ReactNode }) {
@@ -68,6 +68,55 @@ function Verdict({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The whole method as three moves, before any of them is explained.
+ *
+ * This is the first thing on the screen because it is the thing worth carrying
+ * away. An opening that states a fact about doomsdays tells the reader
+ * something true and leaves them with nothing to do; three numbered moves are
+ * a procedure they can hold in one go and recognise in every section below.
+ */
+function Recipe({ steps }: { steps: readonly string[] }) {
+  return (
+    <Box component="ol" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+      {steps.map((text, index) => (
+        <Box
+          component="li"
+          key={text}
+          sx={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: `${space[3]}px`,
+            py: `${space[2]}px`,
+            borderTop: index === 0 ? 'none' : stroke.hairline,
+          }}
+        >
+          <Box
+            aria-hidden
+            sx={{
+              flexShrink: 0,
+              width: 26,
+              height: 26,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: `${radius.sm}px`,
+              bgcolor: 'var(--brand-tint)',
+            }}
+          >
+            <Numeral size={15} weight={500} color="var(--brand-on-tint)">
+              {index + 1}
+            </Numeral>
+          </Box>
+          <Typography variant="body1" sx={{ fontWeight: 500 }}>
+            {text}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 /** One month of the doomsday table: the month, and the date it lands on. */
 function MonthChip({ entry }: { entry: IntroMonth }) {
   return (
@@ -113,12 +162,26 @@ export interface MethodIntroProps {
 export function MethodIntro({ onStart }: MethodIntroProps) {
   const example = useMemo(introExample, []);
   const groups = useMemo(introGroups, []);
+  const centuries = useMemo(introCenturies, []);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[5]}px` }}>
-      <PageTitle subtitle="In any one year, a dozen easy dates all land on the same weekday as each other. Which weekday that is depends on the year. Work it out, then hop from the nearest of those dates to the one you want.">
+      <PageTitle subtitle="Each year has 12 doomsdays with the same weekday. To figure out a date's weekday, you simply find out the doomsday's weekday of that year, then select the nearest doomsday, and now you are always less than a month away and can calculate the rest.">
         How it works
       </PageTitle>
+
+      <Recipe
+        steps={[
+          'Work out that weekday for the year.',
+          'Take the doomsday nearest your date.',
+          'Count the days between and take the sevens off.',
+        ]}
+      />
+
+      <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+        That is your date&apos;s weekday. Below is the same three moves done once, on{' '}
+        {example.dateLabel}.
+      </Typography>
 
       <Part title="The year's doomsday">
         <Typography variant="body2" sx={{ color: 'var(--text-secondary)', mb: `${space[3]}px` }}>
@@ -133,8 +196,49 @@ export function MethodIntro({ onStart }: MethodIntroProps) {
           lead
         />
         <Typography variant="body2" sx={{ color: 'var(--text-secondary)', mt: `${space[3]}px` }}>
-          Then add what the century starts from. The {example.century} start from {example.anchor}.
+          Then add what the century starts from. There are only four, and they come round again
+          every 400 years.
         </Typography>
+        <Box
+          sx={{
+            my: `${space[2]}px`,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: `${space[2]}px`,
+          }}
+        >
+          {centuries.map((century) => (
+            <Box
+              key={century.label}
+              sx={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: `${space[2]}px`,
+                px: `${space[2]}px`,
+                py: '6px',
+                borderRadius: `${radius.sm}px`,
+                border: stroke.hairline,
+                // The one the worked example is standing in. The rest are here
+                // so the century reads as a lookup rather than a constant.
+                bgcolor: century.current ? 'var(--brand-tint)' : 'transparent',
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ color: century.current ? 'var(--brand-on-tint)' : 'var(--text-secondary)' }}
+              >
+                {century.label}
+              </Typography>
+              <Numeral
+                size={17}
+                weight={500}
+                color={century.current ? 'var(--brand-on-tint)' : 'var(--text-primary)'}
+              >
+                {century.anchor}
+              </Numeral>
+            </Box>
+          ))}
+        </Box>
         {/* The intro date is chosen so this sum stays under seven and there is
             no third line to print here. `introContent.test.ts` pins that, so
             moving the date fails loudly rather than printing a wrong step. */}
@@ -155,11 +259,17 @@ export function MethodIntro({ onStart }: MethodIntroProps) {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: `${space[4]}px` }}>
           {groups.map((group) => (
             <Box key={group.id}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              <Typography variant="body1" sx={{ fontWeight: 500 }}>
                 {group.title}
               </Typography>
               <Typography variant="caption" component="p" sx={{ color: 'var(--text-secondary)' }}>
                 {group.hint}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ mt: `${space[1]}px`, color: 'var(--text-secondary)' }}
+              >
+                {group.detail}
               </Typography>
               <Box
                 sx={{

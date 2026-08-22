@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { guidedWalk, type GuidedStepId } from '@/domain/guidedDate';
 import { ALL_MONTHS, MONTH_DOOMSDAYS, monthDoomsday, trueWeekdayName } from '@/domain/weekday';
-import { INTRO_DATE, introExample, introGroups, introTrueWeekday } from './introContent';
+import {
+  INTRO_DATE,
+  introCenturies,
+  introExample,
+  introGroups,
+  introTrueWeekday,
+} from './introContent';
 
 const example = introExample();
 const walk = guidedWalk(INTRO_DATE);
@@ -123,6 +129,45 @@ describe('the doomsday dates, grouped the way they are remembered', () => {
     for (const group of groups) {
       expect(group.title.length).toBeGreaterThan(0);
       expect(group.hint.length).toBeGreaterThan(0);
+      expect(group.detail.length, group.id).toBeGreaterThan(0);
     }
+  });
+
+  it('cashes the 7-Eleven mnemonic out into both pairs, both ways round', () => {
+    // "9-5 at 7-Eleven" is a phrase and nothing more until it is spelled out
+    // that 9 and 5 are a pair working in both directions, and so are 7 and 11.
+    // Without that a reader gets to the end of it asking what it was for.
+    const odd = groups.find((group) => group.id === 'odd');
+    expect(odd?.title).toBe('9-5 at 7-Eleven');
+    expect(odd?.detail).toContain('both ways round');
+    expect(odd?.detail).toContain('the 5th of the 9th and the 9th of the 5th');
+    expect(odd?.detail).toContain('the 11th of the 7th and the 7th of the 11th');
+  });
+
+  it('gives February the rule that makes it memorable, and the way back', () => {
+    const leap = groups.find((group) => group.id === 'leap');
+    expect(leap?.detail).toContain('last day of the month');
+    // A week back from the last day is the other easy one to picture.
+    expect(leap?.detail).toContain('the 7th, or the 8th in a leap year');
+  });
+});
+
+describe('the century anchors', () => {
+  const centuries = introCenturies();
+
+  it('shows all four, oldest first, so the century reads as a lookup', () => {
+    expect(centuries.map((century) => [century.label, century.anchor])).toEqual([
+      ['1800s', 5],
+      ['1900s', 3],
+      ['2000s', 2],
+      ['2100s', 0],
+    ]);
+  });
+
+  it('marks the one the worked example stands in, and only that one', () => {
+    expect(centuries.filter((century) => century.current).map((century) => century.label)).toEqual([
+      '2000s',
+    ]);
+    expect(centuries.find((century) => century.current)?.anchor).toBe(example.anchor);
   });
 });

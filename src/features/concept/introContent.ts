@@ -16,6 +16,7 @@ import { leapDays, reduce28, sevenStep } from '@/domain/calc';
 import { ordinal } from '@/domain/dayStep';
 import type { CalendarDate, Code } from '@/domain/types';
 import {
+  CENTURY_ANCHORS,
   MONTH_DOOMSDAYS,
   centuryAnchor,
   centuryLabel,
@@ -146,10 +147,16 @@ export interface IntroMonth {
  */
 export interface IntroGroup {
   id: 'even' | 'odd' | 'march' | 'leap';
-  /** What the group is. */
+  /** The mnemonic itself, as it is actually said. */
   title: string;
-  /** How to remember it, in one short line. */
+  /** Which months it covers, in one short line. */
   hint: string;
+  /**
+   * What the mnemonic unpacks to. A mnemonic nobody can cash out is worse than
+   * no mnemonic: "9 to 5 at 7-11" is a phrase until it is spelled out that 9
+   * and 5 are a pair working both ways round, and so are 7 and 11.
+   */
+  detail: string;
   months: readonly IntroMonth[];
 }
 
@@ -168,29 +175,63 @@ export function introGroups(): IntroGroup[] {
   return [
     {
       id: 'even',
-      title: 'The even months',
-      hint: 'The date is the month. 4/4, 6/6, 8/8, 10/10, 12/12.',
+      title: 'The date is the month',
+      hint: 'Every even month except February.',
+      detail: '4/4, 6/6, 8/8, 10/10, 12/12.',
       months: [4, 6, 8, 10, 12].map(entry),
     },
     {
       id: 'odd',
-      title: 'The odd ones',
-      hint: 'Nine to five at seven eleven. 9/5 and 5/9, 7/11 and 11/7.',
+      title: '9-5 at 7-Eleven',
+      hint: 'The four odd months that are not March.',
+      detail:
+        'Two pairs, and each pair works both ways round. 9 and 5 give the 5th of the 9th and the 9th of the 5th. 7 and 11 give the 11th of the 7th and the 7th of the 11th.',
       months: [5, 7, 9, 11].map(entry),
     },
     {
       id: 'march',
-      title: 'March',
-      hint: 'Pi day. 3/14.',
+      title: 'Pi day',
+      hint: 'March, the odd one left over.',
+      detail: '3/14, the 14th of March.',
       months: [3].map(entry),
     },
     {
       id: 'leap',
-      title: 'January and February',
-      hint: 'The only two that move. Both go up one in a leap year.',
+      title: 'The only two that move',
+      hint: 'January and February, which a leap day pushes on by one.',
+      detail:
+        "February is the last day of the month, so the 28th, or the 29th in a leap year. January is the 3rd, or the 4th. If the last day of February is awkward to picture, step back a week: the 7th, or the 8th in a leap year.",
       months: [1, 2].map(entry),
     },
   ];
+}
+
+/** One century and the number every year in it starts from. */
+export interface IntroCentury {
+  /** "2000s". */
+  label: string;
+  anchor: Code;
+  /** True for the century the worked example sits in. */
+  current: boolean;
+}
+
+/**
+ * All four century anchors, oldest first.
+ *
+ * The explainer used to name only the one the example needed, which left the
+ * century looking like a constant rather than a lookup. Four rows is the
+ * cheapest way to say "this changes, and here is the whole of it".
+ */
+export function introCenturies(): IntroCentury[] {
+  const here = centuryOf(INTRO_DATE.fullYear);
+  return Object.keys(CENTURY_ANCHORS)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((century) => ({
+      label: centuryLabel(century),
+      anchor: CENTURY_ANCHORS[century],
+      current: century === here,
+    }));
 }
 
 /** The weekday of the intro date, straight off the calendar maths. */

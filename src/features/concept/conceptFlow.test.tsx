@@ -149,6 +149,19 @@ describe('the explainer in front of the walk', () => {
     mount();
 
     expect(await screen.findByRole('heading', { name: 'How it works' })).toBeInTheDocument();
+
+    // It opens on the shape of the method rather than on a fact about it. This
+    // is the thing worth carrying away, so it is pinned rather than left to
+    // survive the next edit by luck.
+    expect(
+      screen.getAllByRole('listitem').map((item) => item.textContent),
+    ).toEqual(
+      expect.arrayContaining([
+        '1Work out that weekday for the year.',
+        '2Take the doomsday nearest your date.',
+        '3Count the days between and take the sevens off.',
+      ]),
+    );
     // Its date is 20 March 2026 and is not the one the walk will use, which is
     // drawn at random. Nothing here is answerable.
     expect(screen.getByText('20 March 2026 is a Friday.')).toBeInTheDocument();
@@ -165,9 +178,12 @@ describe('the explainer in front of the walk', () => {
     mount();
     await screen.findByRole('heading', { name: 'How it works' });
 
-    expect(screen.getByText('The even months')).toBeInTheDocument();
-    expect(screen.getByText(/Nine to five at seven eleven/)).toBeInTheDocument();
-    expect(screen.getByText(/Pi day/)).toBeInTheDocument();
+    expect(screen.getByText('The date is the month')).toBeInTheDocument();
+    expect(screen.getByText('9-5 at 7-Eleven')).toBeInTheDocument();
+    // The mnemonic is cashed out rather than left as a phrase.
+    expect(screen.getByText(/the 5th of the 9th and the 9th of the 5th/)).toBeInTheDocument();
+    expect(screen.getByText('Pi day')).toBeInTheDocument();
+    expect(screen.getByText(/last day of the month/)).toBeInTheDocument();
     // The two that move, printed as both dates rather than only the common one.
     expect(screen.getByText('3/4')).toBeInTheDocument();
     expect(screen.getByText('28/29')).toBeInTheDocument();
