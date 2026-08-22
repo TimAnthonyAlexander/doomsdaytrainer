@@ -85,7 +85,7 @@ export function WeekdayWorking({ working }: WeekdayWorkingProps) {
             <Numeral
               size={13}
               weight={index === lines.length - 1 ? 600 : 400}
-              color={index === lines.length - 1 ? palette.green : palette.ink}
+              color={index === lines.length - 1 ? palette.brandDeep : palette.ink}
             >
               {line.value}
             </Numeral>

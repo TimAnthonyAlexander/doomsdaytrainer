@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { AppData, Attempt, WeekdayAttempt, WeekdayMode } from '@/domain/types';
+import type { AppData, Attempt, CalcAttempt, CalcStepId, WeekdayAttempt, WeekdayMode } from '@/domain/types';
 import { WEEKDAY_BUCKET_COUNT, buildWeekdayTotals, estimateMedianMs } from '@/domain/weekdayLifetime';
+import { CALC_STEP_IDS } from '@/domain/calc';
+import {
+  buildCalcTotals,
+  buildVerifyAttempt,
+  buildVerifyTotals,
+  calcAnsweredTotal,
+  calcStepMedian,
+  emptyVerifyTotals,
+} from '@/domain/calcStats';
 import { SCHEMA_VERSION, defaultAppData, itemKey } from './defaults';
 import { ImportError, parseImportFile, serialiseExport, toExportFile } from './exportImport';
 
@@ -42,7 +51,34 @@ function sample(): AppData {
     weekdayAttempt('assisted', false, 3100),
     weekdayAttempt('unassisted', true, 7400),
   ]);
+  data.calcAttempts = [calcAttempt('leap', true, 2600), calcAttempt('mod', false, 8200)];
+  data.calcTotals = buildCalcTotals(data.calcAttempts);
+  data.verifyAttempts = [
+    buildVerifyAttempt({
+      timestamp: 1_700_000_004_000,
+      yy: 73,
+      recalled: 0,
+      derived: 0,
+      recallLatencyMs: 780,
+      deriveLatencyMs: 5400,
+      reduced: true,
+    }),
+    buildVerifyAttempt({
+      timestamp: 1_700_000_005_000,
+      yy: 40,
+      recalled: 2,
+      derived: 1,
+      recallLatencyMs: 1500,
+      deriveLatencyMs: 6100,
+      reduced: false,
+    }),
+  ];
+  data.verifyTotals = buildVerifyTotals(data.verifyAttempts);
   return data;
+}
+
+function calcAttempt(step: CalcStepId, correct: boolean, latencyMs: number): CalcAttempt {
+  return { timestamp: 1_700_000_006_000, yy: 73, step, answered: correct ? 0 : 4, correct, latencyMs, reduced: true };
 }
 
 function weekdayAttempt(mode: WeekdayMode, correct: boolean, latencyMs: number): WeekdayAttempt {
@@ -109,6 +145,65 @@ describe('parseImportFile', () => {
     expect(back.weekdayTotals.unassisted.answered).toBe(0);
   });
 
+  it('round-trips the calculation and verify history', () => {
+    const original = sample();
+    const back = parseImportFile(serialiseExport(original));
+
+    expect(back.calcAttempts).toHaveLength(2);
+    expect(back.calcTotals).toEqual(original.calcTotals);
+    expect(calcAnsweredTotal(back.calcTotals)).toBe(2);
+    expect(calcStepMedian(back.calcTotals, 'mod')).toBe(calcStepMedian(original.calcTotals, 'mod'));
+
+    expect(back.verifyAttempts).toHaveLength(2);
+    expect(back.verifyTotals).toEqual({
+      agreedRight: 1,
+      agreedWrong: 0,
+      memoryRight: 0,
+      calculationRight: 1,
+      bothWrong: 0,
+    });
+  });
+
+  it('gives a v3 export the calculation trainer without touching what it had', () => {
+    const data = sample() as unknown as Record<string, unknown>;
+    delete data.calcAttempts;
+    delete data.calcTotals;
+    delete data.verifyAttempts;
+    delete data.verifyTotals;
+    const back = parseImportFile(wrap(data, { schemaVersion: 3 }));
+
+    expect(back.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(back.calcAttempts).toEqual([]);
+    expect(calcAnsweredTotal(back.calcTotals)).toBe(0);
+    expect(back.verifyTotals).toEqual(emptyVerifyTotals());
+    // And the rest of the file survived the upgrade.
+    expect(back.items[itemKey(73)].interval).toBe(6);
+    expect(back.drills).toHaveLength(1);
+  });
+
+  it('rebuilds the per-step totals from an older export that only has the log', () => {
+    const data = sample() as unknown as Record<string, unknown>;
+    delete data.calcTotals;
+    const back = parseImportFile(wrap(data, { schemaVersion: 3 }));
+    expect(calcAnsweredTotal(back.calcTotals)).toBe(2);
+    expect(back.calcTotals.leap.correct).toBe(1);
+  });
+
+  it('repairs a hand-edited per-step aggregate instead of putting NaN on a screen', () => {
+    const data = sample() as unknown as Record<string, unknown>;
+    data.calcTotals = { leap: { answered: 'many', correct: 3, buckets: [1, 'x', 2] } };
+    data.verifyTotals = { agreedRight: -1, memoryRight: 'two' };
+    const back = parseImportFile(wrap(data));
+
+    for (const step of CALC_STEP_IDS) {
+      expect(back.calcTotals[step].buckets).toHaveLength(WEEKDAY_BUCKET_COUNT);
+      for (const count of back.calcTotals[step].buckets) expect(Number.isFinite(count)).toBe(true);
+    }
+    expect(back.calcTotals.leap.answered).toBe(3);
+    expect(back.calcTotals.mod.answered).toBe(0);
+    expect(back.verifyTotals).toEqual(emptyVerifyTotals());
+  });
+
   it('fills missing items and settings from a hand-trimmed file', () => {
     const data = sample();
     const trimmed = { ...data, items: { [itemKey(73)]: data.items[itemKey(73)] }, settings: { newItemsPerDay: 4 } };
@@ -173,6 +268,11 @@ describe('parseImportFile', () => {
     ['a weekday log that is not a list', wrap({ items: {}, weekdayAttempts: {} }), /weekday log/i],
     ['lifetime totals that are a list', wrap({ items: {}, weekdayTotals: [] }), /lifetime weekday totals/i],
     ['lifetime totals that are a string', wrap({ items: {}, weekdayTotals: 'none' }), /lifetime weekday totals/i],
+    ['a calculation log that is not a list', wrap({ items: {}, calcAttempts: {} }), /calculation log/i],
+    ['per-step totals that are a list', wrap({ items: {}, calcTotals: [] }), /lifetime calculation totals/i],
+    ['per-step totals that are a string', wrap({ items: {}, calcTotals: 'none' }), /lifetime calculation totals/i],
+    ['a verify log that is not a list', wrap({ items: {}, verifyAttempts: {} }), /verify log/i],
+    ['verify totals that are a list', wrap({ items: {}, verifyTotals: [] }), /lifetime verify totals/i],
   ];
 
   it.each(rejections)('rejects %s', (_label, json, message) => {

@@ -159,7 +159,7 @@ export function TableDrillView({ onBack }: TableDrillProps) {
           {entry.kind === 'month' ? 'Which date is the doomsday?' : 'Which code is the anchor?'}
         </Typography>
         {phase === 'wrong' ? (
-          <Typography variant="body2" sx={{ color: palette.green, textAlign: 'center' }}>
+          <Typography variant="body2" sx={{ color: palette.brandDeep, textAlign: 'center' }}>
             {entryAnswerNote(entry.kind, entry.key)}
           </Typography>
         ) : null}

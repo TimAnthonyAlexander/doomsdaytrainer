@@ -5,6 +5,14 @@ import { allYears } from '@/domain/yearCodes';
 import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
 import { buildWeekdayTotals, repairWeekdayTotals } from '@/domain/weekdayLifetime';
 import {
+  buildCalcTotals,
+  buildVerifyTotals,
+  isCalcAttemptShaped,
+  isVerifyAttemptShaped,
+  repairCalcTotals,
+  repairVerifyTotals,
+} from '@/domain/calcStats';
+import {
   DEFAULT_SETTINGS,
   SCHEMA_VERSION,
   defaultCenturyItems,
@@ -95,6 +103,32 @@ const MIGRATIONS: Record<number, Migration> = {
     schemaVersion: 3,
     weekdayTotals: buildWeekdayTotals(Array.isArray(data.weekdayAttempts) ? data.weekdayAttempts : []),
   }),
+
+  /**
+   * v3 → v4: the calculation trainer. Steps of the derivation get their own
+   * raw log and their own per-step lifetime aggregate; verify mode gets a log
+   * and five outcome counters.
+   *
+   * Nothing else moves. The 28 base years are year codes 00-27 and already
+   * have entries in `items`, so no new item map is created and no scheduling
+   * state is touched. A v3 document has no calculation history, so the logs
+   * start empty; a document that somehow carries raw attempts without an
+   * aggregate has the aggregate built from them rather than started at zero.
+   */
+  4: (data) => {
+    const calcAttempts = Array.isArray(data.calcAttempts) ? data.calcAttempts.filter(isCalcAttemptShaped) : [];
+    const verifyAttempts = Array.isArray(data.verifyAttempts)
+      ? data.verifyAttempts.filter(isVerifyAttemptShaped)
+      : [];
+    return {
+      ...data,
+      schemaVersion: 4,
+      calcAttempts,
+      calcTotals: buildCalcTotals(calcAttempts),
+      verifyAttempts,
+      verifyTotals: buildVerifyTotals(verifyAttempts),
+    };
+  },
 };
 
 export function migrateAppData(data: AppData): AppData {
@@ -190,6 +224,13 @@ function fillDays(stored: unknown): AppData['days'] {
  */
 export function normaliseAppData(data: AppData, now: number): AppData {
   const weekdayAttempts = records<AppData['weekdayAttempts'][number]>(data.weekdayAttempts);
+  // Stricter than `records` on purpose: a step attempt carries a step id and a
+  // year that a screen groups by, and an unknown step id would land in a
+  // breakdown with no column to go in.
+  const calcAttempts = Array.isArray(data.calcAttempts) ? data.calcAttempts.filter(isCalcAttemptShaped) : [];
+  const verifyAttempts = Array.isArray(data.verifyAttempts)
+    ? data.verifyAttempts.filter(isVerifyAttemptShaped)
+    : [];
   return {
     ...data,
     schemaVersion: SCHEMA_VERSION,
@@ -203,6 +244,13 @@ export function normaliseAppData(data: AppData, now: number): AppData {
     // path may put a NaN or a negative count somewhere a screen will read it.
     weekdayTotals: repairWeekdayTotals(data.weekdayTotals, weekdayAttempts),
     weekdayRuns: records(data.weekdayRuns),
+    calcAttempts,
+    // Same contract as `weekdayTotals`: a missing aggregate is rebuilt from
+    // the raw log, a partial or corrupt one is repaired step by step, and
+    // neither path may put a NaN or a negative count where a screen reads it.
+    calcTotals: repairCalcTotals(data.calcTotals, calcAttempts),
+    verifyAttempts,
+    verifyTotals: repairVerifyTotals(data.verifyTotals, verifyAttempts),
     drills: records(data.drills),
     days: fillDays(data.days),
     createdAt: Number.isFinite(data.createdAt) ? data.createdAt : now,

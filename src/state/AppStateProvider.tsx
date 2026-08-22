@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type {
   AppData,
   Attempt,
+  CalcAttempt,
   DrillRecord,
   GradeResult,
   ItemState,
   Settings,
   TableKind,
+  VerifyResultInput,
   WeekdayAttempt,
   WeekdayRun,
   YearKey,
@@ -14,8 +16,11 @@ import type {
 import { applyReview, createItem, introduce } from '@/domain/scheduler';
 import { dayKey } from '@/domain/time';
 import { addWeekdayAttempt } from '@/domain/weekdayLifetime';
+import { addCalcAttempt, addVerifyResult, buildVerifyAttempt } from '@/domain/calcStats';
 import {
   MAX_ATTEMPT_HISTORY,
+  MAX_CALC_ATTEMPTS,
+  MAX_VERIFY_ATTEMPTS,
   MAX_WEEKDAY_ATTEMPTS,
   MAX_WEEKDAY_RUNS,
   defaultAppData,
@@ -194,6 +199,37 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const recordCalcAttempt = useCallback(
+    async (attempt: CalcAttempt) => {
+      const next = await patchAppData((draft) => ({
+        ...draft,
+        calcAttempts: capTail([...draft.calcAttempts, attempt], MAX_CALC_ATTEMPTS),
+        // Written on the same document write as the raw step, so the two can
+        // never disagree. The raw log is trimmed; this is not.
+        calcTotals: addCalcAttempt(draft.calcTotals, attempt),
+      }));
+      commit(next);
+    },
+    [commit],
+  );
+
+  const recordVerifyResult = useCallback(
+    async (input: VerifyResultInput) => {
+      // The true code and the verdict come from the domain, never from the
+      // caller: a screen bug must not be able to write a wrong "actual" into
+      // totals that are never recomputed.
+      const attempt = buildVerifyAttempt(input);
+      const next = await patchAppData((draft) => ({
+        ...draft,
+        verifyAttempts: capTail([...draft.verifyAttempts, attempt], MAX_VERIFY_ATTEMPTS),
+        verifyTotals: addVerifyResult(draft.verifyTotals, attempt),
+      }));
+      commit(next);
+      return attempt;
+    },
+    [commit],
+  );
+
   const reviewTableItem = useCallback(
     async (kind: TableKind, key: number, attempt: Attempt) => {
       const holder: { value: GradeResult | null } = { value: null };
@@ -265,6 +301,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       monthItemList: Object.values(current.monthItems).sort(byKey),
       centuryItemList: Object.values(current.centuryItems).sort(byKey),
       weekdayTotals: current.weekdayTotals,
+      calcTotals: current.calcTotals,
+      verifyTotals: current.verifyTotals,
       updateSettings,
       recordReview,
       recordDrillAttempt,
@@ -272,6 +310,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       recordDrill,
       recordWeekdayAttempt,
       recordWeekdayRun,
+      recordCalcAttempt,
+      recordVerifyResult,
       reviewTableItem,
       noteSessionActivity,
       importData,
@@ -288,6 +328,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     recordDrill,
     recordWeekdayAttempt,
     recordWeekdayRun,
+    recordCalcAttempt,
+    recordVerifyResult,
     reviewTableItem,
     noteSessionActivity,
     importData,

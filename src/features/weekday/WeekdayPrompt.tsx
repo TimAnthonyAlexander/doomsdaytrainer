@@ -73,7 +73,7 @@ export function WeekdayPrompt({
       </Typography>
 
       {phase === 'wrong' ? (
-        <Typography variant="h3" component="p" sx={{ color: palette.green }}>
+        <Typography variant="h3" component="p" sx={{ color: palette.brandDeep }}>
           {trueWeekdayName(correctCode as 0)}
         </Typography>
       ) : null}

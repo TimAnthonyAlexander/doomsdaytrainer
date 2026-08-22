@@ -117,7 +117,7 @@ export function LatencyChart({ points, label, emptyText }: LatencyChartProps) {
             key={`run-${run[0]}`}
             d={d}
             fill="none"
-            stroke={palette.green}
+            stroke={palette.brandDeep}
             strokeWidth={1.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -131,7 +131,7 @@ export function LatencyChart({ points, label, emptyText }: LatencyChartProps) {
             cx={geometry.x(run[0])}
             cy={geometry.y(points[run[0]].medianMs as number)}
             r={2}
-            fill={palette.green}
+            fill={palette.brandDeep}
           />
         );
       })}

@@ -1,9 +1,17 @@
 import type { ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { Attempt } from '@/domain/types';
+import type { Attempt, CalcAttempt, CalcStepId, VerifyResultInput } from '@/domain/types';
+import {
+  buildCalcTotals,
+  calcAnsweredTotal,
+  calcStepAnswered,
+  calcStepMedian,
+  verifyChecked,
+} from '@/domain/calcStats';
+import { codeFor } from '@/domain/yearCodes';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
-import { defaultAppData, itemKey } from '@/storage/defaults';
+import { MAX_CALC_ATTEMPTS, defaultAppData, itemKey } from '@/storage/defaults';
 import { serialiseExport } from '@/storage/exportImport';
 import { AppStateProvider } from './AppStateProvider';
 import { useAppState } from './useAppState';
@@ -35,6 +43,31 @@ function attempt(overrides: Partial<Attempt> = {}): Attempt {
     hintUsed: false,
     source: 'review',
     ...overrides,
+  };
+}
+
+function calcAttempt(step: CalcStepId, overrides: Partial<CalcAttempt> = {}): CalcAttempt {
+  return {
+    timestamp: Date.now(),
+    yy: 73,
+    step,
+    answered: 0,
+    correct: true,
+    latencyMs: 2400,
+    reduced: true,
+    ...overrides,
+  };
+}
+
+function verifyInput(yy: number, recalled: number, derived: number): VerifyResultInput {
+  return {
+    timestamp: Date.now(),
+    yy,
+    recalled,
+    derived,
+    recallLatencyMs: 850,
+    deriveLatencyMs: 5200,
+    reduced: true,
   };
 }
 
@@ -172,6 +205,106 @@ describe('AppStateProvider', () => {
     expect(days).toHaveLength(1);
     expect(days[0].reviewsCompleted).toBe(15);
     expect(days[0].newItemsIntroduced).toBe(10);
+  });
+
+  it('records a calculation step and folds it into the per-step totals', async () => {
+    const { result, unmount } = await mount();
+    expect(calcAnsweredTotal(result.current.calcTotals)).toBe(0);
+
+    await act(async () => {
+      await result.current.recordCalcAttempt(calcAttempt('leap', { latencyMs: 2200 }));
+      await result.current.recordCalcAttempt(calcAttempt('sum', { latencyMs: 1600 }));
+      await result.current.recordCalcAttempt(calcAttempt('mod', { latencyMs: 9000, correct: false, answered: 5 }));
+    });
+
+    expect(result.current.data.calcAttempts).toHaveLength(3);
+    expect(calcStepAnswered(result.current.calcTotals, 'mod')).toBe(1);
+    expect(result.current.calcTotals.mod.correct).toBe(0);
+    expect(calcStepMedian(result.current.calcTotals, 'mod')).toBeGreaterThan(
+      calcStepMedian(result.current.calcTotals, 'sum') as number,
+    );
+
+    unmount();
+    await closeDb();
+    const reloaded = await loadAppData();
+    expect(calcAnsweredTotal(reloaded.calcTotals)).toBe(3);
+  });
+
+  it('leaves scheduling alone when a calculation step is recorded', async () => {
+    const { result } = await mount();
+    await act(async () => {
+      await result.current.introduceItems([73]);
+    });
+    const before = result.current.items[itemKey(73)];
+
+    await act(async () => {
+      await result.current.recordCalcAttempt(calcAttempt('leap', { correct: false }));
+    });
+
+    const after = result.current.items[itemKey(73)];
+    expect(after).toEqual(before);
+  });
+
+  it('keeps the lifetime totals when the raw calculation log is capped', async () => {
+    const seeded = defaultAppData(1000);
+    seeded.calcAttempts = Array.from({ length: MAX_CALC_ATTEMPTS }, (_, i) =>
+      calcAttempt('leap', { timestamp: i, latencyMs: 2000 }),
+    );
+    seeded.calcTotals = buildCalcTotals(seeded.calcAttempts);
+    await saveAppData(seeded);
+    await closeDb();
+
+    const { result } = await mount();
+    await act(async () => {
+      await result.current.recordCalcAttempt(calcAttempt('mod', { timestamp: 999_999, latencyMs: 12_000 }));
+    });
+
+    const log = result.current.data.calcAttempts;
+    expect(log).toHaveLength(MAX_CALC_ATTEMPTS);
+    expect(log[log.length - 1].timestamp).toBe(999_999);
+    // The oldest raw row fell off; the aggregate still counts every one of them.
+    expect(log[0].timestamp).toBe(1);
+    expect(calcAnsweredTotal(result.current.calcTotals)).toBe(MAX_CALC_ATTEMPTS + 1);
+  });
+
+  it('judges a verify result from the shipped table and counts the outcome', async () => {
+    const { result } = await mount();
+
+    let agreed = '';
+    await act(async () => {
+      const stored = await result.current.recordVerifyResult(verifyInput(73, codeFor(73), codeFor(73)));
+      agreed = stored.outcome;
+    });
+    expect(agreed).toBe('agreed-right');
+
+    await act(async () => {
+      // Memory says one thing, the derivation says another, and the
+      // derivation is the one that is right.
+      await result.current.recordVerifyResult(verifyInput(40, 5, codeFor(40)));
+      // Both land on the same wrong code, which is the case worth seeing.
+      await result.current.recordVerifyResult(verifyInput(88, 4, 4));
+    });
+
+    expect(result.current.verifyTotals).toEqual({
+      agreedRight: 1,
+      agreedWrong: 1,
+      memoryRight: 0,
+      calculationRight: 1,
+      bothWrong: 0,
+    });
+    expect(verifyChecked(result.current.verifyTotals)).toBe(3);
+    expect(result.current.data.verifyAttempts[0].actual).toBe(codeFor(73));
+  });
+
+  it('does not lose verify results that land at the same moment', async () => {
+    const { result } = await mount();
+    await act(async () => {
+      await Promise.all(
+        Array.from({ length: 15 }, (_, i) => result.current.recordVerifyResult(verifyInput(i, codeFor(i), codeFor(i)))),
+      );
+    });
+    expect(verifyChecked(result.current.verifyTotals)).toBe(15);
+    expect(result.current.data.verifyAttempts).toHaveLength(15);
   });
 
   it('imports a valid export', async () => {

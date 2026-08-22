@@ -65,23 +65,36 @@ function toneFor(
   return pressed === value ? 'pressed' : 'idle';
 }
 
+/**
+ * STYLEGUIDE.md §8. The keys are neutral until an answer lands, and only then
+ * do they take a grading colour: the flash has to be the one moment those hues
+ * appear, or it stops reading before the user has consciously looked. That also
+ * rules the brand out here — 0 to 6 carry no meaning worth colouring, and a
+ * tinted key would be competing with the flash at the exact instant it fires.
+ */
 const TONE_SX: Record<Tone, Record<string, string>> = {
   idle: { backgroundColor: palette.paper, color: palette.ink, boxShadow: `inset 0 0 0 1px ${palette.rule}` },
   pressed: {
-    backgroundColor: palette.greenSoft,
-    color: palette.greenDeep,
-    boxShadow: `inset 0 0 0 1px ${palette.rule}`,
+    backgroundColor: palette.paper,
+    color: palette.ink,
+    boxShadow: `inset 0 0 0 1px ${palette.ruleStrong}`,
   },
-  right: { backgroundColor: palette.green, color: palette.ground, boxShadow: `inset 0 0 0 1px ${palette.green}` },
+  right: {
+    backgroundColor: palette.gradeFast,
+    color: palette.inkInverse,
+    boxShadow: `inset 0 0 0 1px ${palette.gradeFast}`,
+  },
   wrong: {
-    backgroundColor: palette.terracotta,
-    color: '#FFFFFF',
-    boxShadow: `inset 0 0 0 1px ${palette.terracotta}`,
+    backgroundColor: palette.gradeWrong,
+    color: palette.inkInverse,
+    boxShadow: `inset 0 0 0 1px ${palette.gradeWrong}`,
   },
+  // The reveal: the right answer outlined rather than filled, so it reads as
+  // "this was it" next to the filled key the user actually tapped.
   answer: {
-    backgroundColor: palette.greenSoft,
-    color: palette.greenDeep,
-    boxShadow: `inset 0 0 0 2px ${palette.green}`,
+    backgroundColor: palette.paper,
+    color: palette.ink,
+    boxShadow: `inset 0 0 0 2px ${palette.gradeFast}`,
   },
 };
 
@@ -195,9 +208,17 @@ export function AnswerPad({
                   'background-color 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out',
                 ...TONE_SX[tone],
                 '&.Mui-disabled': { opacity: 1 },
-                '&:focus-visible': { outline: `2px solid ${palette.green}`, outlineOffset: 2 },
+                // The focus ring is the one brand mark allowed here: it marks
+                // where the keyboard is, not what the answer was.
+                '&:focus-visible': { outline: `2px solid ${palette.brand}`, outlineOffset: 2 },
+                // Hover firms the border rather than filling the key, so a
+                // pointer resting on a key cannot be mistaken for feedback.
                 ...(tone === 'idle'
-                  ? { '@media (hover: hover)': { '&:hover': { backgroundColor: palette.greenSoft } } }
+                  ? {
+                      '@media (hover: hover)': {
+                        '&:hover': { boxShadow: `inset 0 0 0 1px ${palette.ruleStrong}` },
+                      },
+                    }
                   : null),
               }}
             >

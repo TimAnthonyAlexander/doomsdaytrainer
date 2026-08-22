@@ -63,7 +63,7 @@ export function IndexStep({ value, onChange }: IndexStepProps) {
           return (
             <Box key={yy} sx={{ display: 'contents' }}>
               <Numeral size={17}>{formatYear(yy)}</Numeral>
-              <Numeral size={17} weight={600} color={palette.green}>
+              <Numeral size={17} weight={600} color={palette.brandDeep}>
                 {code}
               </Numeral>
               <Typography variant="body1">{weekdayName(code, value)}</Typography>

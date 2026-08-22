@@ -25,7 +25,7 @@ export function StepIndicator({ current, total }: StepIndicatorProps) {
             width: 26,
             height: 2,
             borderRadius: 1,
-            bgcolor: index + 1 === current ? palette.green : palette.rule,
+            bgcolor: index + 1 === current ? palette.brandDeep : palette.rule,
           }}
         />
       ))}

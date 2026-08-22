@@ -149,7 +149,7 @@ export function DrillMenu({
                           boxShadow: `inset 0 0 0 1px ${palette.rule}`,
                           '&.Mui-disabled': { opacity: 0.45 },
                           '@media (hover: hover)': {
-                            '&:hover': { backgroundColor: palette.greenSoft },
+                            '&:hover': { backgroundColor: palette.brandTint },
                           },
                         }}
                       >

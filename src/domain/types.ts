@@ -211,6 +211,116 @@ export interface WeekdayRun {
   medianLatencyMs: number;
 }
 
+/* ------------------------------------------------------------------ */
+/* Calculation trainer                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One step of deriving a year code.
+ *
+ * `leap`, `sum` and `mod` are the formula itself. `reduce` is the optional
+ * first move that takes whole 28s out of the year before the formula runs —
+ * the codes repeat every 28 years, so it changes nothing except how small the
+ * numbers get. `code` is not a derivation step: it is a straight recall of the
+ * code from memory, recorded under its own id so that remembering and working
+ * it out can be compared instead of averaged.
+ *
+ * See src/domain/calc.ts. Declared here because the persisted aggregate is
+ * keyed by it.
+ */
+export type CalcStepId = 'leap' | 'sum' | 'mod' | 'reduce' | 'code';
+
+/** One step answered on the calculation trainer. Steps never enter SM-2. */
+export interface CalcAttempt {
+  /** Epoch millis. */
+  timestamp: number;
+  /** The year being derived, 0..99. On the reduce-first path this stays the
+   * original year, not the reduced one, so a decade breakdown still works. */
+  yy: YearKey;
+  step: CalcStepId;
+  /** The number the user produced. Null when the step was abandoned. */
+  answered: number | null;
+  correct: boolean;
+  /** Prompt render → answer, in millis. */
+  latencyMs: number;
+  /** True when the reduce-first path was in use for this derivation. */
+  reduced: boolean;
+}
+
+/**
+ * Lifetime totals for one step. Same trim-proof shape as `WeekdayModeTotals`
+ * and the same bucket edges, so one estimator serves both.
+ */
+export interface CalcStepTotals {
+  answered: number;
+  correct: number;
+  /**
+   * One count per latency bucket, ascending, same length and order as
+   * `WEEKDAY_LATENCY_EDGES`. Ready to be drawn as bars, left to right.
+   */
+  buckets: number[];
+}
+
+/** Every step, kept apart. Averaging them would hide the slow one. */
+export type CalcTotals = Record<CalcStepId, CalcStepTotals>;
+
+/**
+ * What happened when a recalled code and a derived code were put side by side.
+ *
+ * Two answers and one truth give exactly five outcomes. They are stored as
+ * five counters rather than as accuracy percentages because the useful
+ * question is the disagreement: when memory and calculation differ, which one
+ * was right? A pair of accuracy figures cannot answer that; these can.
+ */
+export type VerifyOutcome =
+  /** Both matched the true code. */
+  | 'agreed-right'
+  /** Both gave the same answer, and it was wrong. The dangerous one. */
+  | 'agreed-wrong'
+  /** They differed and the recalled code was right. */
+  | 'memory-right'
+  /** They differed and the derived code was right. */
+  | 'calculation-right'
+  /** They differed and neither was right. */
+  | 'both-wrong';
+
+/** What the verify screen collects. Truth and verdict are added by the domain. */
+export interface VerifyResultInput {
+  /** Epoch millis. */
+  timestamp: number;
+  yy: YearKey;
+  /** The code the user produced from memory. */
+  recalled: number;
+  /** The code the user reached by working it out. */
+  derived: number;
+  /** Prompt render → the recalled answer. */
+  recallLatencyMs: number;
+  /** From the recalled answer to the derived answer. */
+  deriveLatencyMs: number;
+  /** True when the reduce-first path was in use. */
+  reduced: boolean;
+}
+
+/**
+ * One completed comparison. A verify that was abandoned before both answers
+ * exist is not recorded: there is nothing to compare, and a half-filled row
+ * would drag every rate below towards a number that never happened.
+ */
+export interface VerifyAttempt extends VerifyResultInput {
+  /** The true code for `yy`, from the shipped table. */
+  actual: Code;
+  outcome: VerifyOutcome;
+}
+
+/** Lifetime counts of every verify outcome. Never trimmed. */
+export interface VerifyTotals {
+  agreedRight: number;
+  agreedWrong: number;
+  memoryRight: number;
+  calculationRight: number;
+  bothWrong: number;
+}
+
 /** The full persisted document. Also the shape of an export file. */
 export interface AppData {
   schemaVersion: number;
@@ -228,6 +338,17 @@ export interface AppData {
   /** Every date ever answered, per mode. Never trimmed. */
   weekdayTotals: WeekdayTotals;
   weekdayRuns: WeekdayRun[];
+  /**
+   * The most recent steps answered on the calculation trainer, oldest first.
+   * Bounded — read `calcTotals` for anything that must cover all of history.
+   */
+  calcAttempts: CalcAttempt[];
+  /** Every step ever answered, per step. Never trimmed. */
+  calcTotals: CalcTotals;
+  /** The most recent verify comparisons, oldest first. Bounded. */
+  verifyAttempts: VerifyAttempt[];
+  /** Every verify comparison ever made. Never trimmed. */
+  verifyTotals: VerifyTotals;
   drills: DrillRecord[];
   days: Record<string, SessionDay>;
   createdAt: number;

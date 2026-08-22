@@ -145,7 +145,12 @@ function Cell({ item, outOfScope, selected, onSelect }: CellProps) {
             right: 0,
             bottom: 0,
             height: '3px',
-            bgcolor: palette.terracotta,
+            // The cell's own ink, not a grading colour. A leech means "this
+            // one keeps lapsing", which is not the same thing as "you just got
+            // it wrong", and STYLEGUIDE.md §2 keeps grading hues off this grid
+            // entirely. Reusing the ink also guarantees it reads on every step
+            // of the ramp, light end and dark.
+            bgcolor: 'currentColor',
           }}
         />
       ) : null}
@@ -186,7 +191,12 @@ function Swatch({ fill, dashed = false, leech = false }: { fill?: string; dashed
             right: 0,
             bottom: 0,
             height: '3px',
-            bgcolor: palette.terracotta,
+            // The cell's own ink, not a grading colour. A leech means "this
+            // one keeps lapsing", which is not the same thing as "you just got
+            // it wrong", and STYLEGUIDE.md §2 keeps grading hues off this grid
+            // entirely. Reusing the ink also guarantees it reads on every step
+            // of the ramp, light end and dark.
+            bgcolor: 'currentColor',
           }}
         />
       ) : null}

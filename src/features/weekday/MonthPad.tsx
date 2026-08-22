@@ -15,23 +15,28 @@ interface MonthPadProps {
 
 type Tone = 'idle' | 'pressed' | 'right' | 'wrong' | 'answer';
 
+/** Same rule as AnswerPad: neutral until answered, grading colours only then. */
 const TONE_SX: Record<Tone, Record<string, string>> = {
   idle: { backgroundColor: palette.paper, color: palette.ink, boxShadow: `inset 0 0 0 1px ${palette.rule}` },
   pressed: {
-    backgroundColor: palette.greenSoft,
-    color: palette.greenDeep,
-    boxShadow: `inset 0 0 0 1px ${palette.rule}`,
+    backgroundColor: palette.paper,
+    color: palette.ink,
+    boxShadow: `inset 0 0 0 1px ${palette.ruleStrong}`,
   },
-  right: { backgroundColor: palette.green, color: palette.ground, boxShadow: `inset 0 0 0 1px ${palette.green}` },
+  right: {
+    backgroundColor: palette.gradeFast,
+    color: palette.inkInverse,
+    boxShadow: `inset 0 0 0 1px ${palette.gradeFast}`,
+  },
   wrong: {
-    backgroundColor: palette.terracotta,
-    color: '#FFFFFF',
-    boxShadow: `inset 0 0 0 1px ${palette.terracotta}`,
+    backgroundColor: palette.gradeWrong,
+    color: palette.inkInverse,
+    boxShadow: `inset 0 0 0 1px ${palette.gradeWrong}`,
   },
   answer: {
-    backgroundColor: palette.greenSoft,
-    color: palette.greenDeep,
-    boxShadow: `inset 0 0 0 2px ${palette.green}`,
+    backgroundColor: palette.paper,
+    color: palette.ink,
+    boxShadow: `inset 0 0 0 2px ${palette.gradeFast}`,
   },
 };
 
@@ -100,9 +105,9 @@ export function MonthPad({ onAnswer, promptKey, feedback = null, disabled = fals
                 'background-color 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out',
               ...TONE_SX[tone],
               '&.Mui-disabled': { opacity: 1 },
-              '&:focus-visible': { outline: `2px solid ${palette.green}`, outlineOffset: 2 },
+              '&:focus-visible': { outline: `2px solid ${palette.brand}`, outlineOffset: 2 },
               ...(tone === 'idle'
-                ? { '@media (hover: hover)': { '&:hover': { backgroundColor: palette.greenSoft } } }
+                ? { '@media (hover: hover)': { '&:hover': { boxShadow: `inset 0 0 0 1px ${palette.ruleStrong}` } } }
                 : null),
             }}
           >

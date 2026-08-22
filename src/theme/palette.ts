@@ -1,44 +1,46 @@
 /**
- * The old palette names, re-pointed at the tokens in `./tokens.ts`.
+ * Named colour roles, each resolving to a `var(--token)` from `./tokens.ts`
+ * rather than a hex literal, so every consumer follows the active theme mode
+ * without being touched.
  *
- * Every value here is a `var(--token)` reference rather than a hex literal, so
- * the thirty-odd files that already import `palette` follow the mode without
- * being touched. New code should take the token from MUI's theme or from
- * `cssVar()`; these names are kept so the sweep can delete call sites instead of
- * rewriting them, and several no longer describe what they return.
- *
- * The app is purple now. `green`, `greenDeep`, `greenSoft`, `terracotta` and
- * `terracottaSoft` are the names of colours that are gone; they resolve to the
- * nearest token that plays the same role. Anything still reading them is a
- * sweep target.
+ * New code should prefer a MUI theme key where one exists; these names are for
+ * the places `sx` needs a raw colour.
  */
 import { cssVar, BUCKET_COUNT } from './tokens';
 
 export const palette = {
   ground: cssVar('bg'),
   paper: cssVar('surface-2'),
+  surface: cssVar('surface-1'),
   ink: cssVar('text-primary'),
   inkMuted: cssVar('text-secondary'),
   inkFaint: cssVar('text-muted'),
+  inkInverse: cssVar('text-inverse'),
   rule: cssVar('border'),
-
-  /** @deprecated The brand is `--brand-deep`, and it is purple. */
-  green: cssVar('brand-deep'),
-  /** @deprecated Reads as ink on `--brand-tint`. Use `--brand-on-tint`. */
-  greenDeep: cssVar('brand-on-tint'),
-  /** @deprecated The tinted brand surface. Use `--brand-tint`. */
-  greenSoft: cssVar('brand-tint'),
+  ruleStrong: cssVar('border-strong'),
 
   /**
-   * @deprecated There is no accent colour any more. This is the wrong-answer
-   * grading colour, and STYLEGUIDE.md §2 says grading colours appear only in
-   * the feedback flash and the latency histogram. Every other call site — the
-   * leech marker on the mastery grid, destructive buttons, lapse counts — needs
-   * a decision, not a rename.
+   * The brand. Reserved for the mastery ramp, progress, focus rings and
+   * navigation. STYLEGUIDE.md §2: it must never appear on a control the user
+   * taps during a rep, because the feedback flash has to own that moment.
    */
-  terracotta: cssVar('grade-wrong'),
-  /** @deprecated See `terracotta`. */
-  terracottaSoft: cssVar('grade-wrong-tint'),
+  brand: cssVar('brand'),
+  brandDeep: cssVar('brand-deep'),
+  brandTint: cssVar('brand-tint'),
+  brandOnTint: cssVar('brand-on-tint'),
+
+  /**
+   * Grading. STYLEGUIDE.md §2 allows these in exactly two places: the feedback
+   * flash, and the latency histogram. Anywhere else weakens the association and
+   * the flash stops reading pre-attentively, so reach for a neutral or the
+   * brand instead of borrowing one of these because the hue looks right.
+   */
+  gradeFast: cssVar('grade-fast'),
+  gradeMedium: cssVar('grade-medium'),
+  gradeSlow: cssVar('grade-slow'),
+  gradeWrong: cssVar('grade-wrong'),
+  gradeFastTint: cssVar('grade-fast-tint'),
+  gradeWrongTint: cssVar('grade-wrong-tint'),
 
   /**
    * Mastery ramp, index 0..6. Not decorative: index maps to interval bucket.

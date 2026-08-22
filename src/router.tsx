@@ -7,6 +7,7 @@ import { ReviewScreen } from '@/routes/ReviewScreen';
 import { SettingsScreen } from '@/routes/SettingsScreen';
 import { StatsScreen } from '@/routes/StatsScreen';
 import { TroubleScreen } from '@/routes/TroubleScreen';
+import { CalcScreen } from '@/routes/CalcScreen';
 import { WeekdayScreen } from '@/routes/WeekdayScreen';
 import { WelcomeScreen } from '@/routes/WelcomeScreen';
 
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
       // Drills and from the mastery grid, which is where leeches become visible.
       { path: 'trouble', element: <TroubleScreen /> },
       { path: 'weekday', element: <WeekdayScreen /> },
+      { path: 'calc', element: <CalcScreen /> },
       { path: 'stats', element: <StatsScreen /> },
       { path: 'settings', element: <SettingsScreen /> },
       { path: '*', element: <NotFoundScreen /> },

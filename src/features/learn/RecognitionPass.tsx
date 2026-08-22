@@ -107,15 +107,15 @@ function Pair({
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
-        bgcolor: current ? palette.greenSoft : 'transparent',
+        bgcolor: current ? palette.brandTint : 'transparent',
         transition: 'opacity 160ms ease-out, background-color 160ms ease-out',
         '&.Mui-disabled': { opacity: 0.4 },
       }}
     >
-      <Numeral size={13} color={current ? palette.green : palette.inkMuted}>
+      <Numeral size={13} color={current ? palette.brandDeep : palette.inkMuted}>
         {formatYear(yy)}
       </Numeral>
-      <Numeral size={26} weight={600} color={current ? palette.green : palette.ink}>
+      <Numeral size={26} weight={600} color={current ? palette.brandDeep : palette.ink}>
         {code}
       </Numeral>
     </ButtonBase>

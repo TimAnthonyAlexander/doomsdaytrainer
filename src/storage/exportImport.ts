@@ -128,6 +128,18 @@ export function parseImportFile(json: string): AppData {
   if (data.weekdayTotals !== undefined && !isRecord(data.weekdayTotals)) {
     throw new ImportError('That export has lifetime weekday totals that are not an object.');
   }
+  if (data.calcAttempts !== undefined && !Array.isArray(data.calcAttempts)) {
+    throw new ImportError('That export has a calculation log that is not a list.');
+  }
+  if (data.calcTotals !== undefined && !isRecord(data.calcTotals)) {
+    throw new ImportError('That export has lifetime calculation totals that are not an object.');
+  }
+  if (data.verifyAttempts !== undefined && !Array.isArray(data.verifyAttempts)) {
+    throw new ImportError('That export has a verify log that is not a list.');
+  }
+  if (data.verifyTotals !== undefined && !isRecord(data.verifyTotals)) {
+    throw new ImportError('That export has lifetime verify totals that are not an object.');
+  }
 
   const items: AppData['items'] = {};
   for (const [key, value] of Object.entries(data.items)) {

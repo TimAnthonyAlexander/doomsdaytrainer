@@ -141,7 +141,7 @@ function Body({ item, outOfScope, now, onClose }: { item: ItemState; outOfScope:
       </Box>
 
       {isLeech(item) ? (
-        <Typography variant="body2" sx={{ color: palette.terracotta }}>
+        <Typography variant="body2" sx={{ color: palette.ink }}>
           Flagged as a leech after {item.lapses} lapses. It shows up in the Trouble spots drill.
         </Typography>
       ) : null}
@@ -171,7 +171,11 @@ function Body({ item, outOfScope, now, onClose }: { item: ItemState; outOfScope:
 function AttemptRow({ attempt }: { attempt: Attempt }) {
   const when = new Date(attempt.timestamp);
   const Icon = attempt.correct ? Check : X;
-  const tone = attempt.correct ? palette.green : palette.terracotta;
+  // Neutral on purpose. The Check/X icon already carries correct-versus-wrong,
+  // so this does not need a colour, and grading hues belong to the feedback
+  // flash rather than a history list (STYLEGUIDE.md §2). A wrong attempt takes
+  // the stronger ink so the eye still finds the failures first.
+  const tone = attempt.correct ? palette.inkMuted : palette.ink;
 
   return (
     <Box

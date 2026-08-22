@@ -36,7 +36,7 @@ export function PlainToggle<T extends string>({ label, choices, value, onChange 
               minHeight: 48,
               px: 1,
               borderRadius: 1,
-              '&:focus-visible': { outline: `2px solid ${palette.green}`, outlineOffset: 2 },
+              '&:focus-visible': { outline: `2px solid ${palette.brandDeep}`, outlineOffset: 2 },
             }}
           >
             <Typography
@@ -47,7 +47,7 @@ export function PlainToggle<T extends string>({ label, choices, value, onChange 
                 color: current ? 'text.primary' : 'text.secondary',
                 // The underline is the only mark: it reads as "you are here"
                 // rather than as a button that has been switched on.
-                borderBottom: `2px solid ${current ? palette.green : 'transparent'}`,
+                borderBottom: `2px solid ${current ? palette.brandDeep : 'transparent'}`,
                 pb: 0.25,
               }}
             >

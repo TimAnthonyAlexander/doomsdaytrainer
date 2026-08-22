@@ -3,6 +3,7 @@ import { createItem } from '@/domain/scheduler';
 import { allYears } from '@/domain/yearCodes';
 import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
 import { emptyWeekdayTotals } from '@/domain/weekdayLifetime';
+import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
 
 /**
  * Version of the persisted document shape. Bump only when a stored document
@@ -14,8 +15,13 @@ import { emptyWeekdayTotals } from '@/domain/weekdayLifetime';
  *
  * v3 added `weekdayTotals`: lifetime counts and a latency histogram per mode,
  * which outlive the trimming of `weekdayAttempts`.
+ *
+ * v4 added the calculation trainer: `calcAttempts` and the per-step
+ * `calcTotals`, plus `verifyAttempts` and `verifyTotals` for the recall
+ * against calculation comparison. No new item map — the 28 base years are
+ * year codes 00-27 and already live in `items`.
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const DEFAULT_SETTINGS: Settings = {
   indexConvention: 'sunday',
@@ -81,6 +87,10 @@ export function defaultAppData(now: number): AppData {
     weekdayAttempts: [],
     weekdayTotals: emptyWeekdayTotals(),
     weekdayRuns: [],
+    calcAttempts: [],
+    calcTotals: emptyCalcTotals(),
+    verifyAttempts: [],
+    verifyTotals: emptyVerifyTotals(),
     drills: [],
     days: {},
     createdAt: now,
@@ -108,3 +118,20 @@ export const MAX_WEEKDAY_ATTEMPTS = 2000;
 
 /** Weekday runs kept. Older ones are dropped on write. */
 export const MAX_WEEKDAY_RUNS = 200;
+
+/**
+ * Calculation steps kept in the raw log. One derivation writes three or four
+ * rows, so 2000 is roughly 500 worked years — enough for a per-decade or
+ * per-step recent view, and the same order of magnitude as the weekday cap for
+ * the same reason: the whole document is rewritten on every answer.
+ * `AppData.calcTotals` holds the all-time numbers, so trimming this costs
+ * nothing that any screen reads as "lifetime".
+ */
+export const MAX_CALC_ATTEMPTS = 2000;
+
+/**
+ * Verify comparisons kept. One row per completed comparison rather than per
+ * step, so far fewer are needed; `AppData.verifyTotals` is again the all-time
+ * record.
+ */
+export const MAX_VERIFY_ATTEMPTS = 500;

@@ -40,7 +40,7 @@ export function WhyStep() {
             {line}
           </Numeral>
         ))}
-        <Numeral size={15} weight={600} color={palette.green} lineHeight={1.4}>
+        <Numeral size={15} weight={600} color={palette.brandDeep} lineHeight={1.4}>
           {`${sum} mod 7 = ${code}`}
         </Numeral>
       </Box>

@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDB } from 'idb';
-import type { AppData, DrillRecord, WeekdayAttempt, WeekdayMode } from '@/domain/types';
+import type { AppData, CalcAttempt, CalcStepId, DrillRecord, WeekdayAttempt, WeekdayMode } from '@/domain/types';
+import { CALC_STEP_IDS } from '@/domain/calc';
+import {
+  buildCalcTotals,
+  buildVerifyAttempt,
+  calcAnsweredTotal,
+  calcStepAnswered,
+  calcStepMedian,
+  emptyCalcTotals,
+  emptyVerifyTotals,
+  verifyChecked,
+} from '@/domain/calcStats';
 import {
   WEEKDAY_BUCKET_COUNT,
   bucketLowerEdge,
@@ -136,6 +147,10 @@ function v1Document(): AppData {
   delete stripped.weekdayAttempts;
   delete stripped.weekdayTotals;
   delete stripped.weekdayRuns;
+  delete stripped.calcAttempts;
+  delete stripped.calcTotals;
+  delete stripped.verifyAttempts;
+  delete stripped.verifyTotals;
   return stripped as unknown as AppData;
 }
 
@@ -154,7 +169,29 @@ function v2Document(attempts: WeekdayAttempt[]): AppData {
     unknown
   >;
   delete stripped.weekdayTotals;
+  delete stripped.calcAttempts;
+  delete stripped.calcTotals;
+  delete stripped.verifyAttempts;
+  delete stripped.verifyTotals;
   return stripped as unknown as AppData;
+}
+
+/**
+ * A document exactly as schema v3 wrote it: the weekday trainer complete with
+ * its lifetime aggregate, and nothing at all from the calculation trainer.
+ */
+function v3Document(overrides: Record<string, unknown> = {}): AppData {
+  const stripped = { ...defaultAppData(1000), schemaVersion: 3 } as Record<string, unknown>;
+  delete stripped.calcAttempts;
+  delete stripped.calcTotals;
+  delete stripped.verifyAttempts;
+  delete stripped.verifyTotals;
+  return { ...stripped, ...overrides } as unknown as AppData;
+}
+
+/** One answered calculation step, as the trainer writes it. */
+function calcAttempt(step: CalcStepId, correct: boolean, latencyMs: number, yy = 73): CalcAttempt {
+  return { timestamp: 6000, yy, step, answered: correct ? 0 : 4, correct, latencyMs, reduced: true };
 }
 
 describe('migrateAppData', () => {
@@ -255,6 +292,94 @@ describe('migrateAppData', () => {
     expect(Object.keys(data.monthItems)).toHaveLength(12);
     expect(Object.keys(data.centuryItems)).toHaveLength(4);
     expect(data.weekdayRuns).toEqual([]);
+  });
+
+  it('gives a v1, v2 and v3 document the calculation trainer, empty', () => {
+    for (const doc of [v1Document(), v2Document([]), v3Document()]) {
+      const migrated = migrateAppData(doc);
+      expect(migrated.schemaVersion).toBe(4);
+      expect(migrated.calcAttempts).toEqual([]);
+      expect(migrated.calcTotals).toEqual(emptyCalcTotals());
+      expect(migrated.verifyAttempts).toEqual([]);
+      expect(migrated.verifyTotals).toEqual(emptyVerifyTotals());
+    }
+  });
+
+  it('leaves a v3 user’s year codes, weekday history and settings untouched', () => {
+    const before = v3Document({
+      settings: { ...DEFAULT_SETTINGS, newItemsPerDay: 3, onboardingComplete: true },
+      items: {
+        ...defaultAppData(1000).items,
+        [itemKey(27)]: { ...defaultAppData(1000).items[itemKey(27)], introduced: true, interval: 45, repetitions: 6 },
+      },
+      weekdayAttempts: [weekdayAttempt('assisted', true, 900)],
+      weekdayTotals: buildWeekdayTotals([weekdayAttempt('assisted', true, 900)]),
+      days: { '2026-08-21': { date: '2026-08-21', reviewsCompleted: 4, newItemsIntroduced: 2 } },
+    });
+    const migrated = migrateAppData(before);
+
+    expect(migrated.settings.newItemsPerDay).toBe(3);
+    expect(migrated.settings.onboardingComplete).toBe(true);
+    expect(migrated.items[itemKey(27)]).toMatchObject({ introduced: true, interval: 45, repetitions: 6 });
+    expect(Object.keys(migrated.items)).toHaveLength(100);
+    expect(migrated.weekdayTotals.assisted.answered).toBe(1);
+    expect(migrated.days['2026-08-21'].reviewsCompleted).toBe(4);
+    expect(migrated.createdAt).toBe(1000);
+    // No new item map: the 28 base years are year codes 00-27, already here.
+    expect(Object.keys(migrated)).not.toContain('calcItems');
+    expect(migrated.items[itemKey(0)]).toBeDefined();
+    expect(migrated.items[itemKey(27)]).toBeDefined();
+  });
+
+  it('builds the per-step totals from a raw calculation log rather than starting at zero', () => {
+    const attempts = [
+      calcAttempt('leap', true, 2400),
+      calcAttempt('leap', false, 5200),
+      calcAttempt('sum', true, 1800),
+      calcAttempt('mod', true, 9000),
+    ];
+    const verifies = [buildVerifyAttempt({
+      timestamp: 7000,
+      yy: 73,
+      recalled: 0,
+      derived: 0,
+      recallLatencyMs: 800,
+      deriveLatencyMs: 5000,
+      reduced: true,
+    })];
+    const migrated = migrateAppData(v3Document({ calcAttempts: attempts, verifyAttempts: verifies }));
+
+    expect(migrated.calcTotals).toEqual(buildCalcTotals(attempts));
+    expect(calcStepAnswered(migrated.calcTotals, 'leap')).toBe(2);
+    expect(migrated.calcTotals.leap.correct).toBe(1);
+    expect(calcAnsweredTotal(migrated.calcTotals)).toBe(4);
+    expect(migrated.calcAttempts).toHaveLength(4);
+    expect(migrated.verifyTotals.agreedRight).toBe(1);
+    expect(verifyChecked(migrated.verifyTotals)).toBe(1);
+  });
+
+  it('drops a calculation attempt naming a step it does not know', () => {
+    const migrated = migrateAppData(
+      v3Document({
+        calcAttempts: [calcAttempt('leap', true, 2000), { ...calcAttempt('leap', true, 2000), step: 'carry' }, null],
+        verifyAttempts: [null, 'nope'],
+      }),
+    );
+    expect(migrated.calcAttempts).toHaveLength(1);
+    expect(calcAnsweredTotal(migrated.calcTotals)).toBe(1);
+    expect(migrated.verifyAttempts).toEqual([]);
+    expect(verifyChecked(migrated.verifyTotals)).toBe(0);
+  });
+
+  it('loads a stored v3 document and comes back with a usable calculation aggregate', async () => {
+    await putRaw(v3Document({ calcAttempts: [calcAttempt('mod', true, 7000), calcAttempt('mod', false, 11_000)] }));
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(calcStepAnswered(data.calcTotals, 'mod')).toBe(2);
+    expect(data.calcTotals.mod.correct).toBe(1);
+    expect(calcStepMedian(data.calcTotals, 'mod')).toBeGreaterThan(6000);
   });
 });
 
@@ -376,6 +501,71 @@ describe('normalisation of a corrupt document', () => {
 
     const data = await loadAppData();
     expect(data.weekdayTotals.assisted).toMatchObject({ answered: 2, correct: 1 });
+  });
+
+  it('repairs the per-step aggregate rather than letting NaN reach a screen', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.calcTotals = {
+      leap: { answered: 'lots', correct: -3, buckets: [4, null, 'two', 2] },
+      sum: 19,
+    };
+    doc.verifyTotals = { agreedRight: 'many', memoryRight: 2, bothWrong: Number.NaN };
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    for (const step of CALC_STEP_IDS) {
+      expect(data.calcTotals[step].buckets).toHaveLength(WEEKDAY_BUCKET_COUNT);
+      for (const count of data.calcTotals[step].buckets) {
+        expect(Number.isFinite(count)).toBe(true);
+        expect(count).toBeGreaterThanOrEqual(0);
+      }
+    }
+    // The readable bucket entries survive; the junk becomes zero.
+    expect(data.calcTotals.leap.buckets[0]).toBe(4);
+    expect(data.calcTotals.leap.buckets[1]).toBe(0);
+    expect(data.calcTotals.leap.buckets[3]).toBe(2);
+    expect(data.calcTotals.leap.answered).toBe(6);
+    expect(data.calcTotals.leap.correct).toBe(0);
+    // A step that is not an object at all starts empty rather than throwing.
+    expect(data.calcTotals.sum).toEqual(emptyCalcTotals().sum);
+    expect(Number.isFinite(calcStepMedian(data.calcTotals, 'leap') as number)).toBe(true);
+
+    expect(data.verifyTotals).toEqual({
+      agreedRight: 0,
+      agreedWrong: 0,
+      memoryRight: 2,
+      calculationRight: 0,
+      bothWrong: 0,
+    });
+  });
+
+  it('rebuilds the calculation aggregate from the raw log when a document has none', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.calcAttempts = [calcAttempt('sum', true, 1600), calcAttempt('sum', false, 2400)];
+    delete doc.calcTotals;
+    delete doc.verifyTotals;
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.calcTotals.sum).toMatchObject({ answered: 2, correct: 1 });
+    expect(data.verifyTotals).toEqual(emptyVerifyTotals());
+  });
+
+  it('drops calculation and verify log entries that are not usable', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.calcAttempts = [null, calcAttempt('leap', true, 2000), { ...calcAttempt('leap', true, 2000), yy: 300 }, 5];
+    doc.verifyAttempts = [null, { outcome: 'made-up' }];
+    delete doc.calcTotals;
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.calcAttempts).toHaveLength(1);
+    expect(data.calcAttempts[0].yy).toBe(73);
+    expect(calcAnsweredTotal(data.calcTotals)).toBe(1);
+    expect(data.verifyAttempts).toEqual([]);
   });
 
   it('drops an attempt history entry that is not an attempt', async () => {

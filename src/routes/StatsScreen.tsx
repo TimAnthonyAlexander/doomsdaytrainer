@@ -62,7 +62,7 @@ export function StatsScreen() {
   const streak = useMemo(() => reviewStreak(data.days, now), [data.days, now]);
   const series = useMemo(() => dailyLatencySeries(itemList, now, CHART_DAYS), [itemList, now]);
   // The same pool the trouble drill queues. The grid marks a leech with a
-  // terracotta foot; this is what the user can do about one.
+  // leech foot; this is what the user can do about one.
   const trouble = useMemo(() => troubleItems(itemList, scope), [itemList, scope]);
 
   const selectedItem = useMemo(
@@ -91,7 +91,7 @@ export function StatsScreen() {
       {trouble.length > 0 ? (
         <Box>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            {/* Not "flagged codes": the grid keeps the terracotta foot on every
+            {/* Not "flagged codes": the grid keeps the leech foot on every
                 code that ever lapsed six times, while the drill drops the ones
                 whose interval has recovered. Counting flags here would promise
                 a longer drill than the user gets. */}

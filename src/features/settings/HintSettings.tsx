@@ -47,7 +47,7 @@ export function HintSettings({ settings, onChange }: HintSettingsProps) {
                 {choice.label}
               </Typography>
               <Box sx={{ mt: 0.75 }}>
-                <Numeral size={15} color={palette.greenDeep}>
+                <Numeral size={15} color={palette.brandOnTint}>
                   {choice.hint.text}
                 </Numeral>
               </Box>
