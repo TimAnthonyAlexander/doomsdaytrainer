@@ -76,10 +76,11 @@ domain layer has no `Math.random` at all, so its ordering is deterministic.
 
 ### Navigation
 
-Four destinations, and the whole table is in `src/router.tsx`:
+Five destinations, and the whole table is in `src/router.tsx`:
 
 ```
 /                       Weekday          the index route, and the point of the app
+/concept                Concept          one date walked to its weekday, every step asked
 /year-codes             the grid         Learn, Revise, Calc, Trouble when flagged
 /year-codes/learn       Learn
 /year-codes/revise      Revise           the due queue and the three drills
@@ -95,6 +96,13 @@ prefix, so one `/year-codes` entry lights up on all four children with no extra
 rule, and the due count hangs off that one entry through `DUE_COUNT_PATH` rather
 than being written out in the bottom bar and the rail separately, which is how
 the two drifted apart before.
+
+The bottom bar's columns are `minmax(0, 1fr)` rather than `1fr`. Five columns
+give each entry 67px on a 375px phone, and "Year codes" with a two-digit due
+count beside it measures about 74px. A plain `1fr` grows the column to fit and
+pushes the whole bar past the viewport, so the label truncates instead and the
+numeral never shrinks. A clipped label is still readable; a clipped number is a
+different number.
 
 `screenTitle` has to work the other way round, and this is the part that will
 catch the next person. Prefix matching gives the wrong answer for a title: it
@@ -140,6 +148,12 @@ change ships a dead link.
   beside SM-2. Two correct, unhinted, sub-threshold answers on different days.
 - `diagnostics.ts` measures which route the user is actually taking, by slope
   rather than by speed.
+- `guidedDate.ts` is the whole method on one date as nine labelled steps, each
+  carrying its question, its givens, its answer, its worked line and the reason
+  it exists. It computes nothing itself — the arithmetic is `calc.ts`,
+  `dayStep.ts` and `weekday.ts` — and every given names the step whose answer it
+  is, so a test can prove the nine screens agree with each other rather than
+  only agreeing with `weekdayFor`.
 - `scope.ts`, `time.ts`, `weekdayLifetime.ts` round it out.
 
 ### Storage
@@ -283,6 +297,39 @@ nothing about that item either. The totals are cut by step size and by
 direction, because "I am slow at this" is not actionable and "the +5 steps cost
 twice what the +1 steps do" is. Both cuts cover every attempt, so either one
 sums to the overall figures and there is no third stored copy of them.
+
+**Concept** is the method on one date, start to finish, with the user answering
+every step. Pick a date, and nine screens hand over the two tables and ask for
+each piece of arithmetic: which century anchor, take the 28s off, count the leap
+days, take the sevens off, add the anchor, which month doomsday, how many days
+on, the final number, and which day that is. It ends by stating what the date
+actually was.
+
+The year code is **derived, never given**. That is the whole point of the
+screen. Handing it over would make the demonstration a magic trick performed at
+the user rather than by them, and the four steps that produce it are the ones
+worth watching a person do.
+
+Steps a date makes trivial become a line to read rather than a question with a
+forced answer: a year under 28 has no 28s to take off, and a date that is itself
+the month's doomsday is zero days on. The count stays nine either way, so the
+walk never quietly shortens.
+
+Nothing on it is timed and nothing is written. A test walks the whole sequence
+and asserts the stored document is unchanged, because a demonstration that
+recorded attempts would put untimed taps inside the numbers Progress reports.
+
+It is also the last step of onboarding, mounted from the same component. There
+the index convention comes from the onboarding draft rather than from settings,
+since the user picks it two steps earlier and it has not been committed yet.
+Reading committed settings would order the final pad by the value they just
+replaced. That step cannot be skipped, which is safe rather than harsh: every
+step's working line names the value it wanted and both pads outline the correct
+button, so someone who knows nothing can finish by tapping what is on screen.
+
+This screen is also where invariant 8 is easiest to see. Every number in the
+first eight steps is Sunday-indexed whatever the user picked; the convention
+only decides which weekday sits in position 0 of the last pad.
 
 ### Year codes
 
@@ -559,6 +606,11 @@ Tests to know about, because they encode decisions rather than behaviour:
   wrong silently
 - a stored weekday preference that is not a legal value falling back to the
   default instead of reaching the screen
+- the guided walk agreeing with itself across all nine steps, over 750-odd
+  dates, rather than only agreeing with `weekdayFor` at the end
+- no step before the fourth naming a number the year code, which is the one way
+  that screen could quietly stop teaching anything
+- the whole walk leaving the stored document byte for byte unchanged
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.

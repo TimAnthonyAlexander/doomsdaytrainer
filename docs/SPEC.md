@@ -20,10 +20,17 @@ that after 30 days without daily practice.
 
 ## Navigation
 
-Four destinations. Weekday is the index route and the primary one. Everything
-that teaches or keeps the 100 codes sits behind **Year codes**, presented as a
-grid of Learn, Revise and Calc, with Trouble spots joining them when an item has
-been flagged. **Progress** and **Settings** are the other two.
+Five destinations. Weekday is the index route and the primary one. **Concept**
+is second: one date walked to its weekday in nine steps, the tables handed over
+and every piece of arithmetic asked. Everything that teaches or keeps the 100
+codes sits behind **Year codes**, presented as a grid of Learn, Revise and Calc,
+with Trouble spots joining them when an item has been flagged. **Progress** and
+**Settings** are the other two.
+
+Onboarding ends by running the Concept walk, so the last thing a new user does
+before the app opens is produce a weekday themselves. That step is not
+skippable, and it cannot strand anyone: a wrong answer reveals the value it
+wanted, so the walk can always be finished by tapping what is on screen.
 
 **Revise** is one surface with a mode already selected and a Start button. The
 default mode is the scheduled due queue, which is the only mode there that
@@ -72,6 +79,7 @@ Screen sequence:
 2. **Why the codes exist.** Optional, skippable, one screen. Shows the formula `(YY + floor(YY/4)) mod 7` and one worked example so the user knows the table isn't arbitrary.
 3. **Index choice.** User picks Sunday-indexed (`0=Sun`) or Monday-indexed (`0=Mon`). This does not change the year codes at all. It only changes the weekday names shown in optional context. Default: Sunday-indexed. Changeable in settings.
 4. **Scope choice.** Full 100, or a subset (see Scopes below). Default: full 100.
+5. **One date, all the way through.** The Concept walk, on a date the user picks. Not skippable. The settings chosen above are committed at the end of it, and the app opens on Learn.
 
 ### 2. Learn mode
 
