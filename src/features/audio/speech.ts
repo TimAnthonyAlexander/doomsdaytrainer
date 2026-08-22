@@ -33,7 +33,7 @@ import { formatYear } from '@/domain/yearCodes';
  * two voices — half the table in one, half in the other. Bump this and the
  * script's OUT_DIR together, never one alone.
  */
-export const AUDIO_SET = 'v1';
+export const AUDIO_SET = 'v2';
 
 /** "Year twenty-two." The cue on its own, for a question. */
 export function cueUrl(yy: YearKey): string {

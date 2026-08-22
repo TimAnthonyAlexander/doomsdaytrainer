@@ -22,10 +22,12 @@
  * regenerated in a different voice under the same name would reach nobody who
  * already has the old one, and the table would end up half in each voice.
  */
-import { mkdirSync, existsSync, writeFileSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, writeFileSync, statSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 /** Must match src/features/audio/speech.ts. */
-const AUDIO_SET = 'v1';
+const AUDIO_SET = 'v2';
 
 /**
  * ElevenLabs voice. Fixed, because the cue has to be identical on every device
@@ -40,13 +42,25 @@ const AUDIO_SET = 'v1';
 const VOICE_ID = 'eXpIbVcVbLo8ZJQDlDnl';
 
 /** Fast, cheap, and made for exactly this: short formulaic English. */
-const MODEL_ID = 'eleven_flash_v2_5';
+const MODEL_ID = 'eleven_v3';
 
 /**
  * Mono, 22.05 kHz, 32 kbps. Speech at this bitrate is clean, and the whole set
  * of 200 clips has to stay well under the 1.5 MB the app is willing to ship.
  */
-const OUTPUT_FORMAT = 'mp3_22050_32';
+const OUTPUT_FORMAT = 'mp3_44100_128';
+
+/**
+ * The model leaves a faint synthetic noise floor running under the speech, and
+ * it stops dead at the end of the file rather than decaying. The noise itself
+ * is inaudible; the discontinuity where it stops is a click, and it was audible
+ * on 44 of the 200 clips — worst where the final 50ms was still at 15-48% of
+ * the clip's peak. So every clip is faded out over its last 35ms and given
+ * 150ms of trailing silence. Nothing is cut: the words were always complete,
+ * and this only removes the edge the noise floor was leaving behind.
+ */
+const FADE_OUT_S = 0.035;
+const TAIL_SILENCE_S = 0.15;
 
 /** Politeness between requests, in millis. */
 const GAP_MS = 120;
@@ -84,7 +98,7 @@ const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 
  * Spelled out rather than left as digits, or the model reads 22 as "two two".
  */
 function spokenYear(yy) {
-  if (yy < 10) return `oh ${yy === 0 ? 'oh' : ONES[yy]}`;
+  if (yy < 10) return ONES[yy];
   if (yy < 20) return TEENS[yy - 10];
   const tens = TENS[Math.floor(yy / 10)];
   const ones = yy % 10;
@@ -113,7 +127,7 @@ function clips() {
     out.push({ name: `cue-${pad(yy)}.mp3`, text: `Year ${spokenYear(yy)}.` });
     out.push({
       name: `pair-${pad(yy)}.mp3`,
-      text: `Year ${spokenYear(yy)} is ${ONES[codeFor(yy)]}.`,
+      text: `Year ${spokenYear(yy)}, is ${ONES[codeFor(yy)]}.`,
     });
   }
   return out;
@@ -155,6 +169,39 @@ async function speak(text) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+
+/**
+ * Fade the tail and pad it with silence. Requires ffmpeg on the PATH.
+ *
+ * This is part of generation, not a tidy-up afterwards: regenerating without it
+ * reintroduces the click on roughly a fifth of the set.
+ */
+function fadeTail(bytes, name) {
+  const tmp = new URL(`.raw-${name}`, OUT);
+  writeFileSync(tmp, bytes);
+  const raw = fileURLToPath(tmp);
+  const out = fileURLToPath(new URL(name, OUT));
+
+  const probe = spawnSync('ffprobe', [
+    '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', raw,
+  ], { encoding: 'utf8' });
+  const duration = Number.parseFloat(probe.stdout);
+  if (!Number.isFinite(duration)) {
+    rmSync(tmp, { force: true });
+    throw new Error('ffprobe could not read the clip (is ffmpeg installed?)');
+  }
+
+  const start = Math.max(0, duration - FADE_OUT_S).toFixed(3);
+  const run = spawnSync('ffmpeg', [
+    '-v', 'error', '-y', '-i', raw,
+    '-af', `afade=t=out:st=${start}:d=${FADE_OUT_S},apad=pad_dur=${TAIL_SILENCE_S}`,
+    '-codec:a', 'libmp3lame', '-b:a', '128k', '-ac', '1', out,
+  ], { encoding: 'utf8' });
+  rmSync(tmp, { force: true });
+  if (run.status !== 0) throw new Error(`ffmpeg failed: ${(run.stderr || '').slice(0, 160)}`);
+  return readFileSync(out);
+}
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 mkdirSync(OUT, { recursive: true });
@@ -181,10 +228,10 @@ for (const clip of clips()) {
     if (audio[0] !== 0xff && !(audio[0] === 0x49 && audio[1] === 0x44 && audio[2] === 0x33)) {
       throw new Error('response is not an mp3');
     }
-    writeFileSync(file, audio);
+    const final = fadeTail(audio, clip.name);
     written += 1;
-    bytes += audio.length;
-    console.log(`${clip.name}\t${audio.length}\t${clip.text}`);
+    bytes += final.length;
+    console.log(`${clip.name}\t${final.length}\t${clip.text}`);
   } catch (error) {
     failed.push(`${clip.name}: ${error.message}`);
     console.error(`FAILED ${clip.name}\t${error.message}`);
