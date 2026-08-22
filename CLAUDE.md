@@ -395,6 +395,16 @@ keeps asking. It introduces nothing, it draws from every introduced year in
 scope so it widens as blocks are finished, and the user leaves it rather than
 completing it. Leaving shows the block's summary.
 
+Every phase of a block is rendered with a key from `phaseKey`, and that is not
+housekeeping. Two phases in a row can be the same component — the last batch's
+recall and the mixed pass over the ten are both `RecallPass` — and React
+reconciles the same type at the same position by keeping its state. Unkeyed, the
+mixed pass opened on the finished batch's empty queue, behind the green flash
+and the disabled pad the batch had ended on, so the block stopped dead on "6 of
+6" with no way forward and never reached the line that writes its ten. The
+decade then read as unlearned on the picker, because it was. One missing key
+cost both halves of the block.
+
 **Calculate** is the other path to the same 100 codes, and does not replace
 memorisation. It teaches `(yy + floor(yy / 4)) mod 7` one step at a time with the
 reason attached to each: divide by four because a leap day lands every fourth
@@ -596,6 +606,9 @@ Tests to know about, because they encode decisions rather than behaviour:
 - no two adjacent years ever sharing a teaching batch, over all ten decades
 - the structure lesson appearing once, and after every phase that teaches
   anything, asserted against `flow.ts` rather than by walking sixty taps
+- no two phases of a block sharing a React key, and — the one place the sixty
+  taps are worth paying for — a whole block walked to the endless pass, which
+  is where the joins between phases are the only thing that can break
 - a missing or failed audio clip never blocking an answer or changing what is
   recorded, asserted both as a unit and through a rendered pass
 - import rejection paths, each with the message the UI will show

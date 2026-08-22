@@ -15,7 +15,7 @@ import {
   type DailyAllowance,
   type DecadeBlock,
 } from './blocks';
-import { firstPhase, nextPhase, type LearnPhase } from './flow';
+import { firstPhase, nextPhase, phaseKey, type LearnPhase } from './flow';
 
 interface LearnSessionProps {
   decade: number;
@@ -44,6 +44,10 @@ interface LearnSessionProps {
  *
  * Position inside the block lives here and nowhere else. Leaving mid-block
  * writes nothing, so coming back simply starts the block again.
+ *
+ * Every phase is keyed by `phaseKey`, and that is not decoration: two phases in
+ * a row can be the same component, and React keeps a component's state when it
+ * reconciles the same type at the same position. See `flow.ts`.
  */
 export function LearnSession({ decade, blocks, allowance, onStart, onExit }: LearnSessionProps) {
   const { items, itemList, settings, introduceItems, noteSessionActivity, updateSettings } =
@@ -83,6 +87,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
   if (phase.kind === 'batch-study') {
     return (
       <StudyPass
+        key={phaseKey(phase)}
         decade={decade}
         years={batches[phase.batch]}
         stepLabel={`Batch ${phase.batch + 1} of ${batches.length}`}
@@ -95,6 +100,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
   if (phase.kind === 'batch-recall') {
     return (
       <RecallPass
+        key={phaseKey(phase)}
         decade={decade}
         years={batches[phase.batch]}
         seed={seed + phase.batch}
@@ -111,6 +117,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
   if (phase.kind === 'all-ten') {
     return (
       <RecallPass
+        key={phaseKey(phase)}
         decade={decade}
         mixIn={mixIn}
         seed={seed}
@@ -123,7 +130,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
   }
 
   if (phase.kind === 'structure') {
-    return <StructureCheck decade={decade} onDone={() => advance(0)} />;
+    return <StructureCheck key={phaseKey(phase)} decade={decade} onDone={() => advance(0)} />;
   }
 
   if (phase.kind === 'keep-going') {
@@ -136,6 +143,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
       .map((item) => item.yy);
     return (
       <KeepGoing
+        key={phaseKey(phase)}
         decade={decade}
         pool={pool.length > 0 ? pool : years}
         seed={seed}
@@ -146,6 +154,7 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
 
   return (
     <BlockDone
+      key={phaseKey(phase)}
       decade={decade}
       introduced={introduced}
       wrongTaps={wrongTaps}

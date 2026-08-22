@@ -68,6 +68,28 @@ export function nextPhase(phase: LearnPhase, options: FlowOptions): LearnPhase {
   }
 }
 
+/**
+ * A React key for the phase, distinct for every phase a block can be in.
+ *
+ * This is load-bearing rather than tidy, and it was a real bug. Two phases in a
+ * row are rendered by the same component — `batch-recall` on the last batch is
+ * a `RecallPass`, and so is `all-ten` — and React reconciles a component of the
+ * same type at the same position by *keeping its state*. So the mixed pass
+ * inherited the finished batch's queue, its green feedback flash and its
+ * disabled pad, and the block stopped dead on "6 of 6" with no way forward and
+ * nothing written. Keying every phase makes a phase change a remount, which is
+ * what a phase change is.
+ */
+export function phaseKey(phase: LearnPhase): string {
+  switch (phase.kind) {
+    case 'batch-study':
+    case 'batch-recall':
+      return `${phase.kind}-${phase.batch}`;
+    default:
+      return phase.kind;
+  }
+}
+
 /** Every phase of one block, in order, ending on `done`. */
 export function phaseSequence(options: FlowOptions): LearnPhase[] {
   const out: LearnPhase[] = [firstPhase()];

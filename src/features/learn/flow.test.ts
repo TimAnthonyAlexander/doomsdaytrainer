@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BATCH_COUNT } from './blocks';
-import { firstPhase, nextPhase, phaseSequence, type LearnPhase } from './flow';
+import { firstPhase, nextPhase, phaseKey, phaseSequence, type LearnPhase } from './flow';
 
 const kinds = (phases: LearnPhase[]) => phases.map((phase) => phase.kind);
 
@@ -108,5 +108,42 @@ describe('the endless pass', () => {
     // The sequence terminates for the test's sake; in the session the phase
     // only advances when the user stops it.
     expect(nextPhase({ kind: 'keep-going' }, { structureSeen: true })).toEqual({ kind: 'done' });
+  });
+});
+
+describe('one key per phase', () => {
+  // Every phase is a screen, and two of them in a row can be the same
+  // component: the last batch's recall and the mixed pass over the ten are both
+  // a `RecallPass`. React reconciles the same component type at the same
+  // position by keeping its state, so without a key the mixed pass inherited a
+  // finished queue, a green feedback flash and a disabled pad — the block died
+  // on "6 of 6" and never wrote its ten.
+  it('never repeats a key between one phase and the next', () => {
+    for (const structureSeen of [true, false]) {
+      const phases = phaseSequence({ structureSeen });
+      for (let at = 1; at < phases.length; at += 1) {
+        expect(phaseKey(phases[at]), `${phases[at - 1].kind} then ${phases[at].kind}`).not.toBe(
+          phaseKey(phases[at - 1]),
+        );
+      }
+    }
+  });
+
+  it('gives every phase of a block its own key', () => {
+    for (const structureSeen of [true, false]) {
+      const keys = phaseSequence({ structureSeen }).map(phaseKey);
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+  });
+
+  it('separates the batches from each other', () => {
+    // The batch number is the only thing that differs between them, so a key
+    // that dropped it would let batch 2 open on batch 1's leftover state.
+    expect(phaseKey({ kind: 'batch-recall', batch: 0 })).not.toBe(
+      phaseKey({ kind: 'batch-recall', batch: 1 }),
+    );
+    expect(phaseKey({ kind: 'batch-study', batch: 0 })).not.toBe(
+      phaseKey({ kind: 'batch-recall', batch: 0 }),
+    );
   });
 });
