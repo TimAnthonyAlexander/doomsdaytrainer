@@ -4,6 +4,8 @@ import type {
   Attempt,
   CalcAttempt,
   CalcTotals,
+  DayStepAttempt,
+  DayStepTotals,
   DrillRecord,
   GradeResult,
   ItemState,
@@ -41,6 +43,11 @@ export interface AppStateValue {
    */
   weekdayTotals: WeekdayTotals;
   /**
+   * Lifetime day-step counts and latency histograms, by step size and by
+   * direction. Survives the trimming of `data.dayStepAttempts`.
+   */
+  dayStepTotals: DayStepTotals;
+  /**
    * Lifetime counts and a latency histogram for every calculation step, kept
    * apart so the slow step is visible. Survives the trimming of
    * `data.calcAttempts`.
@@ -62,6 +69,13 @@ export interface AppStateValue {
    */
   recordWeekdayAttempt(attempt: WeekdayAttempt): Promise<void>;
   recordWeekdayRun(run: Omit<WeekdayRun, 'id' | 'timestamp'>): Promise<void>;
+  /**
+   * Appends one answered day step to the log and folds it into the lifetime
+   * totals. Nothing here schedules anything: a (doomsday, day) pair is not a
+   * fixed item set, and the month doomsday the prompt states is given rather
+   * than recalled, so the answer says nothing about that item either.
+   */
+  recordDayStepAttempt(attempt: DayStepAttempt): Promise<void>;
   /**
    * Appends one answered calculation step to the log and folds it into the
    * per-step lifetime totals. Nothing here schedules anything: a derivation is

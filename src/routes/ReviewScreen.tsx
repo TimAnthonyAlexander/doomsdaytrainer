@@ -7,6 +7,9 @@ import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Numeral } from '@/components/ui/Numeral';
 import { Screen } from '@/components/ui/Screen';
+import { SoundToggle } from '@/features/audio/SoundToggle';
+import { cueUrl } from '@/features/audio/speech';
+import { useSpokenPrompt } from '@/features/audio/useSpokenPrompt';
 import { ReviewPrompt } from '@/features/review/ReviewPrompt';
 import { SessionSummary } from '@/features/review/SessionSummary';
 import { nextDueLabel, summarise } from '@/features/review/summary';
@@ -20,9 +23,29 @@ const OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
 }));
 
 export function ReviewScreen() {
-  const { settings } = useAppState();
+  const { settings, updateSettings } = useAppState();
   const session = useReviewSession();
   const { phase, advance } = session;
+
+  /*
+   * The spoken cue starts on the same commit that paints the year, which is the
+   * commit the latency clock starts on too. The clock is not moved to the end
+   * of the clip and never will be: an answer given while the year is still
+   * being spoken would then measure as negative, clamp to zero, and take the
+   * top grade — the exact defect paint-to-tap exists to prevent. So a spoken
+   * review answer is simply a slower one, it is marked `audioPlayed`, and Stats
+   * says how many of the recent answers carry the mark.
+   *
+   * The token, rather than the url, is what counts as a new prompt: a queue
+   * with one item asks the same year twice and both are prompts, while the
+   * correction tap after a wrong answer is not one and must not be spoken over.
+   */
+  useSpokenPrompt(
+    session.item === null ? null : cueUrl(session.item.yy),
+    settings.spokenReviewPrompts,
+    session.upcoming === null ? null : cueUrl(session.upcoming),
+    session.item === null ? 'none' : `${session.item.yy}#${session.results.length}`,
+  );
 
   // Correct answers advance themselves. Errors never do: the user has to read
   // the right code and choose to move on.
@@ -92,9 +115,29 @@ export function ReviewScreen() {
 
   return (
     <Screen gap={2} sx={{ flex: 1, justifyContent: { xs: 'flex-start', md: 'center' } }}>
-      <Numeral size={13} color={palette.inkMuted}>
-        {`${done} / ${total}`}
-      </Numeral>
+      {/* The counter stays optically centred and the sound control sits out at
+          the edge, above the prompt and well clear of the thumb zone, so it
+          cannot be caught mid-rep. It is before the prompt in the DOM, so it is
+          never in the tab path between the year and the pad. */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
+          alignItems: 'center',
+          width: '100%',
+        }}
+      >
+        <Box />
+        <Numeral size={13} color={palette.inkMuted}>
+          {`${done} / ${total}`}
+        </Numeral>
+        <Box sx={{ justifySelf: 'end' }}>
+          <SoundToggle
+            on={settings.spokenReviewPrompts}
+            onChange={(next) => void updateSettings({ spokenReviewPrompts: next })}
+          />
+        </Box>
+      </Box>
 
       <Box
         sx={{

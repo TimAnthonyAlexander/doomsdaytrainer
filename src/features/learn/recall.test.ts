@@ -201,6 +201,43 @@ describe('a pass over years already produced once', () => {
   });
 });
 
+describe('a batch-sized pass', () => {
+  // Learn no longer hands this file a whole decade first. It hands it an
+  // introduction batch: three or four years, none of them adjacent, every pair
+  // already produced once in its study trial. The tests above walk ten; these
+  // walk what the app actually passes.
+  const BATCHES: YearKey[][] = [
+    [40, 43, 46, 49],
+    [41, 44, 47],
+    [42, 45, 48],
+  ];
+
+  it('finishes every batch of every decade, at every seed', () => {
+    for (let decade = 0; decade < 10; decade += 1) {
+      for (const shape of BATCHES) {
+        const batch = shape.map((yy) => (yy % 10) + decade * 10);
+        for (const seed of [0, 5, 31]) {
+          const order = walk(startRecall(batch, seed, [], true));
+          for (const yy of batch) {
+            expect(order.filter((seen) => seen === yy).length).toBeGreaterThanOrEqual(
+              VARIED_STREAK,
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it('never asks the same year twice running, even in a pool of three', () => {
+    for (const seed of [0, 5, 31]) {
+      const order = walk(startRecall([41, 44, 47], seed, [], true));
+      for (let i = 1; i < order.length; i += 1) {
+        expect(order[i]).not.toBe(order[i - 1]);
+      }
+    }
+  });
+});
+
 describe('progress and counters', () => {
   it('counts the ordered pass as one step per year', () => {
     const state = startRecall(DECADE);

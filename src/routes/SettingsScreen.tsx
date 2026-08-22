@@ -6,6 +6,7 @@ import { requestReminderPermission, useReminderCapability } from '@/features/not
 import { useInstallPrompt } from '@/features/pwa';
 import { AboutSettings } from '@/features/settings/AboutSettings';
 import { AnsweringSettings } from '@/features/settings/AnsweringSettings';
+import { AudioSettings } from '@/features/settings/AudioSettings';
 import { DataSettings } from '@/features/settings/DataSettings';
 import { HintSettings } from '@/features/settings/HintSettings';
 import { PracticeSettings } from '@/features/settings/PracticeSettings';
@@ -37,6 +38,7 @@ export function SettingsScreen() {
       <PracticeSettings settings={settings} onChange={change} />
       <AnsweringSettings settings={settings} onChange={change} />
       <HintSettings settings={settings} onChange={change} />
+      <AudioSettings settings={settings} onChange={change} />
       <ReminderSettings
         settings={settings}
         onChange={change}

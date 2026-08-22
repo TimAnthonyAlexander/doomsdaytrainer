@@ -205,15 +205,57 @@ function nextVariedQueue(state: RecallState, answered: YearKey): YearKey[] {
   const padded =
     rest.length >= REINSERT_GAP
       ? rest
-      : [...rest, ...spacersFor(state, answered, REINSERT_GAP - rest.length)];
-  const at = Math.min(REINSERT_GAP, padded.length);
+      : [
+          ...rest,
+          ...spacersFor(state, answered, REINSERT_GAP - rest.length, rest[rest.length - 1]),
+        ];
+  const at = insertionPoint(padded, answered);
   return [...padded.slice(0, at), answered, ...padded.slice(at)];
 }
 
-/** Settled years and mix-ins, used only to keep a year off its own heels. */
-function spacersFor(state: RecallState, exclude: YearKey, count: number): YearKey[] {
+/**
+ * Where the answered year goes back in: at the gap, unless that would land it
+ * beside another copy of itself, in which case one place further along.
+ *
+ * A batch is three or four years, not ten, and at that size the queue is
+ * regularly shorter than the gap and padded out. Taking the gap as a fixed
+ * index there could put the year immediately after a spacer that happened to be
+ * the same year, and a year asked twice running is answered by the tap that was
+ * just made rather than by the pairing — which is the one thing the gap exists
+ * to prevent.
+ */
+function insertionPoint(queue: readonly YearKey[], yy: YearKey): number {
+  for (let at = Math.min(REINSERT_GAP, queue.length); at <= queue.length; at += 1) {
+    if (queue[at - 1] === yy || queue[at] === yy) continue;
+    return at;
+  }
+  return queue.length;
+}
+
+/**
+ * Settled years and mix-ins, used only to keep a year off its own heels.
+ *
+ * `previous` is whatever the spacers are being appended to, so the first one
+ * never repeats it. Without that the padding itself creates the repeat it was
+ * added to prevent, which is what happened on a pool of three.
+ */
+function spacersFor(
+  state: RecallState,
+  exclude: YearKey,
+  count: number,
+  previous: YearKey | undefined,
+): YearKey[] {
   const pool = [...state.targets, ...state.mixIn].filter((yy) => yy !== exclude);
   if (pool.length === 0) return [];
   const rotated = orderVaried(pool, state.seed + state.wrongTaps + 1);
-  return Array.from({ length: count }, (_unused, i) => rotated[i % rotated.length]);
+
+  const out: YearKey[] = [];
+  let last = previous;
+  for (let i = 0; out.length < count && i < count + rotated.length; i += 1) {
+    const candidate = rotated[i % rotated.length];
+    if (candidate === last && rotated.length > 1) continue;
+    out.push(candidate);
+    last = candidate;
+  }
+  return out;
 }

@@ -141,23 +141,92 @@ export function leapRuns(decade: number): LeapRun[] {
   return runs.map((run) => ({ ...run, partial: run.years.length < 4 }));
 }
 
+/** How many batches a decade is introduced in. Three, so none is over four. */
+export const BATCH_COUNT = 3;
+
 /**
- * The decade split into the groups learn mode teaches one at a time, before it
- * ever asks for all ten.
+ * The decade split into the batches learn mode introduces one at a time.
  *
- * The split is the leap runs, not an arbitrary four/four/two, because the run
- * boundary is exactly where the code jumps by two. Learning a group means
- * learning one unbroken +1 sequence. For 00–09 that gives 00–03, 04–07, 08–09;
- * for a decade that opens mid-run it gives the short group first.
+ * This used to be the leap runs — 00–03, 04–07, 08–09 — which was the whole
+ * defect in miniature. A batch that is a contiguous run hands the learner the
+ * +1 step and lets them produce every code after the first without ever
+ * retrieving a pair. Small pools are right (Rocket Math teaches four facts at a
+ * time, the Koch method two characters), but the pool has to be small *and*
+ * unconnected.
+ *
+ * So the split is by position mod three: 00, 03, 06, 09 · 01, 04, 07 · 02, 05,
+ * 08. Three or four pairs per batch, no two of them adjacent, and no batch that
+ * is a run of anything. The stride is not a shortcut of its own either, because
+ * three years cross a leap boundary about half the time, so the code step
+ * between batch members alternates between three and four rather than being
+ * one number the user could ride.
  */
-export function learnGroups(decade: number): YearKey[][] {
-  return leapRuns(decade).map((run) => run.years);
+export function introBatches(decade: number): YearKey[][] {
+  const years = decadeYears(decade);
+  return Array.from({ length: BATCH_COUNT }, (_unused, batch) =>
+    years.filter((_year, index) => index % BATCH_COUNT === batch),
+  );
 }
 
 /** Code delta from `yy` to `yy + 1`: 1 inside a run, 2 across the leap boundary. */
 export function stepAfter(yy: YearKey): number {
   if (yy >= 99) return 0;
   return (codeFor(yy + 1) - codeFor(yy) + 7) % 7;
+}
+
+/** One adjacent pair of years, with the size of the step between their codes. */
+export interface StructureExample {
+  from: YearKey;
+  to: YearKey;
+  /** 1 inside a leap run, 2 across a boundary. */
+  step: number;
+}
+
+/**
+ * Two adjacent pairs from a decade the user has just finished: one where the
+ * code rises by one, one where it jumps by two.
+ *
+ * Two pairs, deliberately, and never the ten laid out in a row. The +1/+2
+ * structure is worth knowing as a way to check an answer you have already
+ * produced, and it is ruinous as the route you produce it by — a ladder can
+ * only be climbed from the bottom. Showing it as two isolated pairs after the
+ * decade is learned is the difference between "so that is why the table looks
+ * like that" and "here is how to work them all out".
+ */
+export function structureExamples(decade: number): { rise: StructureExample; jump: StructureExample } {
+  const pairs = decadeYears(decade)
+    .slice(0, BLOCK_SIZE - 1)
+    .map((yy) => ({ from: yy, to: yy + 1, step: stepAfter(yy) }));
+
+  const ones = pairs.filter((pair) => pair.step === 1);
+  const twos = pairs.filter((pair) => pair.step === 2);
+
+  // A pair whose codes wrap past six — 6 then 0 — is a true step of one and
+  // reads as a drop of six. The screen says "one higher", so it gets a pair
+  // where that sentence is literally what the two numbers show. The wrap is
+  // real and it is taught in Calculate, where the remainder step is the lesson.
+  const noWrap = (pair: StructureExample) => codeFor(pair.to) === codeFor(pair.from) + pair.step;
+
+  // The two examples must not touch. Sharing a year, or sitting next to one
+  // another, would put three or four consecutive years on the screen, and four
+  // consecutive years is the run this whole rewrite exists to stop showing.
+  const apart = (a: StructureExample, b: StructureExample) =>
+    b.from > a.to + 1 || a.from > b.to + 1;
+
+  for (const strict of [true, false]) {
+    for (const rise of ones) {
+      if (strict && !noWrap(rise)) continue;
+      for (const jump of twos) {
+        if (strict && !noWrap(jump)) continue;
+        if (!apart(rise, jump)) continue;
+        return { rise, jump };
+      }
+    }
+  }
+
+  // Unreachable for every real decade: leap runs are four long, so ten
+  // consecutive years always hold a boundary and an interior far apart enough.
+  throw new Error(`decade ${decade} has no separated +1/+2 pair`);
 }
 
 /** How many already-known years the final pass mixes in to space the block. */

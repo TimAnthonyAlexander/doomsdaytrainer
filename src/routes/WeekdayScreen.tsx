@@ -8,6 +8,7 @@ import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Screen } from '@/components/ui/Screen';
 import type { WeekdayMode, WeekdayRangeId } from '@/domain/types';
 import { weekdayRanges } from '@/features/weekday/datePool';
+import { DayStepView } from '@/features/weekday/DayStepView';
 import { PlainToggle, type ToggleChoice } from '@/features/weekday/PlainToggle';
 import { TableDrillView } from '@/features/weekday/TableDrillView';
 import { WeekdayPrompt } from '@/features/weekday/WeekdayPrompt';
@@ -20,7 +21,17 @@ import { weekdayOptions } from '@/features/weekday/weekdayPad';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
 
-type View = 'dates' | 'tables' | 'stats';
+/**
+ * The day step sits here rather than on a route of its own.
+ *
+ * It is the last step of the same method, it answers on the same seven weekday
+ * buttons, and it follows the same rule as the dates above it: nothing on
+ * either surface is a fixed item set, so nothing on either is scheduled.
+ * Splitting it out would put two halves of one calculation behind two different
+ * tabs. The bottom nav is also already seven entries wide, which at 375px is
+ * 45.6px a column, so an eighth would cost the labels rather than earn a place.
+ */
+type View = 'dates' | 'daystep' | 'tables' | 'stats';
 
 const MODE_CHOICES: readonly ToggleChoice<WeekdayMode>[] = [
   { value: 'assisted', label: 'Assisted' },
@@ -163,6 +174,17 @@ function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
 
       <Box>
         <SectionRow
+          title="Day step"
+          detail={
+            data.dayStepAttempts.length === 0
+              ? 'Nothing yet'
+              : data.dayStepAttempts.length === 1
+                ? '1 step'
+                : `${data.dayStepAttempts.length} steps`
+          }
+          onOpen={() => onView('daystep')}
+        />
+        <SectionRow
           title="Tables"
           detail={tablesDue === 0 ? 'Nothing due' : `${tablesDue} due`}
           onOpen={() => onView('tables')}
@@ -185,6 +207,14 @@ export function WeekdayScreen() {
   const [view, setView] = useState<View>('dates');
   const [mode, setMode] = useState<WeekdayMode>('assisted');
   const [rangeId, setRangeId] = useState<WeekdayRangeId>('century');
+
+  if (view === 'daystep') {
+    return (
+      <Screen gap={2} sx={{ flex: 1 }}>
+        <DayStepView onBack={() => setView('dates')} />
+      </Screen>
+    );
+  }
 
   if (view === 'tables') {
     return (

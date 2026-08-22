@@ -77,6 +77,13 @@ domain layer has no `Math.random` at all, so its ordering is deterministic.
   days, which is exactly one full Gregorian cycle: 400 years is 146,097 days and
   divides by 7 with no remainder, so the range is not a large sample, it is every
   distinct case the calendar can produce.
+- `dayStep.ts` is the last step of the method on its own: from a month's
+  doomsday to another day in that month, `(anchorWeekday + targetDay -
+  anchorDay) mod 7`, plus the step size, the direction and the labelled
+  working. Its test checks every case the trainer can produce — 707 legal days
+  across a common and a leap year, each asked from all seven weekdays the
+  doomsday could fall on — against a day-by-day walk of the calendar, and
+  against `weekdayFor` on real dates. `dayStepLifetime.ts` is its aggregate.
 - `calc.ts` is the calculation trainer's maths: `leapDays`, `rawSum`,
   `reduce28`, `cyclesRemoved`, `sevenStep`, and `stepsFor` / `reducedStepsFor`,
   which return the derivation as labelled steps, each carrying the question, the
@@ -117,6 +124,7 @@ v2  month doomsdays, century anchors, weekday attempts and runs
 v3  the weekday lifetime aggregate, built from existing attempts on upgrade
 v4  calculation-trainer attempts and per-step totals
 v5  per-item fluency, rebuilt from each item's stored attempts on upgrade
+v6  the day-step log and its aggregate, by step size and by direction
 ```
 
 Migrations that introduce an aggregate rebuild it from whatever raw history the
@@ -198,30 +206,48 @@ violation, and several were bugs before they were rules.
 **Review** is the main loop: the due queue, one year at a time, seven buttons,
 hints behind a button and shown unasked after two consecutive failures.
 
-**Learn** teaches the table. A decade is split at its leap-run boundaries into
-groups, taught one group at a time before the full ten is ever asked for, because
-ten unfamiliar pairs at once is past what working memory holds and a user who
-cannot hold them guesses. Blocks unlock in order; a finished block can always be
-redone, and redoing it is not charged against the daily new-item cap.
+**Learn** teaches the table one decade at a time, and it teaches pairs rather
+than the run. A decade is introduced in three batches split by position mod
+three — 40, 43, 46, 49 · 41, 44, 47 · 42, 45, 48 — so no batch holds two
+adjacent years and no batch is a run of anything. Blocks unlock in order; a
+finished block can always be redone, and redoing it is not charged against the
+daily new-item cap.
 
-Each recall pass runs ascending only until every year in it has been produced
-correctly once, then switches to varied order. That switch point is not a guess:
-Battig, Brown & Nelson (1963) compared constant and varied presentation across
-five experiments and found that moving to varied order **after the first correct
-response to each pair** kept the entire benefit of constant order. It is
-therefore per item, not per block.
+Inside a batch, one pair is on screen at a time: the year and its code, both
+labelled, the user taps the code they can see, and the same pair comes straight
+back with the code hidden. That order is not an accident. Seabrooke et al.
+(2019, JML 104) found that guessing before feedback on pairs with no
+pre-existing association improves memory for the items and *impairs* cued recall
+of the link, and the link is the only thing this app builds. So a pair is never
+asked for before its first reveal, and the show trial still takes a tap, because
+a tap on a code that is on screen cannot be wrong and makes the pairing a motor
+act.
 
-The final pass over all ten also mixes in years from other decades, chosen
-weakest-fluency-first, because ten years of one decade practised against each
-other can be recited however they are shuffled. The mix-in count is fixed, so
-the tenth block is no longer than the first; what widens with progress is the
-review queue.
+Then the batch is recalled in varied order, twice clean each, then all ten mixed
+with years from other decades. The mix-in count is fixed, so the tenth block is
+no longer than the first; what widens with progress is the review queue.
+
+The switch from ordered to varied is per item, at first correct — Battig, Brown
+& Nelson (1963) compared constant and varied presentation across five
+experiments and found that moving to varied order **after the first correct
+response to each pair** kept the entire benefit of constant order. Because the
+study trial is what spends each pair's first correct, every learn pass now opens
+varied; `recall.ts` keeps its ordered phase as the module's general contract.
 
 Full interleaving from the start would be worse, not better. Interleaving's wins
 are in category induction, and for arbitrary paired associates it is
 null-to-negative — Hwang (2025) ran blocked, interleaved and blocked-then-
-interleaved over word pairs and pure interleaving came last of the three.
-Blocked-then-varied is the shape the evidence supports, and it is the shape here.
+interleaved over word pairs and pure interleaving came last of the three. That
+licenses *blocked* practice, not *ordered* presentation: decades stay as the
+unit, ascending order does not.
+
+The +1/+2 structure is taught once, ever, on its own screen, after a decade has
+been learned, as two isolated pairs. Placed first it becomes the route the ten
+are produced by, and a route into a decade can only be entered at its start.
+Placed last it can only be an explanation of a table the user already has.
+`flow.ts` holds the block's phase order as a pure function for exactly that
+reason: where the structure lesson sits is a claim about how the table gets
+learned, and a claim like that should be assertable without walking sixty taps.
 
 **Calculate** is the other path to the same 100 codes, and does not replace
 memorisation. It teaches `(yy + floor(yy / 4)) mod 7` one step at a time with the
@@ -268,6 +294,28 @@ Dates never enter spaced repetition, because they are not a fixed item set. Mont
 doomsdays and century anchors do, because they are 12 and 4 fixed items. A wrong
 weekday answer does not punish either, since which step failed is unknowable.
 
+**Day step** is the last step of that method timed on its own, and it sits on
+the Weekday screen beside the dates and the tables. "In March, the 14th is a
+Tuesday. What is the 5th?" — one addition, seven buttons. It exists because a
+whole date cannot say where the time went: an answer that took six seconds spent
+them on the century anchor, the year code, the month doomsday or this final
+count, and the full-date trainer cannot tell those apart. David Turner's
+doomsday writeup memorises day-of-month mod 7 for 1 to 31 outright, precisely
+because this step is done while the rest of the date is still being read out.
+
+The anchor is always the real doomsday of the month named, so the step drilled
+is the step the method needs, and January and February get their leap case drawn
+too since those are the only two doomsdays that move. The weekday of that
+doomsday is stated rather than taken from a real year: a real year would let the
+answer be recalled instead of counted, and the count is what is being timed.
+
+Nothing here schedules anything. A (doomsday, day) pair is not a fixed item set,
+and the month doomsday is handed over rather than recalled, so the answer says
+nothing about that item either. The totals are cut by step size and by
+direction, because "I am slow at this" is not actionable and "the +5 steps cost
+twice what the +1 steps do" is. Both cuts cover every attempt, so either one
+sums to the overall figures and there is no third stored copy of them.
+
 **Drills** are sprint, gauntlet and decade, outside spaced repetition entirely.
 
 **Progress** centres on the mastery grid, a 10x10 heatmap on a single-hue ramp so
@@ -298,6 +346,36 @@ in a sentence meant to be rendered as-is, and the settings screen shows that
 rather than a switch that quietly does nothing.
 
 ---
+
+
+## Audio
+
+Spoken years are shipped content: 200 mp3 clips under `/audio/v1/`, generated by
+`scripts/generate-tts.mjs` and committed like the year codes themselves. The
+script is run by hand and reads `ELEVENLABS_API_KEY` from the environment; the
+key is never in the repo, the bundle or a committed file. At runtime the app
+fetches nothing but same-origin static files, so invariant 9 holds.
+
+Two utterances per year, a cue and the whole pair, rather than composing from
+107 clips. Composition would halve the payload and put the seam exactly between
+the year and its code, which is the one place a gap teaches the wrong thing.
+
+The clips are runtime-cached in `sw.ts` and never precached — a hundred years
+met ten at a time over weeks should not cost a megabyte at first install.
+Filenames carry the set version because `public/` is copied verbatim and nginx
+pins it; a regeneration in a different voice bumps `AUDIO_SET` in both the
+script and `speech.ts`, or a returning user hears half the table in each voice.
+
+Learn speaks by default because nothing there is timed. Review is off by
+default, and it is the one setting in the app that changes what a number means:
+latency is paint-to-tap, a clip runs about a second, and that second lands
+inside the grade, the fluency decision and the mastery bucket. The clock was
+**not** moved to the end of the clip — an answer given while the year was still
+being spoken would measure negative, clamp to zero and take a free grade 5,
+which is the exact bug invariant 3 exists to prevent. Instead the attempt
+carries `audioPlayed` (optional, so absent reads as false and no migration was
+needed) and Stats says how many of the recent review answers have it. The review
+screen's speaker button and the Settings row write the same field.
 
 ## Design
 
@@ -354,6 +432,11 @@ Tests to know about, because they encode decisions rather than behaviour:
 - a long interval alone never reaching the top of the mastery ramp
 - a fluency run refusing to advance twice in one sitting
 - the answer window expiring without writing an attempt
+- no two adjacent years ever sharing a teaching batch, over all ten decades
+- the structure lesson appearing once and last, asserted against `flow.ts`
+  rather than by walking sixty taps
+- a missing or failed audio clip never blocking an answer or changing what is
+  recorded, asserted both as a unit and through a rendered pass
 - import rejection paths, each with the message the UI will show
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
@@ -471,3 +554,23 @@ Two rules follow from that, and they are why `diagnostics.ts` exists at all.
 distinguish recall from a fast procedure, and a slope can. And **when a metric
 and a user disagree, the user is the measurement.** The grid was green for
 months. One sentence from the person using it was worth more than all of it.
+
+### The same trap's second half
+
+That fix corrected how the app *asked* for the codes and left how it *taught*
+them untouched. `RecognitionPass` still laid a decade out as its leap runs in a
+grid, drew a `+1` between every adjacent pair and a ruled `+2` across each
+boundary, and made the user tap the ten in ascending order — and `learnGroups`
+split the decade into those same runs, so even the sub-groups were runs.
+Shuffled questions over a run that has just been handed to the user are answered
+by walking the run.
+
+The reasoning error was conflating two axes. Battig and Hwang licence *blocked*
+practice, not *ordered* presentation, and the difference only vanishes for
+arbitrary pairs where ascending order affords nothing. Consecutive years differ
+by one, so it affords everything. Blocked stayed: decades are still the unit.
+Ordered went, including from teaching.
+
+The lesson, again, is that a half-fix passes every test. The suite was green
+across the first change, and the screen that caused the problem was never once
+touched by it.

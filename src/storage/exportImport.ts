@@ -128,6 +128,12 @@ export function parseImportFile(json: string): AppData {
   if (data.weekdayTotals !== undefined && !isRecord(data.weekdayTotals)) {
     throw new ImportError('That export has lifetime weekday totals that are not an object.');
   }
+  if (data.dayStepAttempts !== undefined && !Array.isArray(data.dayStepAttempts)) {
+    throw new ImportError('That export has a day-step log that is not a list.');
+  }
+  if (data.dayStepTotals !== undefined && !isRecord(data.dayStepTotals)) {
+    throw new ImportError('That export has lifetime day-step totals that are not an object.');
+  }
   if (data.calcAttempts !== undefined && !Array.isArray(data.calcAttempts)) {
     throw new ImportError('That export has a calculation log that is not a list.');
   }

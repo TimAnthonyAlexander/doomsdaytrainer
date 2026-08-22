@@ -38,6 +38,8 @@ export interface ReviewSession {
   answer: (value: number, latencyMs: number) => void;
   advance: () => void;
   results: SessionResult[];
+  /** Best guess at the year after this one. Used only to preload its clip. */
+  upcoming: YearKey | null;
   /** Items still due after the ones already answered this session. */
   remaining: number;
   /** Any item introduced at all, in or out of scope. Guards the empty screen. */
@@ -160,6 +162,12 @@ export function useReviewSession(): ReviewSession {
         answered: value as Code,
         hintUsed,
         source: 'review',
+        // Marked, not compensated for. The clock still runs from paint to tap,
+        // because moving it to the end of the clip would let an answer given
+        // while the year was still being spoken measure as negative and take a
+        // free grade 5 — the exact bug the paint-to-tap rule exists to stop.
+        // Stats reads this to say how much of the recent median was listening.
+        audioPlayed: settings.spokenReviewPrompts,
       };
 
       setAnswered({ yy: item.yy, chosen: value as Code, correct, autoHint: shouldAutoHint(item) });
@@ -168,8 +176,25 @@ export function useReviewSession(): ReviewSession {
 
       void recordReview(item.yy, attempt).then(() => noteSessionActivity('review', 1));
     },
-    [item, answered, hintOpen, timedOut, recordReview, noteSessionActivity, advance],
+    [
+      item,
+      answered,
+      hintOpen,
+      timedOut,
+      settings.spokenReviewPrompts,
+      recordReview,
+      noteSessionActivity,
+      advance,
+    ],
   );
+
+  // Only used to warm the next spoken clip, so a miss costs nothing: the year
+  // that actually comes up next depends on what this answer does to the queue.
+  const upcoming = useMemo(() => {
+    if (!item) return null;
+    const rest = queue.filter((entry) => entry.yy !== item.yy);
+    return nextDueItem(rest, [...recent, item.yy])?.yy ?? null;
+  }, [queue, item, recent]);
 
   const phase: ReviewPhase = answered ? (answered.correct ? 'correct' : 'wrong') : 'prompt';
 
@@ -191,6 +216,7 @@ export function useReviewSession(): ReviewSession {
     answer,
     advance,
     results,
+    upcoming,
     remaining: queue.length,
     introducedCount,
     unlearnedCount,

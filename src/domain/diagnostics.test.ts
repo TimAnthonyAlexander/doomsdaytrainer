@@ -7,6 +7,7 @@ import {
   latencyCv,
   routeReport,
   scoredAttempts,
+  spokenShare,
 } from './diagnostics';
 import { createItem, introduce } from './scheduler';
 
@@ -185,5 +186,50 @@ describe('routeReport', () => {
   it('has data once there are enough scored attempts to regress', () => {
     const items = Array.from({ length: 30 }, (_unused, i) => item(i, 500 + (i % 10) * 200));
     expect(routeReport(items).hasData).toBe(true);
+  });
+});
+
+describe('spokenShare', () => {
+  /** One item carrying exactly these attempts. */
+  const withAttempts = (yy: number, attempts: Attempt[]): ItemState => ({
+    ...introduce(createItem(yy), NOW),
+    attemptHistory: attempts,
+  });
+
+  it('is zero on a history written before spoken prompts existed', () => {
+    // The field is optional, so every attempt already stored reads as absent.
+    const items = [withAttempts(10, [attempt(), attempt(), attempt()])];
+    expect(spokenShare(items)).toEqual({ spoken: 0, total: 3 });
+  });
+
+  it('counts only review answers, over every item', () => {
+    const items = [
+      withAttempts(10, [attempt({ audioPlayed: true }), attempt({ audioPlayed: false })]),
+      withAttempts(20, [
+        attempt({ audioPlayed: true }),
+        // Learn and drills speak too, and neither one is in a latency the
+        // stats screen reports, so neither belongs in this count.
+        attempt({ audioPlayed: true, source: 'learn' }),
+        attempt({ audioPlayed: true, source: 'sprint' }),
+      ]),
+    ];
+    expect(spokenShare(items)).toEqual({ spoken: 2, total: 3 });
+  });
+
+  it('looks at the most recent answers, not the first ones', () => {
+    const old = Array.from({ length: 5 }, (_unused, i) =>
+      attempt({ timestamp: NOW + i, audioPlayed: false }),
+    );
+    const recent = Array.from({ length: 3 }, (_unused, i) =>
+      attempt({ timestamp: NOW + 1000 + i, audioPlayed: true }),
+    );
+    expect(spokenShare([withAttempts(10, [...old, ...recent])], 3)).toEqual({
+      spoken: 3,
+      total: 3,
+    });
+  });
+
+  it('is empty rather than undefined when nothing has been reviewed', () => {
+    expect(spokenShare([])).toEqual({ spoken: 0, total: 0 });
   });
 });

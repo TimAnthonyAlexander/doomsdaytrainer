@@ -28,6 +28,17 @@ export interface Attempt {
   hintUsed: boolean;
   /** Which surface produced this attempt. Drills never touch scheduling. */
   source: AttemptSource;
+  /**
+   * The year was spoken with this prompt, so the latency contains listening
+   * time. Optional: absent reads as false, which is what every attempt written
+   * before spoken prompts existed means.
+   *
+   * It marks intent rather than sound — a clip that failed to load still sets
+   * it, because what the figure has to be honest about is whether the user was
+   * waiting for one. Nothing grades on it. It exists so Stats can say why a
+   * median moved instead of leaving the user to wonder.
+   */
+  audioPlayed?: boolean;
 }
 
 export type AttemptSource =
@@ -139,10 +150,22 @@ export interface Settings {
   /** Millis, 0..1000. */
   autoAdvanceMs: number;
   keyboardInput: boolean;
+  /** Spoken year and code while learning a block. Nothing there is timed. */
+  spokenPrompts: boolean;
+  /**
+   * Spoken year on a review prompt. Off by default, and it is the one setting
+   * in the app that changes what a number means: latency runs from paint to
+   * tap, so a spoken cue puts about a second of listening inside every latency,
+   * every fluency decision and every mastery bucket. Attempts made with it on
+   * carry `audioPlayed`, and Stats says how many.
+   */
+  spokenReviewPrompts: boolean;
   reminderEnabled: boolean;
   /** "HH:MM", 24h, local time. */
   reminderTime: string;
   eveningReminderEnabled: boolean;
+  /** Set once the +1/+2 structure has been shown. It is taught once, ever. */
+  structureLessonSeen: boolean;
   /** Set once the user has finished onboarding. */
   onboardingComplete: boolean;
 }
@@ -248,6 +271,81 @@ export interface WeekdayRun {
   correct: number;
   total: number;
   medianLatencyMs: number;
+}
+
+/* ------------------------------------------------------------------ */
+/* Day-step trainer                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * How far the day asked for sits from the month's doomsday, reduced mod 7.
+ *
+ * Zero is a real size and not an absence: a day a whole number of weeks from
+ * the doomsday falls on the doomsday's own weekday. See src/domain/dayStep.ts.
+ */
+export type DayStepSize = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Whether the day asked for sits after the doomsday or before it. */
+export type DayStepDirection = 'forward' | 'backward';
+
+/**
+ * One step answered on the day-step trainer.
+ *
+ * A prompt is a month, a stated weekday for that month's doomsday, and a day.
+ * It is not a date, so — like every date on the weekday trainer — nothing here
+ * enters spaced repetition. A (doomsday, day) pair is not a fixed item set
+ * either: there are 366 of them and no reason to schedule any one.
+ */
+export interface DayStepAttempt {
+  /** Epoch millis. */
+  timestamp: number;
+  /** 1..12, 1 = January. */
+  month: number;
+  /** True when the leap-year doomsday was in force. Only moves Jan and Feb. */
+  leapYear: boolean;
+  /** The month's doomsday date, as the prompt gave it. */
+  anchorDay: number;
+  /** The weekday the prompt stated for that doomsday, Sunday-indexed. */
+  anchorWeekday: Code;
+  /** The day the prompt asked for. Never the doomsday itself. */
+  targetDay: number;
+  /** Stored rather than recomputed, so a breakdown reads what was asked. */
+  size: DayStepSize;
+  direction: DayStepDirection;
+  correct: boolean;
+  /** Prompt render → button tap, in millis. */
+  latencyMs: number;
+  /** The weekday index tapped, Sunday-indexed. Null when the window ran out. */
+  answered: Code | null;
+}
+
+/**
+ * Lifetime totals for one slice of the day-step trainer. Same trim-proof shape
+ * as `WeekdayModeTotals` and the same bucket edges, so one estimator serves all
+ * three aggregates.
+ */
+export interface DayStepBucketTotals {
+  answered: number;
+  correct: number;
+  /**
+   * One count per latency bucket, ascending, same length and order as
+   * `WEEKDAY_LATENCY_EDGES`. Ready to be drawn as bars, left to right.
+   */
+  buckets: number[];
+}
+
+/**
+ * Every day-step answer ever given, cut two ways.
+ *
+ * Both cuts cover every attempt, so either one adds up to the overall totals —
+ * which is why there is no third stored copy of them, and why a test asserts
+ * the two agree. "I am slow at this" is not actionable; "the +5 steps cost
+ * twice what the +1 steps do" and "counting back costs more than counting on"
+ * both are.
+ */
+export interface DayStepTotals {
+  bySize: Record<DayStepSize, DayStepBucketTotals>;
+  byDirection: Record<DayStepDirection, DayStepBucketTotals>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -377,6 +475,13 @@ export interface AppData {
   /** Every date ever answered, per mode. Never trimmed. */
   weekdayTotals: WeekdayTotals;
   weekdayRuns: WeekdayRun[];
+  /**
+   * The most recent day steps answered, oldest first. Bounded — read
+   * `dayStepTotals` for anything that must cover all of history.
+   */
+  dayStepAttempts: DayStepAttempt[];
+  /** Every day step ever answered, by size and by direction. Never trimmed. */
+  dayStepTotals: DayStepTotals;
   /**
    * The most recent steps answered on the calculation trainer, oldest first.
    * Bounded — read `calcTotals` for anything that must cover all of history.

@@ -3,16 +3,18 @@ import { resolveScope } from '@/domain/scope';
 import { useAppState } from '@/state/useAppState';
 import { BlockDone } from './BlockDone';
 import { RecallPass } from './RecallPass';
-import { RecognitionPass } from './RecognitionPass';
+import { StructureCheck } from './StructureCheck';
+import { StudyPass } from './StudyPass';
 import {
   decadeYears,
-  learnGroups,
+  introBatches,
   mixInYears,
   newlyIntroducedCount,
   nextBlock,
   type DailyAllowance,
   type DecadeBlock,
 } from './blocks';
+import { firstPhase, nextPhase, type LearnPhase } from './flow';
 
 interface LearnSessionProps {
   decade: number;
@@ -22,40 +24,34 @@ interface LearnSessionProps {
   onExit: () => void;
 }
 
-type Phase =
-  | { kind: 'group-show'; group: number }
-  | { kind: 'group-recall'; group: number }
-  | { kind: 'recognition' }
-  | { kind: 'recall' }
-  | { kind: 'done'; wrongTaps: number; introduced: number };
-
 /**
- * One block, start to finish.
+ * One block, start to finish. The order of the steps is `flow.ts`; this file
+ * renders them and carries the tally.
  *
- * The decade is taught in groups before it is ever asked for whole: show a
- * group, recall that group, next group. Ten unfamiliar pairs at once is more
- * than working memory holds, and a user who cannot hold them guesses, which
- * teaches nothing. That much is unchanged, and the evidence backs it — pure
- * interleaving of arbitrary pairs from the start comes out behind blocking
- * (Hwang 2025), and blocked-then-varied comes out ahead of both.
+ * The decade is introduced in three batches of three or four, and a batch is
+ * never a run of consecutive years. That is the correction the previous pass at
+ * this problem missed: it fixed the order the codes were *asked* in and left
+ * the order they were *taught* in untouched, so the app was still handing over
+ * the string 00, 01, 02 with a `+1` drawn between each pair and then shuffling
+ * the questions. Shuffled questions over a memorised run are answered by
+ * walking the run.
  *
- * What changed is what "recall" means. Each pass now runs ascending only until
- * every year has been produced once, then switches to varied order, per
- * `recall.ts`. The final pass over all ten also mixes in years from other
- * decades, because ten years of one decade practised against each other can be
- * recited, however they are shuffled.
+ * Inside a batch, `StudyPass` shows one pair and immediately asks for that same
+ * pair. Then `RecallPass` takes the batch in varied order, twice clean each.
+ * Then the whole ten, varied, with years from other decades mixed in. The
+ * structure lesson comes after all of that and only once, ever.
  *
  * Position inside the block lives here and nowhere else. Leaving mid-block
- * writes nothing, so coming back simply starts the block again — a half-taught
- * decade is not a thing worth persisting.
+ * writes nothing, so coming back simply starts the block again.
  */
 export function LearnSession({ decade, blocks, allowance, onStart, onExit }: LearnSessionProps) {
-  const { items, settings, introduceItems, noteSessionActivity } = useAppState();
-  const [phase, setPhase] = useState<Phase>({ kind: 'group-show', group: 0 });
-  const [groupWrongTaps, setGroupWrongTaps] = useState(0);
+  const { items, settings, introduceItems, noteSessionActivity, updateSettings } = useAppState();
+  const [phase, setPhase] = useState<LearnPhase>(firstPhase);
+  const [wrongTaps, setWrongTaps] = useState(0);
+  const [introduced, setIntroduced] = useState(0);
 
   const years = decadeYears(decade);
-  const groups = learnGroups(decade);
+  const batches = useMemo(() => introBatches(decade), [decade]);
   const scope = useMemo(() => resolveScope(settings), [settings]);
   // Frozen for the life of the block: recomputing it as answers land would swap
   // the spacers out mid-pass.
@@ -63,75 +59,76 @@ export function LearnSession({ decade, blocks, allowance, onStart, onExit }: Lea
   // Two runs of the same block should not be the same rotation, and the domain
   // layer takes its randomness from the caller.
   const [seed] = useState(() => Date.now() % 100_000);
+  // Frozen too. Marking the lesson seen at the end of this block must not make
+  // the block it is inside behave as though it had already happened.
+  const [structureSeen] = useState(() => settings.structureLessonSeen);
 
-  const finish = async (wrongTaps: number) => {
-    const introduced = newlyIntroducedCount(years, items);
-    setPhase({ kind: 'done', wrongTaps: groupWrongTaps + wrongTaps, introduced });
+  /** The ten are learned. Everything after this point is explanation. */
+  const commitBlock = async () => {
+    const count = newlyIntroducedCount(years, items);
+    setIntroduced(count);
     await introduceItems(years);
-    if (introduced > 0) await noteSessionActivity('new', introduced);
+    if (count > 0) await noteSessionActivity('new', count);
   };
 
-  if (phase.kind === 'group-show') {
-    const group = phase.group;
+  const advance = (wrong: number) => {
+    setWrongTaps((total) => total + wrong);
+    if (phase.kind === 'all-ten') void commitBlock();
+    if (phase.kind === 'structure') void updateSettings({ structureLessonSeen: true });
+    setPhase(nextPhase(phase, { batches: batches.length, structureSeen }));
+  };
+
+  if (phase.kind === 'batch-study') {
     return (
-      <RecognitionPass
+      <StudyPass
         decade={decade}
-        years={groups[group]}
-        stepLabel={`Group ${group + 1} of ${groups.length}`}
-        onDone={() => setPhase({ kind: 'group-recall', group })}
+        years={batches[phase.batch]}
+        stepLabel={`Batch ${phase.batch + 1} of ${batches.length}`}
+        onDone={advance}
         onExit={onExit}
       />
     );
   }
 
-  if (phase.kind === 'group-recall') {
-    const group = phase.group;
+  if (phase.kind === 'batch-recall') {
     return (
       <RecallPass
         decade={decade}
-        years={groups[group]}
-        seed={seed + group}
-        stepLabel={`Group ${group + 1} of ${groups.length} · recall`}
-        onDone={(wrong) => {
-          setGroupWrongTaps((total) => total + wrong);
-          setPhase(
-            group + 1 < groups.length
-              ? { kind: 'group-show', group: group + 1 }
-              : { kind: 'recognition' },
-          );
-        }}
+        years={batches[phase.batch]}
+        seed={seed + phase.batch}
+        // Every pair in the batch was produced once, on its own ask, moments
+        // ago. Battig's switch point is per pair, so this pass opens varied.
+        alreadyProduced
+        stepLabel={`Batch ${phase.batch + 1} of ${batches.length} · recall`}
+        onDone={advance}
         onExit={onExit}
       />
     );
   }
 
-  if (phase.kind === 'recognition') {
-    return (
-      <RecognitionPass decade={decade} onDone={() => setPhase({ kind: 'recall' })} onExit={onExit} />
-    );
-  }
-
-  if (phase.kind === 'recall') {
+  if (phase.kind === 'all-ten') {
     return (
       <RecallPass
         decade={decade}
         mixIn={mixIn}
         seed={seed}
-        // Every one of the ten was produced correctly in its group pass, so the
-        // ordered ask is spent and this one opens mixed.
         alreadyProduced
         stepLabel="All ten, mixed"
-        onDone={(wrong) => void finish(wrong)}
+        onDone={advance}
         onExit={onExit}
       />
     );
   }
 
+  if (phase.kind === 'structure') {
+    return <StructureCheck decade={decade} onDone={() => advance(0)} />;
+  }
+
   return (
     <BlockDone
       decade={decade}
-      introduced={phase.introduced}
-      wrongTaps={phase.wrongTaps}
+      introduced={introduced}
+      wrongTaps={wrongTaps}
       next={nextBlock(blocks)}
       allowance={allowance}
       onStart={onStart}

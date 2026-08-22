@@ -1,7 +1,24 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDB } from 'idb';
-import type { AppData, CalcAttempt, CalcStepId, DrillRecord, WeekdayAttempt, WeekdayMode } from '@/domain/types';
+import type {
+  AppData,
+  CalcAttempt,
+  CalcStepId,
+  DayStepAttempt,
+  DayStepDirection,
+  DayStepSize,
+  DrillRecord,
+  WeekdayAttempt,
+  WeekdayMode,
+} from '@/domain/types';
 import { CALC_STEP_IDS } from '@/domain/calc';
+import { DAY_STEP_SIZES } from '@/domain/dayStep';
+import {
+  buildDayStepTotals,
+  emptyDayStepBucketTotals,
+  emptyDayStepTotals,
+  overallDayStepTotals,
+} from '@/domain/dayStepLifetime';
 import {
   buildCalcTotals,
   buildVerifyAttempt,
@@ -192,6 +209,39 @@ function v3Document(overrides: Record<string, unknown> = {}): AppData {
 /** One answered calculation step, as the trainer writes it. */
 function calcAttempt(step: CalcStepId, correct: boolean, latencyMs: number, yy = 73): CalcAttempt {
   return { timestamp: 6000, yy, step, answered: correct ? 0 : 4, correct, latencyMs, reduced: true };
+}
+
+/**
+ * A document exactly as schema v5 wrote it: everything up to and including
+ * fluency, and nothing at all from the day-step trainer.
+ */
+function v5Document(overrides: Record<string, unknown> = {}): AppData {
+  const stripped = { ...defaultAppData(1000), schemaVersion: 5 } as Record<string, unknown>;
+  delete stripped.dayStepAttempts;
+  delete stripped.dayStepTotals;
+  return { ...stripped, ...overrides } as unknown as AppData;
+}
+
+/** One answered day step, as the trainer writes it. */
+function dayStepAttempt(
+  size: DayStepSize,
+  direction: DayStepDirection,
+  correct: boolean,
+  latencyMs: number,
+): DayStepAttempt {
+  return {
+    timestamp: 8000,
+    month: 3,
+    leapYear: false,
+    anchorDay: 14,
+    anchorWeekday: 2,
+    targetDay: direction === 'forward' ? 14 + size : 14 - size,
+    size,
+    direction,
+    correct,
+    latencyMs,
+    answered: correct ? 0 : 1,
+  };
 }
 
 describe('migrateAppData', () => {
@@ -433,6 +483,111 @@ describe('migrateAppData', () => {
     expect(verifyChecked(migrated.verifyTotals)).toBe(0);
   });
 
+  it('gives every older document the day-step trainer, empty', () => {
+    for (const doc of [v1Document(), v2Document([]), v3Document(), v5Document()]) {
+      const migrated = migrateAppData(doc);
+      expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
+      expect(migrated.dayStepAttempts).toEqual([]);
+      expect(migrated.dayStepTotals).toEqual(emptyDayStepTotals());
+      expect(overallDayStepTotals(migrated.dayStepTotals).answered).toBe(0);
+    }
+  });
+
+  it('leaves everything a v5 user had exactly where it was', () => {
+    const base = defaultAppData(1000);
+    const before = v5Document({
+      settings: { ...DEFAULT_SETTINGS, newItemsPerDay: 5, onboardingComplete: true },
+      items: {
+        ...base.items,
+        [itemKey(73)]: {
+          ...base.items[itemKey(73)],
+          introduced: true,
+          interval: 45,
+          repetitions: 6,
+          lapses: 2,
+          fluency: {
+            consecutiveFast: 2,
+            consecutiveSlow: 0,
+            lastFastDay: '2026-08-20',
+            fluent: true,
+            fluentAt: 999,
+          },
+        },
+      },
+      weekdayAttempts: [weekdayAttempt('assisted', true, 900)],
+      weekdayTotals: buildWeekdayTotals([weekdayAttempt('assisted', true, 900)]),
+      calcAttempts: [calcAttempt('mod', true, 3000)],
+      calcTotals: buildCalcTotals([calcAttempt('mod', true, 3000)]),
+      drills: [
+        { id: 'drill-9', mode: 'sprint', decade: null, timestamp: 1, score: 30, correct: 30, total: 33, medianLatencyMs: 900 },
+      ],
+      days: { '2026-08-21': { date: '2026-08-21', reviewsCompleted: 11, newItemsIntroduced: 4 } },
+    });
+    const migrated = migrateAppData(before);
+
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(migrated.settings.newItemsPerDay).toBe(5);
+    expect(migrated.settings.onboardingComplete).toBe(true);
+    expect(Object.keys(migrated.items)).toHaveLength(100);
+    expect(migrated.items[itemKey(73)]).toMatchObject({ introduced: true, interval: 45, repetitions: 6, lapses: 2 });
+    // The fluency a v5 document already earned is carried, not rebuilt.
+    expect(migrated.items[itemKey(73)].fluency.fluent).toBe(true);
+    expect(migrated.items[itemKey(73)].fluency.consecutiveFast).toBe(2);
+    expect(Object.keys(migrated.monthItems)).toHaveLength(12);
+    expect(Object.keys(migrated.centuryItems)).toHaveLength(4);
+    expect(migrated.weekdayAttempts).toHaveLength(1);
+    expect(migrated.weekdayTotals.assisted.answered).toBe(1);
+    expect(calcStepAnswered(migrated.calcTotals, 'mod')).toBe(1);
+    expect(migrated.drills[0].id).toBe('drill-9');
+    expect(migrated.days['2026-08-21'].reviewsCompleted).toBe(11);
+    expect(migrated.createdAt).toBe(1000);
+    // And no new item map: a (doomsday, day) pair is not a fixed item set.
+    expect(Object.keys(migrated)).not.toContain('dayStepItems');
+  });
+
+  it('builds the day-step aggregate from a raw log rather than starting at zero', () => {
+    const attempts = [
+      dayStepAttempt(1, 'forward', true, 700),
+      dayStepAttempt(1, 'forward', false, 3000),
+      dayStepAttempt(5, 'backward', true, 2000),
+    ];
+    const migrated = migrateAppData(v5Document({ dayStepAttempts: attempts }));
+
+    expect(migrated.dayStepTotals).toEqual(buildDayStepTotals(attempts));
+    expect(migrated.dayStepTotals.bySize[1]).toMatchObject({ answered: 2, correct: 1 });
+    expect(migrated.dayStepTotals.byDirection.backward.answered).toBe(1);
+    expect(overallDayStepTotals(migrated.dayStepTotals).answered).toBe(3);
+    expect(migrated.dayStepAttempts).toHaveLength(3);
+  });
+
+  it('drops a day step naming a size or direction it does not know', () => {
+    const migrated = migrateAppData(
+      v5Document({
+        dayStepAttempts: [
+          dayStepAttempt(2, 'forward', true, 900),
+          { ...dayStepAttempt(2, 'forward', true, 900), size: 9 },
+          { ...dayStepAttempt(2, 'forward', true, 900), direction: 'sideways' },
+          null,
+        ],
+      }),
+    );
+    expect(migrated.dayStepAttempts).toHaveLength(1);
+    expect(overallDayStepTotals(migrated.dayStepTotals).answered).toBe(1);
+  });
+
+  it('loads a stored v5 document and comes back with a usable day-step aggregate', async () => {
+    await putRaw(
+      v5Document({ dayStepAttempts: [dayStepAttempt(3, 'backward', true, 800), dayStepAttempt(3, 'backward', false, 4000)] }),
+    );
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(data.dayStepTotals.bySize[3]).toMatchObject({ answered: 2, correct: 1 });
+    expect(data.dayStepTotals.byDirection.backward.answered).toBe(2);
+    expect(data.dayStepAttempts).toHaveLength(2);
+  });
+
   it('loads a stored v3 document and comes back with a usable calculation aggregate', async () => {
     await putRaw(v3Document({ calcAttempts: [calcAttempt('mod', true, 7000), calcAttempt('mod', false, 11_000)] }));
     await closeDb();
@@ -613,6 +768,61 @@ describe('normalisation of a corrupt document', () => {
     const data = await loadAppData();
     expect(data.calcTotals.sum).toMatchObject({ answered: 2, correct: 1 });
     expect(data.verifyTotals).toEqual(emptyVerifyTotals());
+  });
+
+  it('repairs the day-step aggregate rather than letting NaN reach a screen', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.dayStepTotals = {
+      bySize: {
+        1: { answered: Number.NaN, correct: -3, buckets: ['nonsense', 2] },
+        2: { answered: 4, correct: 99, buckets: [] },
+      },
+      byDirection: { forward: { answered: 2, correct: 2, buckets: [2] } },
+    };
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    // The one real count survives; the string does not, and nothing is invented.
+    expect(data.dayStepTotals.bySize[1].buckets[1]).toBe(2);
+    expect(data.dayStepTotals.bySize[1].answered).toBe(2);
+    expect(data.dayStepTotals.bySize[1].correct).toBe(0);
+    // `correct` never exceeds `answered`, so accuracy cannot come out over 100%.
+    expect(data.dayStepTotals.bySize[2].correct).toBe(4);
+    // Every cell is present and drawable, including the ones that were missing.
+    for (const size of DAY_STEP_SIZES) {
+      expect(data.dayStepTotals.bySize[size].buckets).toHaveLength(WEEKDAY_BUCKET_COUNT);
+    }
+    expect(data.dayStepTotals.byDirection.backward).toEqual(emptyDayStepBucketTotals());
+  });
+
+  it('rebuilds the day-step aggregate from the raw log when a document has none', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.dayStepAttempts = [dayStepAttempt(4, 'forward', true, 1100), dayStepAttempt(4, 'forward', false, 2600)];
+    delete doc.dayStepTotals;
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.dayStepTotals.bySize[4]).toMatchObject({ answered: 2, correct: 1 });
+    expect(overallDayStepTotals(data.dayStepTotals).answered).toBe(2);
+  });
+
+  it('drops day-step log entries that are not usable', async () => {
+    const doc = defaultAppData(1000) as unknown as Record<string, unknown>;
+    doc.dayStepAttempts = [
+      null,
+      dayStepAttempt(2, 'forward', true, 900),
+      { ...dayStepAttempt(2, 'forward', true, 900), month: 13 },
+      7,
+    ];
+    delete doc.dayStepTotals;
+    await putRaw(doc);
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.dayStepAttempts).toHaveLength(1);
+    expect(overallDayStepTotals(data.dayStepTotals).answered).toBe(1);
   });
 
   it('drops calculation and verify log entries that are not usable', async () => {

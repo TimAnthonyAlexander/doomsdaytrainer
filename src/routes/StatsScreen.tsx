@@ -3,9 +3,11 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { Numeral } from '@/components/ui/Numeral';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Screen } from '@/components/ui/Screen';
 import { Stat } from '@/components/ui/Stat';
+import { spokenShare } from '@/domain/diagnostics';
 import { inScope, resolveScope } from '@/domain/scope';
 import { formatMs } from '@/domain/time';
 import type { YearKey } from '@/domain/types';
@@ -65,6 +67,10 @@ export function StatsScreen() {
   // The same pool the trouble drill queues. The grid marks a leech with a
   // leech foot; this is what the user can do about one.
   const trouble = useMemo(() => troubleItems(itemList, scope), [itemList, scope]);
+  // Spoken review prompts put listening time inside the latency. The attempts
+  // are graded and scheduled like any other, so the honest thing is not to hide
+  // them but to say how many of these numbers contain a clip.
+  const spoken = useMemo(() => spokenShare(itemList), [itemList]);
 
   const selectedItem = useMemo(
     () => (selected === null ? null : (itemList.find((item) => item.yy === selected) ?? null)),
@@ -110,6 +116,16 @@ export function StatsScreen() {
           size="lg"
           value={overall === null ? '—' : formatMs(overall)}
         />
+        {spoken.spoken > 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            <Numeral color="inherit">{spoken.spoken}</Numeral>
+            {' of the last '}
+            <Numeral color="inherit">{spoken.total}</Numeral>
+            {
+              ' review answers had the year spoken, which puts the length of the clip inside every one of them.'
+            }
+          </Typography>
+        ) : null}
         <DecadeLatency rows={decades} />
       </Section>
 

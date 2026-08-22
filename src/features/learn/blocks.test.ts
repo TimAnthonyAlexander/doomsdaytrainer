@@ -3,6 +3,7 @@ import type { ItemState, SessionDay, YearKey } from '@/domain/types';
 import { resolveScope, SCOPES } from '@/domain/scope';
 import { createItem } from '@/domain/scheduler';
 import { dayKey } from '@/domain/time';
+import { codeFor } from '@/domain/yearCodes';
 import { DEFAULT_SETTINGS, itemKey } from '@/storage/defaults';
 import {
   BLOCK_SIZE,
@@ -12,15 +13,16 @@ import {
   decadeBlocks,
   decadeLabel,
   decadeYears,
+  introBatches,
   introducedCount,
   leapRuns,
-  learnGroups,
   newItemsIntroducedToday,
   newlyIntroducedCount,
   MIX_IN_SIZE,
   mixInYears,
   nextBlock,
   stepAfter,
+  structureExamples,
 } from './blocks';
 
 function items(introduced: YearKey[] = []): Record<string, ItemState> {
@@ -269,39 +271,110 @@ describe('newItemsIntroducedToday', () => {
   });
 });
 
-describe('learnGroups', () => {
-  it('splits a decade at its leap boundaries', () => {
-    // 00-09 is the case the user sees first: four, four, then the two that
-    // belong to the run continuing into the next decade.
-    expect(learnGroups(0)).toEqual([
-      [0, 1, 2, 3],
-      [4, 5, 6, 7],
-      [8, 9],
+/*
+ * This suite used to assert the opposite of what it asserts now, and the old
+ * assertions were the bug written down. `learnGroups` split a decade into its
+ * leap runs — 00-03, 04-07, 08-09 — and a test here demanded that every step
+ * inside a group be +1, which is to say it demanded that every batch be a run
+ * the user could walk instead of retrieve. The batches replace it and the
+ * assertions are inverted: adjacency is now the thing that must never happen.
+ */
+describe('introBatches', () => {
+  it('takes every third year rather than a run of four', () => {
+    expect(introBatches(0)).toEqual([
+      [0, 3, 6, 9],
+      [1, 4, 7],
+      [2, 5, 8],
     ]);
-  });
-
-  it('puts the short group first when a decade opens mid-run', () => {
-    expect(learnGroups(1)).toEqual([
-      [10, 11],
-      [12, 13, 14, 15],
-      [16, 17, 18, 19],
+    expect(introBatches(4)).toEqual([
+      [40, 43, 46, 49],
+      [41, 44, 47],
+      [42, 45, 48],
     ]);
   });
 
   it('covers every year of the decade exactly once, for all ten decades', () => {
     for (const decade of DECADES) {
-      expect(learnGroups(decade).flat()).toEqual(decadeYears(decade));
+      expect(introBatches(decade).flat().sort((a, b) => a - b)).toEqual(decadeYears(decade));
     }
   });
 
-  it('never emits a group that spans a leap boundary', () => {
+  it('never puts two adjacent years in the same batch, over every decade', () => {
+    // The whole point. A batch holding 04 and 05 hands the user the +1 step and
+    // lets them produce the second code without retrieving anything.
     for (const decade of DECADES) {
-      for (const group of learnGroups(decade)) {
-        // Inside a group every step is +1. A +2 would mean the split is wrong.
-        for (let i = 0; i < group.length - 1; i++) {
-          expect(stepAfter(group[i])).toBe(1);
+      for (const batch of introBatches(decade)) {
+        for (const a of batch) {
+          for (const b of batch) {
+            if (a === b) continue;
+            expect(Math.abs(a - b)).not.toBe(1);
+          }
         }
       }
+    }
+  });
+
+  it('never emits a batch that is a contiguous run, over every decade', () => {
+    for (const decade of DECADES) {
+      for (const batch of introBatches(decade)) {
+        const sorted = [...batch].sort((a, b) => a - b);
+        const contiguous = sorted.every((yy, i) => i === 0 || yy === sorted[i - 1] + 1);
+        expect(contiguous).toBe(false);
+      }
+    }
+  });
+
+  it('keeps every batch small enough to hold at once', () => {
+    for (const decade of DECADES) {
+      for (const batch of introBatches(decade)) {
+        expect(batch.length).toBeGreaterThanOrEqual(3);
+        expect(batch.length).toBeLessThanOrEqual(4);
+      }
+    }
+  });
+
+  it('stays inside the decade', () => {
+    for (const decade of DECADES) {
+      for (const yy of introBatches(decade).flat()) {
+        expect(Math.floor(yy / 10)).toBe(decade);
+      }
+    }
+  });
+});
+
+describe('structureExamples', () => {
+  it('gives one +1 pair and one +2 pair from inside the decade, for all ten', () => {
+    for (const decade of DECADES) {
+      const { rise, jump } = structureExamples(decade);
+      for (const example of [rise, jump]) {
+        expect(example.to).toBe(example.from + 1);
+        expect(Math.floor(example.from / 10)).toBe(decade);
+        expect(Math.floor(example.to / 10)).toBe(decade);
+        expect(stepAfter(example.from)).toBe(example.step);
+      }
+      expect(rise.step).toBe(1);
+      expect(jump.step).toBe(2);
+    }
+  });
+
+  it('never picks a pair whose codes wrap past six', () => {
+    // The screen says "one higher" and "two higher". A pair that runs 6 then 0
+    // is a true step of one and reads as a drop of six.
+    for (const decade of DECADES) {
+      const { rise, jump } = structureExamples(decade);
+      expect(codeFor(rise.to)).toBe(codeFor(rise.from) + 1);
+      expect(codeFor(jump.to)).toBe(codeFor(jump.from) + 2);
+    }
+  });
+
+  it('is two isolated pairs, never a run through the decade', () => {
+    for (const decade of DECADES) {
+      const { rise, jump } = structureExamples(decade);
+      const years = [rise.from, rise.to, jump.from, jump.to];
+      expect(new Set(years).size).toBe(4);
+      // The two pairs never touch, so the four years cannot be read as a walk.
+      expect(Math.abs(rise.to - jump.from)).toBeGreaterThan(1);
+      expect(Math.abs(jump.to - rise.from)).toBeGreaterThan(1);
     }
   });
 });

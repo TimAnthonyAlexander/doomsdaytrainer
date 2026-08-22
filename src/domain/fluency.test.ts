@@ -22,9 +22,12 @@ const settings: Settings = {
   answerWindowMs: null,
   autoAdvanceMs: 250,
   keyboardInput: false,
+  spokenPrompts: false,
+  spokenReviewPrompts: false,
   reminderEnabled: false,
   reminderTime: '19:00',
   eveningReminderEnabled: false,
+  structureLessonSeen: true,
   onboardingComplete: true,
 };
 

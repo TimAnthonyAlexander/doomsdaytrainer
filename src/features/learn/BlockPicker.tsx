@@ -74,7 +74,7 @@ export function BlockPicker({ blocks, allowance, onStart }: BlockPickerProps) {
 
   return (
     <>
-      <PageTitle subtitle="Ten codes at a time, in order. See them with their structure, then say all ten back without a mistake.">
+      <PageTitle subtitle="Ten codes at a time, three or four of them at once. Each pair is shown on its own before it is ever asked for, and years that sit next to each other are never taught together.">
         Learn
       </PageTitle>
 

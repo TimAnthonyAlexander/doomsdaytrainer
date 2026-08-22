@@ -3,6 +3,7 @@ import { createItem } from '@/domain/scheduler';
 import { allYears } from '@/domain/yearCodes';
 import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
 import { emptyWeekdayTotals } from '@/domain/weekdayLifetime';
+import { emptyDayStepTotals } from '@/domain/dayStepLifetime';
 import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
 
 /**
@@ -25,8 +26,12 @@ import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
  * held beside the SM-2 fields and read by the mastery grid in place of the
  * interval. Rebuilt from each item's stored attempts on upgrade, so nobody
  * loses the fluency they had already earned.
+ *
+ * v6 added the day-step trainer: `dayStepAttempts` and `dayStepTotals`, the
+ * last step of the method timed on its own. No new item map — a (doomsday, day)
+ * pair is not a fixed item set, so nothing there is scheduled.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const DEFAULT_SETTINGS: Settings = {
   indexConvention: 'sunday',
@@ -44,9 +49,16 @@ export const DEFAULT_SETTINGS: Settings = {
   answerWindowMs: null,
   autoAdvanceMs: 250,
   keyboardInput: true,
+  // On, because nothing in Learn is timed, so nothing there can be distorted.
+  spokenPrompts: true,
+  // Off, because a review latency is measured from paint to tap and a spoken
+  // cue runs about a second. The user can turn it on from the review screen and
+  // the app then says, on Stats, how many of their recent answers had it.
+  spokenReviewPrompts: false,
   reminderEnabled: false,
   reminderTime: '19:00',
   eveningReminderEnabled: false,
+  structureLessonSeen: false,
   onboardingComplete: false,
 };
 
@@ -98,6 +110,8 @@ export function defaultAppData(now: number): AppData {
     weekdayAttempts: [],
     weekdayTotals: emptyWeekdayTotals(),
     weekdayRuns: [],
+    dayStepAttempts: [],
+    dayStepTotals: emptyDayStepTotals(),
     calcAttempts: [],
     calcTotals: emptyCalcTotals(),
     verifyAttempts: [],
@@ -129,6 +143,22 @@ export const MAX_WEEKDAY_ATTEMPTS = 2000;
 
 /** Weekday runs kept. Older ones are dropped on write. */
 export const MAX_WEEKDAY_RUNS = 200;
+
+/**
+ * Day steps kept in the raw log.
+ *
+ * The breakdown cuts this two ways — seven step sizes and two directions — so
+ * the smallest cell that has to stay meaningful is one size in one direction,
+ * fourteen of them in all. 1200 leaves each of those around 85 samples, which is
+ * enough for a recent median to move when practice moves it.
+ *
+ * It is smaller than `MAX_WEEKDAY_ATTEMPTS` because a step row is smaller and
+ * because the lifetime figures do not depend on it at all: `AppData.dayStepTotals`
+ * holds the counts and the latency histogram, so trimming this cannot change a
+ * single all-time number. The ceiling exists for the same reason as the others,
+ * which is that the whole document is rewritten under one key on every answer.
+ */
+export const MAX_DAY_STEP_ATTEMPTS = 1200;
 
 /**
  * Calculation steps kept in the raw log. One derivation writes three or four

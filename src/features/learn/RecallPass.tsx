@@ -5,6 +5,8 @@ import { AnswerPad, type AnswerFeedback, type AnswerOption } from '@/components/
 import { Numeral } from '@/components/ui/Numeral';
 import type { Attempt, Code, YearKey } from '@/domain/types';
 import { codeFor, formatYear } from '@/domain/yearCodes';
+import { cueUrl } from '@/features/audio/speech';
+import { useSpokenPrompt } from '@/features/audio/useSpokenPrompt';
 import { useAppState } from '@/state/useAppState';
 import { SessionHeader } from './SessionHeader';
 import { decadeLabel, decadeYears } from './blocks';
@@ -71,6 +73,16 @@ export function RecallPass({
 
   const yy = currentYear(state);
   const { position, total } = progress(state);
+  const upcoming = state.queue[1] ?? null;
+
+  // The cue only, never the pair: this pass is the ask. A wrong tap leaves the
+  // year on screen, so the url does not change and nothing is spoken over the
+  // correction.
+  useSpokenPrompt(
+    yy === null ? null : cueUrl(yy),
+    settings.spokenPrompts,
+    upcoming === null ? null : cueUrl(upcoming),
+  );
 
   const handleAnswer = (value: number, latencyMs: number) => {
     if (feedback !== null || yy === null) return;

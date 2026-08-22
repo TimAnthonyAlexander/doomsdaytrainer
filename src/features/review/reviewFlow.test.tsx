@@ -1,7 +1,7 @@
 import { ThemeProvider } from '@mui/material/styles';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
 import { codeFor } from '@/domain/yearCodes';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
@@ -293,5 +293,74 @@ describe('the optional answer window', () => {
       expect(item.fluency.consecutiveFast).toBe(0);
       expect(item.fluency.fluent).toBe(false);
     });
+  });
+});
+
+describe('the spoken review prompt', () => {
+  it('is off by default, and an answer given without it is not marked', async () => {
+    await seed([{ yy: 73, dueAgo: 4000 }]);
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    expect(screen.getByLabelText('Spoken year is off. Turn it on.')).toBeInTheDocument();
+
+    await tap(String(codeFor(73)));
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.items[itemKey(73)].attemptHistory[0].audioPlayed).toBe(false);
+    });
+  });
+
+  it('marks every answer given with it on, so Stats can say what is in the median', async () => {
+    // The latency stays paint-to-tap and the attempt is graded and scheduled
+    // like any other. What changes is that the app can now say the clip was in
+    // it, rather than letting a median move for a reason nobody can see.
+    await seed([{ yy: 73, dueAgo: 4000 }], { spokenReviewPrompts: true });
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    expect(screen.getByLabelText('Spoken year is on. Turn it off.')).toBeInTheDocument();
+
+    await tap(String(codeFor(73)));
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      const attempt = stored.items[itemKey(73)].attemptHistory[0];
+      expect(attempt.audioPlayed).toBe(true);
+      expect(attempt.correct).toBe(true);
+      expect(attempt.latencyMs).toBeGreaterThan(0);
+    });
+  });
+
+  it('remembers the button, and the button is the settings value', async () => {
+    await seed([{ yy: 73, dueAgo: 4000 }]);
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    fireEvent.click(screen.getByLabelText('Spoken year is off. Turn it on.'));
+
+    await waitFor(async () => {
+      expect((await loadAppData()).settings.spokenReviewPrompts).toBe(true);
+    });
+    expect(screen.getByLabelText('Spoken year is on. Turn it off.')).toBeInTheDocument();
+  });
+
+  it('answers exactly the same when the clip cannot play', async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockRejectedValue(new Error('NotAllowedError'));
+
+    await seed([{ yy: 73, dueAgo: 4000 }], { spokenReviewPrompts: true });
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    await tap(String(codeFor(73)));
+
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.items[itemKey(73)].attemptHistory).toHaveLength(1);
+      expect(stored.items[itemKey(73)].repetitions).toBe(1);
+    });
+    expect(play).toHaveBeenCalled();
+    play.mockRestore();
   });
 });

@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest';
+import { BATCH_COUNT } from './blocks';
+import { firstPhase, nextPhase, phaseSequence, type LearnPhase } from './flow';
+
+const kinds = (phases: LearnPhase[]) => phases.map((phase) => phase.kind);
+
+describe('the shape of a block', () => {
+  it('teaches a batch, recalls it, and only then moves to the next', () => {
+    expect(kinds(phaseSequence({ structureSeen: true }))).toEqual([
+      'batch-study',
+      'batch-recall',
+      'batch-study',
+      'batch-recall',
+      'batch-study',
+      'batch-recall',
+      'all-ten',
+      'done',
+    ]);
+  });
+
+  it('walks the batches in order and each exactly once', () => {
+    const batches = phaseSequence({ structureSeen: true })
+      .filter((phase) => phase.kind === 'batch-study')
+      .map((phase) => (phase.kind === 'batch-study' ? phase.batch : -1));
+    expect(batches).toEqual([0, 1, 2]);
+    expect(batches.length).toBe(BATCH_COUNT);
+  });
+
+  it('opens on the first batch, never on the structure lesson', () => {
+    expect(firstPhase()).toEqual({ kind: 'batch-study', batch: 0 });
+  });
+});
+
+describe('the structure lesson', () => {
+  it('appears exactly once in a block, and only when it has never been shown', () => {
+    const fresh = kinds(phaseSequence({ structureSeen: false }));
+    expect(fresh.filter((kind) => kind === 'structure')).toHaveLength(1);
+
+    const seen = kinds(phaseSequence({ structureSeen: true }));
+    expect(seen).not.toContain('structure');
+  });
+
+  it('is not on the path through the ten', () => {
+    // The +1/+2 relation is a way to check an answer, and a ruinous way to
+    // produce one: shown before the pairs it becomes the route, and a route
+    // that starts at the first year of a decade can only be entered there.
+    // Everything that asks for a code has to be finished before it appears.
+    const phases = kinds(phaseSequence({ structureSeen: false }));
+    const at = phases.indexOf('structure');
+    expect(at).toBeGreaterThan(-1);
+    expect(phases.slice(0, at)).toContain('all-ten');
+    expect(phases.slice(at + 1)).toEqual(['done']);
+  });
+
+  it('leads to the end of the block and to nothing else', () => {
+    expect(nextPhase({ kind: 'structure' }, { structureSeen: false })).toEqual({ kind: 'done' });
+  });
+
+  it('cannot repeat once the flag is set', () => {
+    // The session freezes the flag at mount, so writing it at the end of this
+    // block cannot change this block. The next block reads it as seen.
+    expect(nextPhase({ kind: 'all-ten' }, { structureSeen: true })).toEqual({ kind: 'done' });
+    expect(nextPhase({ kind: 'all-ten' }, { structureSeen: false })).toEqual({ kind: 'structure' });
+  });
+});
+
+describe('termination', () => {
+  it('ends on done and stays there', () => {
+    expect(nextPhase({ kind: 'done' }, { structureSeen: false })).toEqual({ kind: 'done' });
+  });
+
+  it('handles a single batch without skipping the mixed pass', () => {
+    expect(kinds(phaseSequence({ batches: 1, structureSeen: true }))).toEqual([
+      'batch-study',
+      'batch-recall',
+      'all-ten',
+      'done',
+    ]);
+  });
+});

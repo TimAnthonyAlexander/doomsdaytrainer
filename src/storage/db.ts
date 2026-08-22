@@ -6,6 +6,11 @@ import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
 import { buildFluency, emptyFluency } from '@/domain/fluency';
 import { buildWeekdayTotals, repairWeekdayTotals } from '@/domain/weekdayLifetime';
 import {
+  buildDayStepTotals,
+  isDayStepAttemptShaped,
+  repairDayStepTotals,
+} from '@/domain/dayStepLifetime';
+import {
   buildCalcTotals,
   buildVerifyTotals,
   isCalcAttemptShaped,
@@ -163,6 +168,29 @@ const MIGRATIONS: Record<number, Migration> = {
       centuryItems: withFluency(data.centuryItems),
     };
   },
+
+  /**
+   * v5 → v6: the day-step trainer. The last step of the method — from a
+   * month's doomsday to another day in that month — gets its own raw log and
+   * its own lifetime aggregate, cut by step size and by direction.
+   *
+   * Nothing else moves, and no new item map appears: a (doomsday, day) pair is
+   * not a fixed item set, so it is never scheduled, exactly like the dates on
+   * the weekday trainer. A v5 document has no day-step history, so the log
+   * starts empty; a document that somehow carries raw attempts without an
+   * aggregate has the aggregate built from them rather than started at zero.
+   */
+  6: (data) => {
+    const dayStepAttempts = Array.isArray(data.dayStepAttempts)
+      ? data.dayStepAttempts.filter(isDayStepAttemptShaped)
+      : [];
+    return {
+      ...data,
+      schemaVersion: 6,
+      dayStepAttempts,
+      dayStepTotals: buildDayStepTotals(dayStepAttempts),
+    };
+  },
 };
 
 export function migrateAppData(data: AppData): AppData {
@@ -288,6 +316,12 @@ export function normaliseAppData(data: AppData, now: number): AppData {
   const verifyAttempts = Array.isArray(data.verifyAttempts)
     ? data.verifyAttempts.filter(isVerifyAttemptShaped)
     : [];
+  // Stricter than `records` for the same reason as the calculation log: a step
+  // carries a size and a direction that a breakdown groups by, and an unknown
+  // one would land in a column that does not exist.
+  const dayStepAttempts = Array.isArray(data.dayStepAttempts)
+    ? data.dayStepAttempts.filter(isDayStepAttemptShaped)
+    : [];
   return {
     ...data,
     schemaVersion: SCHEMA_VERSION,
@@ -301,6 +335,10 @@ export function normaliseAppData(data: AppData, now: number): AppData {
     // path may put a NaN or a negative count somewhere a screen will read it.
     weekdayTotals: repairWeekdayTotals(data.weekdayTotals, weekdayAttempts),
     weekdayRuns: records(data.weekdayRuns),
+    dayStepAttempts,
+    // Same contract again: rebuilt from the raw log when the aggregate is
+    // missing, repaired cell by cell when it is there and wrong.
+    dayStepTotals: repairDayStepTotals(data.dayStepTotals, dayStepAttempts),
     calcAttempts,
     // Same contract as `weekdayTotals`: a missing aggregate is rebuilt from
     // the raw log, a partial or corrupt one is repaired step by step, and

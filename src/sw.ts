@@ -51,6 +51,39 @@ cleanupOutdatedCaches();
 registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html')));
 
 /* ------------------------------------------------------------------ */
+/* Spoken clips                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The two hundred spoken clips are cached as they are played, not precached.
+ *
+ * They are deliberately outside `injectManifest.globPatterns`, which lists
+ * js/css/html/svg/png/woff2 and no audio. Precaching them would put roughly a
+ * megabyte in front of every first install, for a hundred years the user will
+ * meet ten at a time over weeks, and would make every app update re-verify all
+ * of them. Cache-first from the moment one is actually heard costs nothing up
+ * front and still leaves a learned decade fully offline.
+ *
+ * Hand-rolled rather than `workbox-strategies`, because the whole strategy is
+ * the six lines below and a dependency for that is not worth carrying.
+ */
+const AUDIO_CACHE = 'doomsday-audio';
+
+registerRoute(
+  ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/audio/'),
+  async ({ request }) => {
+    const cache = await caches.open(AUDIO_CACHE);
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    const response = await fetch(request);
+    // Only a real clip is kept. A 404 cached here would be silence for good,
+    // and the filenames carry a set version, so a good one never goes stale.
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  },
+);
+
+/* ------------------------------------------------------------------ */
 /* Reading the app's data                                              */
 /* ------------------------------------------------------------------ */
 

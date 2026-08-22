@@ -55,10 +55,11 @@ Screen sequence:
 
 New items are introduced here before they enter review.
 
-- Presents a **decade block** (e.g. 40-49) as a grid, values visible.
-- Highlights the structure: within each run of 4 the code increments by 1, then jumps 2 at the leap boundary.
-- User taps through each item once with the answer shown (recognition pass).
-- Then a **cued recall pass** over the same 10, answer hidden, no scoring, unlimited retries.
+- Takes a **decade block** (e.g. 40-49) and introduces it in **three batches** of three or four years, split by position so that no batch holds two adjacent years: 40, 43, 46, 49 · 41, 44, 47 · 42, 45, 48. A batch that is a contiguous run hands the user the +1 step and lets them produce every code after the first without retrieving a pair.
+- Teaches **one pair at a time**: the year and its code alone on screen, both labelled. The user taps the code that is shown, and the same pair comes straight back with the code hidden for them to tap from memory. A pair is never asked for before its first reveal.
+- Then a **cued recall pass** over that batch, varied order, each year twice correct in a row. No scoring, unlimited retries, and a wrong tap never advances.
+- Then the same over all ten, mixed, with years from other decades mixed in.
+- The +1 / +2 structure is shown **once, ever**, after a decade has been learned, as two isolated pairs and framed as a way to check an answer rather than a way to find one. Shown before the pairs it becomes the route the codes are produced by, and a route into a decade can only be entered at its start.
 - Completing a block moves those 10 items into the review queue with `interval = 0`.
 
 Rate limit: max 2 new blocks (20 items) per day by default. Adjustable.
@@ -178,6 +179,10 @@ New items per day     0-40, default 20
 Latency thresholds    fast/medium cutoffs, default 2000/5000ms
 Hint type             structural / arithmetic / anchor
 Auto-advance delay    0-1000ms, default 250ms
+Spoken years, Learn   on/off, default on. Nothing in Learn is timed.
+Spoken years, Review  on/off, default off. Latency is paint-to-tap, so a
+                      spoken cue is inside every latency, grade and mastery
+                      bucket it produces. Also toggled from the review screen.
 Daily reminder        on/off + time
 Reset progress        with confirmation
 Export data           JSON

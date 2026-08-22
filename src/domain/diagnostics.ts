@@ -211,6 +211,42 @@ export function latencyCv(item: ItemState): number | null {
   return Math.sqrt(variance) / mean;
 }
 
+export interface SpokenShare {
+  /** Review answers in the window that had the year spoken. */
+  spoken: number;
+  /** Review answers in the window. */
+  total: number;
+}
+
+/** How many recent review answers to look back over when reporting audio. */
+export const SPOKEN_WINDOW = 100;
+
+/**
+ * How much of the recent review history was answered with the year spoken.
+ *
+ * Spoken review prompts are the one option in the app that changes what a
+ * latency means: the clock runs from paint to tap, and a clip runs about a
+ * second, so an answer that would have been under a 2000ms fast threshold can
+ * land over it purely because the user waited for the sentence to finish. That
+ * cost is real and the user chose it knowingly, so these attempts are graded
+ * and scheduled like any other and nothing here is excluded from fluency. What
+ * would be dishonest is showing the median without saying what is in it.
+ */
+export function spokenShare(
+  items: readonly ItemState[],
+  limit = SPOKEN_WINDOW,
+): SpokenShare {
+  const recent = items
+    .flatMap((item) => item.attemptHistory)
+    .filter((attempt) => attempt.source === 'review')
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, Math.max(0, limit));
+  return {
+    spoken: recent.filter((attempt) => attempt.audioPlayed === true).length,
+    total: recent.length,
+  };
+}
+
 export interface RouteReport {
   decadePosition: Slope;
   derivation: Slope;
