@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GUIDED_GOAL_IDS,
   GUIDED_STEP_COUNT,
   GUIDED_STEP_IDS,
   askAnswer,
   askOperands,
-  centuryAnchorRows,
-  equationTerms,
-  filledSlots,
+  goalOf,
   guidedClosingLine,
   guidedWalk,
   isWalkableDate,
-  type GuidedSlotId,
+  rowState,
+  settledGoals,
+  visibleNumbers,
+  type GuidedGoalRow,
   type GuidedStep,
   type GuidedStepId,
+  type GuidedWalk,
 } from './guidedDate';
 import { cyclesRemoved } from './calc';
 import type { CalendarDate, Code } from './types';
@@ -38,13 +41,16 @@ function answerOf(steps: readonly GuidedStep[], id: GuidedStepId): number {
   return stepOf(steps, id).answer;
 }
 
-/**
- * Every number a step actually prints, taken out of the givens rather than
- * listed by hand. A given holding a list — the doomsday dates of a month —
- * yields all of them, which is what makes the choice step answerable.
- */
-function shownNumbers(step: GuidedStep): number[] {
-  return step.givens.flatMap((given) => (given.value.match(/\d+/g) ?? []).map(Number));
+/** Every row of every goal, flattened. */
+function allRows(walk: GuidedWalk): GuidedGoalRow[] {
+  return walk.goals.flatMap((goal) => [...goal.rows]);
+}
+
+/** The row a step fills. Exactly one exists — see the test that pins it. */
+function rowFor(walk: GuidedWalk, id: GuidedStepId): GuidedGoalRow {
+  const row = allRows(walk).find((candidate) => candidate.from === id);
+  if (!row) throw new Error(`No row for ${id}`);
+  return row;
 }
 
 /**
@@ -104,54 +110,19 @@ describe('guidedWalk', () => {
     }
   });
 
-  it('never hands a step a number that contradicts the answer before it', () => {
-    // Every given that claims to carry an earlier answer has to equal it. This
-    // is the whole contract of the screen: a user following it can only ever be
-    // shown their own working.
-    for (const date of SAMPLE) {
-      const { steps, dateLabel } = guidedWalk(date);
-      for (const step of steps) {
-        for (const given of step.givens) {
-          if (given.from === null) continue;
-          expect(Number(given.value), `${dateLabel} · ${step.id} · ${given.label}`).toBe(
-            answerOf(steps, given.from),
-          );
-        }
-      }
-    }
-  });
-
-  it('only ever carries a value forward from a step already worked', () => {
-    for (const date of SAMPLE) {
-      const { steps } = guidedWalk(date);
-      const seen = new Set<GuidedStepId>();
-      for (const step of steps) {
-        for (const given of step.givens) {
-          if (given.from !== null) expect(seen.has(given.from)).toBe(true);
-        }
-        seen.add(step.id);
-      }
-    }
-  });
-
-  it('labels every number it puts on screen', () => {
-    for (const date of SAMPLE) {
-      for (const step of guidedWalk(date).steps) {
-        expect(step.answerLabel.length).toBeGreaterThan(0);
-        for (const given of step.givens) expect(given.label.length).toBeGreaterThan(0);
-      }
-    }
-  });
-
   it('derives the year code rather than handing it over', () => {
     for (const date of SAMPLE) {
-      const { steps } = guidedWalk(date);
-      expect(answerOf(steps, 'yearCode')).toBe(codeFor(yearKeyOf(date.fullYear)));
-      // Nothing before the step that produces it may carry the code.
-      const code = stepOf(steps, 'yearCode');
-      for (const step of steps) {
-        if (step.position > code.position) continue;
-        for (const given of step.givens) expect(given.from).not.toBe('yearCode');
+      const walk = guidedWalk(date);
+      expect(answerOf(walk.steps, 'yearCode')).toBe(codeFor(yearKeyOf(date.fullYear)));
+
+      // Nothing on screen may name the code before the step that produces it.
+      // The first goal's rows are the only thing up at that point, and the code
+      // is the last of them.
+      const upTo = walk.steps.findIndex((step) => step.id === 'yearCode');
+      const goal = goalOf(walk, 'yearCode');
+      for (let done = 0; done < upTo; done += 1) {
+        const shown = goal.rows.filter((row) => rowState(walk, row, done) !== 'pending');
+        expect(shown.some((row) => row.from === 'yearCode'), walk.dateLabel).toBe(false);
       }
     }
   });
@@ -173,14 +144,14 @@ describe('every question is answerable from what is on screen', () => {
     expect([...kinds].sort()).toEqual(['add', 'name', 'nearest', 'quarter', 'sevens', 'subtract']);
   });
 
-  it('rests every question on numbers the same step prints', () => {
+  it('rests every question on numbers the screen is printing at that moment', () => {
     for (const date of SAMPLE) {
       const walk = guidedWalk(date);
-      for (const step of walk.steps) {
+      for (const [index, step] of walk.steps.entries()) {
         if (!step.ask) continue;
-        const shown = shownNumbers(step);
+        const shown = visibleNumbers(walk, index);
         for (const operand of askOperands(step.ask)) {
-          expect(shown, `${walk.dateLabel} · ${step.id} · ${operand}`).toContain(operand);
+          expect([...shown], `${walk.dateLabel} · ${step.id} · ${operand}`).toContain(operand);
         }
       }
     }
@@ -206,6 +177,27 @@ describe('every question is answerable from what is on screen', () => {
       }
     }
   });
+
+  it('explains mod 7 wherever it asks for it', () => {
+    // The screen said "a week is 7 days, so whole sevens change nothing", which
+    // is the reason rather than the operation. Somebody meeting it for the first
+    // time needs to be told what to do.
+    for (const date of FEW) {
+      for (const step of guidedWalk(date).steps) {
+        if (step.ask?.kind !== 'sevens') continue;
+        expect(step.why, step.id).toBe('mod 7 means take 7 away until less than 7 is left.');
+      }
+    }
+  });
+
+  it('says nothing where the operation explains itself', () => {
+    // An addition needs no line under it, and one there anyway is a line the
+    // user has to read past to get to the thing they are answering.
+    const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
+    for (const id of ['sum', 'anchorSum', 'daysOn', 'weekdaySum'] as const) {
+      expect(stepOf(walk.steps, id).why, id).toBe('');
+    }
+  });
 });
 
 describe('the rhythm', () => {
@@ -229,36 +221,146 @@ describe('the rhythm', () => {
   });
 });
 
+/**
+ * Twelve sums in a row is arithmetic homework. The goals are what make it a
+ * walk: one of them on screen at a time, saying what is being built.
+ */
+describe('the four goals', () => {
+  it('is the year code, the doomsday, the days on and the weekday', () => {
+    for (const date of FEW) {
+      expect(guidedWalk(date).goals.map((goal) => goal.id)).toEqual([...GUIDED_GOAL_IDS]);
+    }
+  });
+
+  it('gives every step exactly one row, inside its own goal', () => {
+    // The screen finds the row to highlight by the step that fills it. A step
+    // with no row would render a goal with nothing marked, which is the state
+    // this design exists to make impossible.
+    for (const date of SAMPLE) {
+      const walk = guidedWalk(date);
+      for (const step of walk.steps) {
+        const owning = allRows(walk).filter((row) => row.from === step.id);
+        expect(owning, `${walk.dateLabel} · ${step.id}`).toHaveLength(1);
+        expect(goalOf(walk, step.goal).rows).toContain(owning[0]);
+      }
+    }
+  });
+
+  it('names every row and every goal', () => {
+    for (const date of SAMPLE) {
+      const walk = guidedWalk(date);
+      for (const goal of walk.goals) {
+        expect(goal.title.length).toBeGreaterThan(0);
+        expect(goal.blurb.length).toBeGreaterThan(0);
+        for (const row of goal.rows) {
+          expect(row.label.length, `${goal.id}`).toBeGreaterThan(0);
+          expect(row.value.length, `${goal.id} · ${row.label}`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('holds the number the producing step actually answers', () => {
+    for (const date of SAMPLE) {
+      const walk = guidedWalk(date);
+      for (const row of allRows(walk)) {
+        if (row.from === null) continue;
+        const step = stepOf(walk.steps, row.from);
+        const wanted =
+          step.input === 'weekday' ? trueWeekdayName(step.answer as Code) : String(step.answer);
+        expect(row.value, `${walk.dateLabel} · ${row.label}`).toBe(wanted);
+      }
+    }
+  });
+
+  it('never fills a row before its step, or leaves it empty after', () => {
+    for (const date of FEW) {
+      const walk = guidedWalk(date);
+      const order = walk.steps.map((step) => step.id);
+      for (const row of allRows(walk)) {
+        const produced = row.from === null ? 0 : order.indexOf(row.from);
+        for (let done = 0; done <= GUIDED_STEP_COUNT; done += 1) {
+          const state = rowState(walk, row, done);
+          const label = `${walk.dateLabel} · ${row.label} · ${done} done`;
+          if (row.from === null) expect(state, label).toBe('filled');
+          else if (done < produced) expect(state, label).toBe('pending');
+          else if (done === produced) expect(state, label).toBe('active');
+          else expect(state, label).toBe('filled');
+        }
+      }
+    }
+  });
+
+  it('settles a goal only once every one of its rows is filled', () => {
+    for (const date of FEW) {
+      const walk = guidedWalk(date);
+      for (let done = 0; done <= GUIDED_STEP_COUNT; done += 1) {
+        const settled = settledGoals(walk, done).map((goal) => goal.id);
+        const expected = walk.goals
+          .filter((goal) => goal.rows.every((row) => rowState(walk, row, done) === 'filled'))
+          .map((goal) => goal.id);
+        expect(settled, `${walk.dateLabel} · ${done}`).toEqual(expected);
+      }
+    }
+    // And nothing is settled before anything is answered.
+    expect(settledGoals(guidedWalk(FEW[0]), 0)).toEqual([]);
+  });
+
+  it('collapses a settled goal to a line carrying its result', () => {
+    const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
+    expect(walk.goals.map((goal) => goal.summary)).toEqual([
+      'Year code 3',
+      'Doomsday 6, Saturday',
+      'Days on 6',
+      // The last goal is the answer. It does not collapse into anything.
+      null,
+    ]);
+  });
+});
+
 describe('the worked example, 20 March 1987', () => {
   const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
 
   it('answers 3, 0, 3, 3, 6, 6, 6, 14, 6, 12, 5, 5', () => {
-    expect(walk.steps.map((step) => step.answer)).toEqual([
-      3, 0, 3, 3, 6, 6, 6, 14, 6, 12, 5, 5,
+    expect(walk.steps.map((step) => step.answer)).toEqual([3, 0, 3, 3, 6, 6, 6, 14, 6, 12, 5, 5]);
+  });
+
+  it('asks each one as a sum on numbers already printed', () => {
+    expect(walk.steps.map((step) => rowFor(walk, step.id).expression)).toEqual([
+      '87 − 84',
+      '3 ÷ 4',
+      '3 + 0',
+      '3 mod 7',
+      '3 + 3',
+      '6 mod 7',
+      '6 as a weekday',
+      'closest at or under 20',
+      '20 − 14',
+      '6 + 6',
+      '12 mod 7',
+      '5 as a weekday',
     ]);
   });
 
-  it('asks each one as a sum on numbers it has just printed', () => {
-    expect(walk.steps.map((step) => step.question)).toEqual([
-      '87 − 84 = ?',
-      '3 ÷ 4 = ?',
-      '3 + 0 = ?',
-      '3 mod 7 = ?',
-      '3 + 3 = ?',
-      '6 mod 7 = ?',
-      'Which weekday is 6?',
-      'Which of those is closest to the 20th without going past it?',
-      '20 − 14 = ?',
-      '6 + 6 = ?',
-      '12 mod 7 = ?',
-      'Which weekday is 5?',
+  it('reads as four goals rather than twelve sums', () => {
+    expect(walk.goals.map((goal) => goal.title)).toEqual([
+      'The year code for 87',
+      'The doomsday of 1987',
+      'From a doomsday to the 20th',
+      'The weekday',
     ]);
   });
 
-  it('names the year code and the year doomsday once each is produced', () => {
-    expect(walk.steps[3].result).toBe('That is the year code for 87.');
-    expect(walk.steps[5].result).toBe('Every doomsday in 1987 falls on 6.');
-    expect(walk.steps[6].result).toBe('Every doomsday in 1987 is a Saturday.');
+  it('states the anchor and the doomsday dates rather than asking for them', () => {
+    // The old walk asked which century anchor applied and which date was
+    // March's doomsday. Both are lookups, both can be got wrong by not having
+    // followed an explanation, and neither is arithmetic.
+    const stated = allRows(walk).filter((row) => row.from === null);
+    expect(stated.map((row) => `${row.label}: ${row.value}`)).toEqual([
+      'Anchor for the 1900s: 3',
+      'Doomsdays in March: 7, 14, 21, 28',
+      'Your date: 20',
+    ]);
   });
 
   it('asks every step, none of them a line to read', () => {
@@ -268,122 +370,10 @@ describe('the worked example, 20 March 1987', () => {
   it('offers the four doomsday dates of March as the choice', () => {
     expect(walk.steps[7].choices).toEqual([7, 14, 21, 28]);
     expect(walk.steps[7].input).toBe('choice');
-    expect(walk.steps[7].note).toBeNull();
-  });
-
-  it('puts the century table on the anchor step and the month table on the choice', () => {
-    expect(walk.steps.map((step) => step.table)).toEqual([
-      null,
-      null,
-      null,
-      null,
-      'century',
-      null,
-      null,
-      'month',
-      null,
-      null,
-      null,
-      null,
-    ]);
   });
 
   it('closes on the fact', () => {
     expect(guidedClosingLine(walk, Date.UTC(2026, 7, 22))).toBe('20 March 1987 was a Friday.');
-  });
-});
-
-describe('the three equations', () => {
-  it('is year code, days on and weekday, in that order', () => {
-    const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
-    expect(walk.equations.map((equation) => equation.result.slot)).toEqual([
-      'yearCode',
-      'daysOn',
-      'weekday',
-    ]);
-  });
-
-  it('labels every term, filled or not', () => {
-    for (const date of SAMPLE) {
-      for (const equation of guidedWalk(date).equations) {
-        for (const term of equationTerms(equation)) {
-          expect(term.label.length).toBeGreaterThan(0);
-        }
-      }
-    }
-  });
-
-  it('gives every slot one source and one value, wherever it appears', () => {
-    for (const date of SAMPLE) {
-      const walk = guidedWalk(date);
-      const sources = new Map<GuidedSlotId, string>();
-      for (const equation of walk.equations) {
-        for (const term of equationTerms(equation)) {
-          const signature = `${term.from}:${term.value}`;
-          const seen = sources.get(term.slot);
-          if (seen === undefined) sources.set(term.slot, signature);
-          else expect(signature, `${walk.dateLabel} · ${term.slot}`).toBe(seen);
-        }
-      }
-    }
-  });
-
-  it('holds the number the producing step actually answers', () => {
-    for (const date of SAMPLE) {
-      const walk = guidedWalk(date);
-      for (const equation of walk.equations) {
-        for (const term of equationTerms(equation)) {
-          if (term.from === null) continue;
-          expect(Number(term.value), `${walk.dateLabel} · ${term.slot}`).toBe(
-            answerOf(walk.steps, term.from),
-          );
-        }
-      }
-    }
-  });
-
-  it('never shows a slot filled before its step, or empty after it', () => {
-    for (const date of FEW) {
-      const walk = guidedWalk(date);
-      const order = walk.steps.map((step) => step.id);
-      for (const equation of walk.equations) {
-        for (const term of equationTerms(equation)) {
-          const produced = term.from === null ? 0 : order.indexOf(term.from) + 1;
-          for (let done = 0; done <= GUIDED_STEP_COUNT; done += 1) {
-            expect(
-              filledSlots(walk, done).has(term.slot),
-              `${walk.dateLabel} · ${term.slot} · ${done} done`,
-            ).toBe(done >= produced);
-          }
-        }
-      }
-    }
-  });
-
-  it('starts with the date and the anchor already standing, and nothing else', () => {
-    const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
-    expect([...filledSlots(walk, 0)].sort()).toEqual(['anchor', 'day']);
-    expect([...filledSlots(walk, GUIDED_STEP_COUNT)].sort()).toEqual([
-      'anchor',
-      'day',
-      'daysOn',
-      'leapDays',
-      'nearest',
-      'reduced',
-      'weekday',
-      'yearCode',
-    ]);
-  });
-
-  it('shows the sum that will fill the first slot rather than a bare dash', () => {
-    const walk = guidedWalk({ fullYear: 1987, month: 3, day: 20 });
-    const reduced = equationTerms(walk.equations[0]).find((term) => term.slot === 'reduced');
-    expect(reduced?.pending).toBe('87 − 84');
-
-    // Nothing comes off a year under 28, so there is no sum to show.
-    const small = guidedWalk({ fullYear: 2012, month: 6, day: 9 });
-    const none = equationTerms(small.equations[0]).find((term) => term.slot === 'reduced');
-    expect(none?.pending).toBeNull();
   });
 });
 
@@ -395,7 +385,8 @@ describe('the step a date makes trivial', () => {
     expect(reduce.noop).toBe(true);
     expect(reduce.ask).toBeNull();
     expect(reduce.answer).toBe(12);
-    expect(reduce.question).toContain('no 28s come off');
+    expect(reduce.why).toContain('nothing comes off');
+    expect(rowFor(walk, 'reduce').expression).toBe('12 is under 28');
   });
 
   it('still asks the 28s when something comes off', () => {
@@ -413,11 +404,9 @@ describe('the step a date makes trivial', () => {
   });
 
   it('still asks the count when the date is the doomsday itself', () => {
-    // 14 March is March's doomsday. Under the old walk that was a line to read;
-    // it is a subtraction like every other date, and the rhythm is the point.
     const walk = guidedWalk({ fullYear: 1987, month: 3, day: 14 });
     expect(walk.steps[8].noop).toBe(false);
-    expect(walk.steps[8].question).toBe('14 − 14 = ?');
+    expect(rowFor(walk, 'daysOn').expression).toBe('14 − 14');
     expect(walk.steps[8].answer).toBe(0);
   });
 
@@ -474,7 +463,9 @@ describe('a day below every doomsday date in the month', () => {
   function shiftedDays(fullYear: number, month: number): number[] {
     const days: number[] = [];
     for (let day = 1; day <= daysInMonth(fullYear, month); day += 1) {
-      if (guidedWalk({ fullYear, month, day }).steps[7].note !== null) days.push(day);
+      const walk = guidedWalk({ fullYear, month, day });
+      const shifted = goalOf(walk, 'daysOn').rows.some((row) => row.label === 'A week on from it');
+      if (shifted) days.push(day);
     }
     return days;
   }
@@ -507,16 +498,17 @@ describe('a day below every doomsday date in the month', () => {
 
   it('states the week rather than asking, and counts forward from there', () => {
     const walk = guidedWalk({ fullYear: 1987, month: 3, day: 3 });
-    const nearest = walk.steps[7];
-    expect(nearest.note).toBe(
-      'The 3rd has no doomsday at or before it. A week either way is the same weekday, so use the 10th.',
-    );
-    expect(nearest.question).toBe('Which of those is closest to the 10th without going past it?');
-    expect(nearest.answer).toBe(7);
-
-    const count = walk.steps[8];
-    expect(count.question).toBe('10 − 7 = ?');
-    expect(count.answer).toBe(3);
+    const rows = goalOf(walk, 'daysOn').rows;
+    expect(rows.map((row) => `${row.label}: ${row.value}`)).toEqual([
+      'Doomsdays in March: 7, 14, 21, 28',
+      'Your date: 3',
+      'A week on from it: 10',
+      'Nearest doomsday: 7',
+      'Days on: 3',
+    ]);
+    expect(walk.steps[7].why).toContain('A week on is the same weekday');
+    expect(walk.steps[7].answer).toBe(7);
+    expect(walk.steps[8].answer).toBe(3);
     expect(walk.weekday).toBe(weekdayFor(1987, 3, 3));
   });
 
@@ -578,17 +570,6 @@ describe('guidedClosingLine', () => {
   it('says today is today', () => {
     const walk = guidedWalk({ fullYear: 2026, month: 8, day: 22 });
     expect(guidedClosingLine(walk, now)).toBe(`22 August 2026 is a ${walk.weekdayName}.`);
-  });
-});
-
-describe('centuryAnchorRows', () => {
-  it('is the four anchors, oldest century first', () => {
-    expect(centuryAnchorRows()).toEqual([
-      { century: 18, label: '1800s', anchor: 5 },
-      { century: 19, label: '1900s', anchor: 3 },
-      { century: 20, label: '2000s', anchor: 2 },
-      { century: 21, label: '2100s', anchor: 0 },
-    ]);
   });
 });
 

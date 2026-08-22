@@ -98,7 +98,7 @@ async function finishWalk(): Promise<void> {
   fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
   for (const value of WALK_ANSWERS) {
     await answerStep(value);
-    fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^(Next|Finish)$/ }));
   }
 }
 
@@ -308,7 +308,7 @@ describe('the guided walk at the end of onboarding', () => {
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: WALK_DATE } });
     for (const value of WALK_ANSWERS.slice(0, 11)) {
       await answerStep(value);
-      fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
+      fireEvent.click(screen.getByRole('button', { name: /^(Next|Finish)$/ }));
     }
     await nextPaint();
 
@@ -320,7 +320,7 @@ describe('the guided walk at the end of onboarding', () => {
     ).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
 
     // Invariant 8: the buttons moved and the number did not.
-    expect(screen.getByText('Which weekday is 5?')).toBeInTheDocument();
+    expect(screen.getByTestId('concept-expression')).toHaveTextContent('5 as a weekday');
     fireEvent.click(screen.getByRole('button', { name: 'Fri' }));
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();

@@ -11,12 +11,19 @@
  * That rule is structural rather than a matter of care. Each step carries a
  * `GuidedAsk` — the sum itself, as data — and the step's `answer` is
  * `askAnswer(ask)` rather than a number written out beside it. `askOperands`
- * then names exactly which numbers the question rests on, and every one of them
- * appears in `givens`, which is what the screen prints. A step that asked for
- * something the user could not see would fail that check rather than merely
- * read badly. See `guidedDate.test.ts`.
+ * then names exactly which numbers the question rests on, and `visibleNumbers`
+ * says which numbers the screen is printing at that moment. A step that asked
+ * for something the user could not see fails a test rather than merely reading
+ * badly. See `guidedDate.test.ts`.
  *
- * Two more rules shape it.
+ * Three more rules shape it.
+ *
+ * **Twelve steps, but four goals.** Twelve sums in a row is arithmetic homework:
+ * each one is answerable and none of them says what is being built. So the steps
+ * are grouped into four goals — the year code, the year's doomsday, the distance
+ * from a doomsday to the date, the weekday — and only the goal being worked is
+ * on screen. A finished goal collapses to its one-line `summary`. That is the
+ * difference between a walk a person can follow and a list of sums.
  *
  * **The rhythm never changes.** Add, then take the sevens off, as two separate
  * questions, even when the sum is already under seven. A step that sometimes
@@ -40,7 +47,6 @@ import { CYCLE, cyclesRemoved, leapDays, reduce28, sevenStep } from './calc';
 import { ordinal } from './dayStep';
 import type { CalendarDate, Code, YearKey } from './types';
 import {
-  CENTURY_ANCHORS,
   MAX_YEAR,
   MIN_YEAR,
   centuryAnchor,
@@ -93,6 +99,32 @@ export const GUIDED_STEP_IDS: readonly GuidedStepId[] = [
 
 export const GUIDED_STEP_COUNT = GUIDED_STEP_IDS.length;
 
+/** The four things the twelve steps build, in the order they are built. */
+export type GuidedGoalId = 'yearCode' | 'doomsday' | 'daysOn' | 'weekday';
+
+export const GUIDED_GOAL_IDS: readonly GuidedGoalId[] = [
+  'yearCode',
+  'doomsday',
+  'daysOn',
+  'weekday',
+];
+
+/** Which goal each step serves. One goal is on screen at a time. */
+const GOAL_OF: Readonly<Record<GuidedStepId, GuidedGoalId>> = {
+  reduce: 'yearCode',
+  leap: 'yearCode',
+  sum: 'yearCode',
+  yearCode: 'yearCode',
+  anchorSum: 'doomsday',
+  yearDoomsday: 'doomsday',
+  doomsdayName: 'doomsday',
+  nearest: 'daysOn',
+  daysOn: 'daysOn',
+  weekdaySum: 'weekday',
+  weekdayCode: 'weekday',
+  weekdayName: 'weekday',
+};
+
 /**
  * Which control can take the answer.
  *
@@ -103,15 +135,12 @@ export const GUIDED_STEP_COUNT = GUIDED_STEP_IDS.length;
  */
 export type GuidedInput = 'code' | 'count' | 'choice' | 'weekday';
 
-/** The reference table this step needs on screen, or null. */
-export type GuidedTable = 'century' | 'month' | null;
-
 /**
  * The question itself, as data rather than as a sentence.
  *
- * `question` is what the screen prints; this is what the screen prints *about*.
- * Keeping the two separate is what lets a test assert that no question ever
- * needs a number the user cannot see: the operands are enumerable.
+ * `expression` on the goal row is what the screen prints; this is what it
+ * prints *about*. Keeping the two separate is what lets a test assert that no
+ * question ever needs a number the user cannot see: the operands are enumerable.
  *
  * The divisor in `quarter` and the modulus in `sevens` are part of the
  * operation rather than operands taken off the screen. Four is in "divide by
@@ -148,9 +177,10 @@ export function askAnswer(ask: GuidedAsk): number {
 }
 
 /**
- * Every number the question rests on. All of them must be printed by the step
- * that asks it, or the user is being asked to supply something the app never
- * gave them. That is the property `guidedDate.test.ts` pins.
+ * Every number the question rests on. All of them must be printed by the screen
+ * at the moment it is asked, or the user is being asked to supply something the
+ * app never gave them. That is the property `guidedDate.test.ts` pins, against
+ * `visibleNumbers`.
  */
 export function askOperands(ask: GuidedAsk): number[] {
   switch (ask.kind) {
@@ -167,37 +197,68 @@ export function askOperands(ask: GuidedAsk): number[] {
   }
 }
 
-export interface GuidedGiven {
+/* ------------------------------------------------------------------ */
+/* Goals                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One line of a goal's working: what the number is, how it is got, and what it
+ * comes out at.
+ *
+ * The label is never empty, filled or not. Half this screen is digits and two
+ * of them stacked with nothing naming them teach nothing (invariant 7).
+ */
+export interface GuidedGoalRow {
+  /** Names the number. "Leap days", "Nearest doomsday". */
   label: string;
-  /** One number, or a comma-separated list of them. Always printed. */
+  /**
+   * The sum as it reads: "87 − 84", "3 ÷ 4", "12 mod 7", "5 as a weekday".
+   * Empty for a row the app simply states, which has nothing to work out.
+   *
+   * A row's expression names numbers the user has not necessarily produced yet,
+   * so the screen only prints it once the row is the live one. Before that the
+   * row shows its label alone, which is the shape of what is coming without the
+   * answers to it.
+   */
+  expression: string;
+  /** The value once it is known. A word for the two naming rows. */
   value: string;
   /**
-   * The step whose answer this value is, or null when the date or a shipped
-   * table supplies it. This is what makes the chain assertable: a given that
-   * claims to carry an earlier answer must actually equal it, or the user has
-   * been handed a number that contradicts what they just said.
+   * The step that fills it, or null for a row the app states outright — the
+   * century anchor, the month's doomsday dates, the date itself. Those are the
+   * lookups the app does on the user's behalf, and they stand filled from the
+   * moment their goal opens.
    */
   from: GuidedStepId | null;
+}
+
+export interface GuidedGoal {
+  id: GuidedGoalId;
+  /** What these steps are building. "The year code for 87". */
+  title: string;
+  /** One short line saying what that thing is. Plain words, no method jargon. */
+  blurb: string;
+  rows: readonly GuidedGoalRow[];
+  /**
+   * How the goal reads once it is behind the user and collapses to one line.
+   * Null for the last goal, which does not collapse: it is the answer.
+   */
+  summary: string | null;
 }
 
 export interface GuidedStep {
   id: GuidedStepId;
   /** 1-based, and always 1..12. No date changes the count. */
   position: number;
-  /** Two or three words naming the step. */
-  title: string;
+  /** The goal this step is working toward. */
+  goal: GuidedGoalId;
   /**
-   * True when this date makes the step a no-op. The screen states `question`
-   * and moves on rather than asking it. Exactly the steps with no `ask`.
+   * True when this date makes the step a no-op. The screen states the row and
+   * moves on rather than asking it. Exactly the steps with no `ask`.
    */
   noop: boolean;
-  /** The ask, or for a no-op step the statement that stands in its place. */
-  question: string;
-  /** The sum behind `question`, or null when the step is a line to read. */
+  /** The sum behind the step, or null when the step is a line to read. */
   ask: GuidedAsk | null;
-  /** Every number the step puts on screen, each with the label naming it. */
-  givens: readonly GuidedGiven[];
-  table: GuidedTable;
   input: GuidedInput;
   /** The largest answer this kind of step can have. `count` and `choice` read it. */
   max: number;
@@ -206,75 +267,18 @@ export interface GuidedStep {
   answer: number;
   /** What the answer is. Never omitted; a bare number teaches nothing. */
   answerLabel: string;
-  /** The worked line, shown after a wrong answer and after a right one. */
+  /**
+   * The worked line, shown when the answer is wrong. It always contains the
+   * value that was wanted, which is what makes the walk finishable by somebody
+   * who knows nothing and why there is no skip.
+   */
   working: string;
-  /** One short line of narration, before the question. */
+  /**
+   * One short line, or empty. Only where the operation itself needs saying —
+   * what `mod 7` means, where the anchor came from. An addition explains itself
+   * and gets nothing.
+   */
   why: string;
-  /** One sentence naming what the answer has just produced, or null. */
-  result: string | null;
-  /** Something about this date that changes the step, or null. */
-  note: string | null;
-  /** The equation slot this step completes, or null when it is a middle sum. */
-  fills: GuidedSlotId | null;
-  /** The slot the step is working toward. The equation strip marks it. */
-  solving: GuidedSlotId;
-}
-
-/* ------------------------------------------------------------------ */
-/* The equations                                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * A named place in the three equations.
- *
- * The strip shows the whole computation from the first screen, with the pieces
- * that are not known yet standing empty, so the user can always see the shape
- * of what they are building and where inside it they are. Which slot holds what,
- * and when, is derived from the step sequence rather than decided by the
- * component — the same reason table maths lives here and not in a screen.
- */
-export type GuidedSlotId =
-  | 'reduced'
-  | 'leapDays'
-  | 'yearCode'
-  | 'day'
-  | 'nearest'
-  | 'daysOn'
-  | 'anchor'
-  | 'weekday';
-
-export interface GuidedTerm {
-  kind: 'term';
-  slot: GuidedSlotId;
-  /** Names the number, per invariant 7. Never empty, filled or not. */
-  label: string;
-  value: string;
-  /** What stands in the slot before it is produced, or null for a plain dash. */
-  pending: string | null;
-  /** The step that produces it, or null when the date or a table supplies it. */
-  from: GuidedStepId | null;
-}
-
-export interface GuidedOperator {
-  kind: 'op';
-  text: string;
-}
-
-export type GuidedPart = GuidedTerm | GuidedOperator;
-
-/** `result = parts`. The result sits on the left, as the three lines read. */
-export interface GuidedEquation {
-  result: GuidedTerm;
-  parts: readonly GuidedPart[];
-}
-
-function isTerm(part: GuidedPart): part is GuidedTerm {
-  return part.kind === 'term';
-}
-
-/** Every slot an equation names, the result first. */
-export function equationTerms(equation: GuidedEquation): GuidedTerm[] {
-  return [equation.result, ...equation.parts.filter(isTerm)];
 }
 
 export interface GuidedWalk {
@@ -288,26 +292,78 @@ export interface GuidedWalk {
   dateLabel: string;
   /** Exactly `GUIDED_STEP_COUNT`, in `GUIDED_STEP_IDS` order. */
   steps: readonly GuidedStep[];
-  /** Year code, days on, weekday. All three visible from the first screen. */
-  equations: readonly GuidedEquation[];
+  /** Four, in `GUIDED_GOAL_IDS` order. */
+  goals: readonly GuidedGoal[];
+}
+
+/* ------------------------------------------------------------------ */
+/* What the screen is showing, at a given point                        */
+/* ------------------------------------------------------------------ */
+
+export type GuidedRowState = 'filled' | 'active' | 'pending';
+
+export function goalOf(walk: GuidedWalk, id: GuidedGoalId): GuidedGoal {
+  const goal = walk.goals.find((entry) => entry.id === id);
+  if (!goal) throw new RangeError(`No goal ${id}`);
+  return goal;
 }
 
 /**
- * Which slots stand filled once `stepsDone` steps have been answered.
+ * How one row of the current goal reads after `stepsDone` steps.
  *
- * A slot the date supplies is filled from the start. Everything else appears
- * exactly when the step that produces it is behind the user, which is the whole
- * contract of the strip: never filled early, never empty late.
+ * A row the app states is filled the moment its goal opens. A row a step fills
+ * is pending until that step is live, active while it is, and filled after.
+ * Never filled early, never empty late — that is the whole contract, and it is
+ * decided here rather than in the component so it can be asserted without
+ * rendering anything.
  */
-export function filledSlots(walk: GuidedWalk, stepsDone: number): Set<GuidedSlotId> {
-  const done = new Set(walk.steps.slice(0, Math.max(0, stepsDone)).map((step) => step.id));
-  const filled = new Set<GuidedSlotId>();
-  for (const equation of walk.equations) {
-    for (const term of equationTerms(equation)) {
-      if (term.from === null || done.has(term.from)) filled.add(term.slot);
-    }
+export function rowState(
+  walk: GuidedWalk,
+  row: GuidedGoalRow,
+  stepsDone: number,
+): GuidedRowState {
+  if (row.from === null) return 'filled';
+  const at = walk.steps.findIndex((step) => step.id === row.from);
+  if (at < stepsDone) return 'filled';
+  return at === stepsDone ? 'active' : 'pending';
+}
+
+/** Goals fully behind the user, which collapse to their summary line. */
+export function settledGoals(walk: GuidedWalk, stepsDone: number): GuidedGoal[] {
+  return walk.goals.filter((goal) =>
+    goal.rows.every((row) => rowState(walk, row, stepsDone) === 'filled'),
+  );
+}
+
+/**
+ * Every number the screen is actually printing after `stepsDone` steps.
+ *
+ * Only the goal being worked is on screen, plus the one-line summary of each
+ * goal already behind it, so this counts those and nothing else. Counting every
+ * goal's rows would overstate what the user can see and would let a question
+ * rest on a number that is not there — which is the exact failure this whole
+ * file is built to make impossible.
+ */
+export function visibleNumbers(walk: GuidedWalk, stepsDone: number): Set<number> {
+  const seen = new Set<number>();
+  const take = (text: string) => {
+    for (const found of text.match(/\d+/g) ?? []) seen.add(Number(found));
+  };
+
+  for (const settled of settledGoals(walk, stepsDone)) {
+    if (settled.summary !== null) take(settled.summary);
   }
-  return filled;
+
+  const step = walk.steps[stepsDone];
+  if (step === undefined) return seen;
+
+  for (const row of goalOf(walk, step.goal).rows) {
+    const state = rowState(walk, row, stepsDone);
+    // A pending row shows its label and nothing else, so it prints no number.
+    if (state === 'filled') take(row.value);
+    if (state === 'active') take(row.expression);
+  }
+  return seen;
 }
 
 /* ------------------------------------------------------------------ */
@@ -315,18 +371,22 @@ export function filledSlots(walk: GuidedWalk, stepsDone: number): Set<GuidedSlot
 /* ------------------------------------------------------------------ */
 
 /**
- * A week is seven days, so this line is the same one three times over. It is
- * repeated rather than cross-referenced because a user on step 11 should not
- * have to remember what step 4 said.
+ * What the operation is, not why it is there.
+ *
+ * The screen used to say "a week is 7 days, so whole sevens change nothing",
+ * which explains the reason to somebody who already knows the operation. A
+ * person meeting `mod 7` for the first time needs the operation first, and it
+ * is repeated at all three sevens steps rather than cross-referenced, because a
+ * user on step 11 should not have to remember what step 4 said.
  */
-const SEVENS_WHY = 'A week is 7 days, so whole sevens change nothing.';
+const SEVENS_WHY = 'mod 7 means take 7 away until less than 7 is left.';
 
 const NAMING_WHY = 'The numbers count from Sunday, so 0 is Sunday and 6 is Saturday.';
 
 /** "12 − 7 = 5.", or that nothing comes off. */
 function sevensLine(sum: number): string {
   const { multiple, remainder } = sevenStep(sum);
-  if (multiple === 0) return `${sum} is under 7, so ${sum}.`;
+  if (multiple === 0) return `${sum} is already under 7, so ${sum}.`;
   return `${sum} − ${multiple} = ${remainder}.`;
 }
 
@@ -374,6 +434,7 @@ interface WalkNumbers {
   sum: number;
   code: Code;
   anchor: Code;
+  century: string;
   /** anchor + code, before the sevens come off. Never past 12. */
   anchorSum: number;
   doomsday: Code;
@@ -424,6 +485,7 @@ function walkNumbers(date: CalendarDate): WalkNumbers {
     sum,
     code,
     anchor,
+    century: centuryLabel(centuryOf(fullYear)),
     anchorSum,
     doomsday,
     leapYear,
@@ -443,440 +505,308 @@ function walkNumbers(date: CalendarDate): WalkNumbers {
 /* ------------------------------------------------------------------ */
 
 /** Builds a step around its ask, so the answer can only ever be the sum's own. */
-function asked(
-  step: Omit<GuidedStep, 'answer' | 'noop'> & { ask: GuidedAsk },
-): GuidedStep {
-  return { ...step, noop: false, answer: askAnswer(step.ask) };
+function asked(step: Omit<GuidedStep, 'answer' | 'noop' | 'goal'> & { ask: GuidedAsk }): GuidedStep {
+  return { ...step, goal: GOAL_OF[step.id], noop: false, answer: askAnswer(step.ask) };
 }
 
-function reduceStep(n: WalkNumbers): GuidedStep {
+function stepsFor(date: CalendarDate, n: WalkNumbers): GuidedStep[] {
+  const { fullYear, month, day } = date;
   const year = formatYear(n.yy);
-  if (n.cycles === 0) {
-    return {
-      id: 'reduce',
-      position: 1,
-      title: 'Take the 28s off',
-      noop: true,
-      question: `${year} is under 28, so no 28s come off. The year to work with is ${n.reduced}.`,
-      ask: null,
-      givens: [{ label: 'Year, last two digits', value: year, from: null }],
-      table: null,
-      input: 'count',
-      max: CYCLE - 1,
-      choices: [],
-      answer: n.reduced,
-      answerLabel: 'Year, 28s off',
-      working: `${year} is under 28, so ${n.reduced}.`,
-      why: 'The codes repeat every 28 years.',
-      result: null,
-      note: null,
-      fills: 'reduced',
-      solving: 'reduced',
-    };
-  }
-
-  return asked({
-    id: 'reduce',
-    position: 1,
-    title: 'Take the 28s off',
-    question: `${n.yy} − ${n.taken} = ?`,
-    ask: { kind: 'subtract', left: n.yy, right: n.taken },
-    givens: [
-      { label: 'Year, last two digits', value: year, from: null },
-      { label: '28s to take off', value: String(n.taken), from: null },
-    ],
-    table: null,
-    input: 'count',
-    max: CYCLE - 1,
-    choices: [],
-    answerLabel: 'Year, 28s off',
-    working: `${n.yy} − ${n.taken} = ${n.reduced}.`,
-    why: `The codes repeat every 28 years. 28 × ${n.cycles} = ${n.taken}.`,
-    result: null,
-    note: null,
-    fills: 'reduced',
-    solving: 'reduced',
-  });
-}
-
-function leapStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'leap',
-    position: 2,
-    title: 'Leap days',
-    question: `${n.reduced} ÷ 4 = ?`,
-    ask: { kind: 'quarter', left: n.reduced },
-    givens: [{ label: 'Year, 28s off', value: String(n.reduced), from: 'reduce' }],
-    table: null,
-    input: 'code',
-    max: 6,
-    choices: [],
-    answerLabel: 'Leap days',
-    working: quarterLine(n.reduced),
-    why: 'A leap day lands every fourth year. Divide by four and drop the remainder.',
-    result: null,
-    note: null,
-    fills: 'leapDays',
-    solving: 'leapDays',
-  });
-}
-
-function sumStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'sum',
-    position: 3,
-    title: 'Add them',
-    question: `${n.reduced} + ${n.leaps} = ?`,
-    ask: { kind: 'add', left: n.reduced, right: n.leaps },
-    givens: [
-      { label: 'Year, 28s off', value: String(n.reduced), from: 'reduce' },
-      { label: 'Leap days', value: String(n.leaps), from: 'leap' },
-    ],
-    table: null,
-    input: 'count',
-    max: CYCLE - 1 + 6,
-    choices: [],
-    answerLabel: 'Year plus leap days',
-    working: `${n.reduced} + ${n.leaps} = ${n.sum}.`,
-    why: 'Each year moves the weekday on by one, and each leap day by one more.',
-    result: null,
-    note: null,
-    fills: null,
-    solving: 'yearCode',
-  });
-}
-
-function yearCodeStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'yearCode',
-    position: 4,
-    title: 'Take the sevens off',
-    question: `${n.sum} mod 7 = ?`,
-    ask: { kind: 'sevens', left: n.sum },
-    givens: [{ label: 'Year plus leap days', value: String(n.sum), from: 'sum' }],
-    table: null,
-    input: 'code',
-    max: 6,
-    choices: [],
-    answerLabel: 'Year code',
-    working: sevensLine(n.sum),
-    why: SEVENS_WHY,
-    result: `That is the year code for ${formatYear(n.yy)}.`,
-    note: null,
-    fills: 'yearCode',
-    solving: 'yearCode',
-  });
-}
-
-function anchorSumStep(fullYear: number, n: WalkNumbers): GuidedStep {
-  const century = centuryLabel(centuryOf(fullYear));
-  return asked({
-    id: 'anchorSum',
-    position: 5,
-    title: 'Add the anchor',
-    question: `${n.anchor} + ${n.code} = ?`,
-    ask: { kind: 'add', left: n.anchor, right: n.code },
-    givens: [
-      { label: `Century anchor, ${century}`, value: String(n.anchor), from: null },
-      { label: `Year code, ${formatYear(n.yy)}`, value: String(n.code), from: 'yearCode' },
-    ],
-    table: 'century',
-    input: 'count',
-    max: 12,
-    choices: [],
-    answerLabel: 'Anchor plus year code',
-    working: `${n.anchor} + ${n.code} = ${n.anchorSum}.`,
-    why: `The ${century} anchor is ${n.anchor}.`,
-    result: null,
-    note: null,
-    fills: null,
-    solving: 'weekday',
-  });
-}
-
-function yearDoomsdayStep(fullYear: number, n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'yearDoomsday',
-    position: 6,
-    title: 'Take the sevens off',
-    question: `${n.anchorSum} mod 7 = ?`,
-    ask: { kind: 'sevens', left: n.anchorSum },
-    givens: [{ label: 'Anchor plus year code', value: String(n.anchorSum), from: 'anchorSum' }],
-    table: null,
-    input: 'code',
-    max: 6,
-    choices: [],
-    answerLabel: `Doomsday in ${fullYear}`,
-    working: sevensLine(n.anchorSum),
-    why: SEVENS_WHY,
-    result: `Every doomsday in ${fullYear} falls on ${n.doomsday}.`,
-    note: null,
-    fills: null,
-    solving: 'weekday',
-  });
-}
-
-function doomsdayNameStep(fullYear: number, n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'doomsdayName',
-    position: 7,
-    title: 'Name it',
-    question: `Which weekday is ${n.doomsday}?`,
-    ask: { kind: 'name', code: n.doomsday },
-    givens: [{ label: `Doomsday in ${fullYear}`, value: String(n.doomsday), from: 'yearDoomsday' }],
-    table: null,
-    input: 'weekday',
-    max: 6,
-    choices: [],
-    answerLabel: `Doomsday in ${fullYear}`,
-    working: `${n.doomsday} is ${trueWeekdayName(n.doomsday)}.`,
-    why: NAMING_WHY,
-    result: `Every doomsday in ${fullYear} is a ${trueWeekdayName(n.doomsday)}.`,
-    note: null,
-    fills: null,
-    solving: 'weekday',
-  });
-}
-
-/**
- * The one question in the walk that is not arithmetic, and it is a comparison
- * of numbers on the screen rather than a concept.
- *
- * A day below every doomsday date in the month — 3 March, where the doomsdays
- * are the 7th, 14th, 21st and 28th — gets a week added to it first, stated as a
- * line rather than asked. The alternative is counting backwards, and direction
- * is exactly the kind of idea this screen exists not to require.
- */
-function nearestStep(month: number, day: number, n: WalkNumbers): GuidedStep {
   const name = monthName(month);
-  const givens: GuidedGiven[] = [
-    { label: `${name} doomsday`, value: String(n.anchorDay), from: null },
-    { label: `Doomsdays in ${name}`, value: numberList(n.dates), from: null },
-    { label: 'Your date', value: String(day), from: null },
+
+  const reduce: GuidedStep =
+    n.cycles === 0
+      ? {
+          id: 'reduce',
+          position: 1,
+          goal: 'yearCode',
+          noop: true,
+          ask: null,
+          input: 'count',
+          max: CYCLE - 1,
+          choices: [],
+          answer: n.reduced,
+          answerLabel: 'Year, 28s off',
+          working: `${year} is under 28, so ${n.reduced}.`,
+          why: `The codes repeat every 28 years, and ${year} is under 28, so nothing comes off.`,
+        }
+      : asked({
+          id: 'reduce',
+          position: 1,
+          ask: { kind: 'subtract', left: n.yy, right: n.taken },
+          input: 'count',
+          max: CYCLE - 1,
+          choices: [],
+          answerLabel: 'Year, 28s off',
+          working: `${n.yy} − ${n.taken} = ${n.reduced}.`,
+          why: `The codes repeat every 28 years, so 28 × ${n.cycles} comes off.`,
+        });
+
+  return [
+    reduce,
+    asked({
+      id: 'leap',
+      position: 2,
+      ask: { kind: 'quarter', left: n.reduced },
+      input: 'code',
+      max: 6,
+      choices: [],
+      answerLabel: 'Leap days',
+      working: quarterLine(n.reduced),
+      why: 'A leap day lands every fourth year. Ignore the remainder.',
+    }),
+    asked({
+      id: 'sum',
+      position: 3,
+      ask: { kind: 'add', left: n.reduced, right: n.leaps },
+      input: 'count',
+      max: CYCLE - 1 + 6,
+      choices: [],
+      answerLabel: 'Added up',
+      working: `${n.reduced} + ${n.leaps} = ${n.sum}.`,
+      why: '',
+    }),
+    asked({
+      id: 'yearCode',
+      position: 4,
+      ask: { kind: 'sevens', left: n.sum },
+      input: 'code',
+      max: 6,
+      choices: [],
+      answerLabel: 'Year code',
+      working: sevensLine(n.sum),
+      why: SEVENS_WHY,
+    }),
+    asked({
+      id: 'anchorSum',
+      position: 5,
+      ask: { kind: 'add', left: n.anchor, right: n.code },
+      input: 'count',
+      max: 12,
+      choices: [],
+      answerLabel: 'Anchor plus year code',
+      working: `${n.anchor} + ${n.code} = ${n.anchorSum}.`,
+      why: '',
+    }),
+    asked({
+      id: 'yearDoomsday',
+      position: 6,
+      ask: { kind: 'sevens', left: n.anchorSum },
+      input: 'code',
+      max: 6,
+      choices: [],
+      answerLabel: 'Doomsday number',
+      working: sevensLine(n.anchorSum),
+      why: SEVENS_WHY,
+    }),
+    asked({
+      id: 'doomsdayName',
+      position: 7,
+      ask: { kind: 'name', code: n.doomsday },
+      input: 'weekday',
+      max: 6,
+      choices: [],
+      answerLabel: `Doomsday in ${fullYear}`,
+      working: `${n.doomsday} is ${trueWeekdayName(n.doomsday)}.`,
+      why: NAMING_WHY,
+    }),
+    asked({
+      id: 'nearest',
+      position: 8,
+      ask: { kind: 'nearest', options: n.dates, ceiling: n.target },
+      input: 'choice',
+      max: n.dates[n.dates.length - 1],
+      choices: n.dates,
+      answerLabel: 'Nearest doomsday',
+      working: `The ${ordinal(n.nearest)} is the closest one at or before the ${ordinal(n.target)}.`,
+      why: n.shifted
+        ? `No doomsday falls on or before the ${ordinal(day)}, so count from the ${ordinal(n.target)} instead. A week on is the same weekday.`
+        : `${name}'s doomsday is the ${ordinal(n.anchorDay)}, and every 7 days from it is another one.`,
+    }),
+    asked({
+      id: 'daysOn',
+      position: 9,
+      ask: { kind: 'subtract', left: n.target, right: n.nearest },
+      input: 'code',
+      max: 6,
+      choices: [],
+      answerLabel: 'Days on',
+      working: `${n.target} − ${n.nearest} = ${n.daysOn}.`,
+      why: '',
+    }),
+    asked({
+      id: 'weekdaySum',
+      position: 10,
+      ask: { kind: 'add', left: n.doomsday, right: n.daysOn },
+      input: 'count',
+      max: 12,
+      choices: [],
+      answerLabel: 'Doomsday plus days on',
+      working: `${n.doomsday} + ${n.daysOn} = ${n.weekdaySum}.`,
+      why: '',
+    }),
+    asked({
+      id: 'weekdayCode',
+      position: 11,
+      ask: { kind: 'sevens', left: n.weekdaySum },
+      input: 'code',
+      max: 6,
+      choices: [],
+      answerLabel: 'Weekday number',
+      working: sevensLine(n.weekdaySum),
+      why: SEVENS_WHY,
+    }),
+    asked({
+      id: 'weekdayName',
+      position: 12,
+      ask: { kind: 'name', code: n.weekday },
+      input: 'weekday',
+      max: 6,
+      choices: [],
+      answerLabel: 'The day',
+      working: `${n.weekday} is ${trueWeekdayName(n.weekday)}.`,
+      why: NAMING_WHY,
+    }),
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/* The goals                                                           */
+/* ------------------------------------------------------------------ */
+
+function goalsFor(fullYear: number, month: number, day: number, n: WalkNumbers): GuidedGoal[] {
+  const year = formatYear(n.yy);
+  const name = monthName(month);
+
+  const daysOnRows: GuidedGoalRow[] = [
+    {
+      label: `Doomsdays in ${name}`,
+      expression: '',
+      value: numberList(n.dates),
+      from: null,
+    },
+    { label: 'Your date', expression: '', value: String(day), from: null },
   ];
   if (n.shifted) {
-    givens.push({ label: 'Date, a week on', value: String(n.target), from: null });
+    daysOnRows.push({
+      label: 'A week on from it',
+      expression: '',
+      value: String(n.target),
+      from: null,
+    });
   }
-
-  return asked({
-    id: 'nearest',
-    position: 8,
-    title: 'The nearest doomsday',
-    question: `Which of those is closest to the ${ordinal(n.target)} without going past it?`,
-    ask: { kind: 'nearest', options: n.dates, ceiling: n.target },
-    givens,
-    table: 'month',
-    input: 'choice',
-    max: n.dates[n.dates.length - 1],
-    choices: n.dates,
-    answerLabel: 'Nearest doomsday',
-    working: `The ${ordinal(n.nearest)} is the closest doomsday at or before the ${ordinal(n.target)}.`,
-    why: `${name}'s doomsday is the ${ordinal(n.anchorDay)}, and every 7 days from it is another one.`,
-    result: null,
-    note: n.shifted
-      ? `The ${ordinal(day)} has no doomsday at or before it. A week either way is the same weekday, so use the ${ordinal(n.target)}.`
-      : null,
-    fills: 'nearest',
-    solving: 'nearest',
-  });
-}
-
-function daysOnStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'daysOn',
-    position: 9,
-    title: 'Count on',
-    question: `${n.target} − ${n.nearest} = ?`,
-    ask: { kind: 'subtract', left: n.target, right: n.nearest },
-    givens: [
-      {
-        label: n.shifted ? 'Date, a week on' : 'Your date',
-        value: String(n.target),
-        from: null,
-      },
-      { label: 'Nearest doomsday', value: String(n.nearest), from: 'nearest' },
-    ],
-    table: null,
-    input: 'code',
-    max: 6,
-    choices: [],
-    answerLabel: 'Days on',
-    working: `${n.target} − ${n.nearest} = ${n.daysOn}.`,
-    why: 'Count on from that doomsday to your date.',
-    result: null,
-    note: null,
-    fills: 'daysOn',
-    solving: 'daysOn',
-  });
-}
-
-function weekdaySumStep(fullYear: number, n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'weekdaySum',
-    position: 10,
-    title: 'Add them',
-    question: `${n.doomsday} + ${n.daysOn} = ?`,
-    ask: { kind: 'add', left: n.doomsday, right: n.daysOn },
-    givens: [
-      { label: `Doomsday in ${fullYear}`, value: String(n.doomsday), from: 'yearDoomsday' },
-      { label: 'Days on', value: String(n.daysOn), from: 'daysOn' },
-    ],
-    table: null,
-    input: 'count',
-    max: 12,
-    choices: [],
-    answerLabel: 'Doomsday plus days on',
-    working: `${n.doomsday} + ${n.daysOn} = ${n.weekdaySum}.`,
-    why: 'The doomsday says where the year sits. The days move you off it.',
-    result: null,
-    note: null,
-    fills: null,
-    solving: 'weekday',
-  });
-}
-
-function weekdayCodeStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'weekdayCode',
-    position: 11,
-    title: 'Take the sevens off',
-    question: `${n.weekdaySum} mod 7 = ?`,
-    ask: { kind: 'sevens', left: n.weekdaySum },
-    givens: [{ label: 'Doomsday plus days on', value: String(n.weekdaySum), from: 'weekdaySum' }],
-    table: null,
-    input: 'code',
-    max: 6,
-    choices: [],
-    answerLabel: 'Weekday number',
-    working: sevensLine(n.weekdaySum),
-    why: SEVENS_WHY,
-    result: null,
-    note: null,
-    fills: 'weekday',
-    solving: 'weekday',
-  });
-}
-
-function weekdayNameStep(n: WalkNumbers): GuidedStep {
-  return asked({
-    id: 'weekdayName',
-    position: 12,
-    title: 'Name it',
-    question: `Which weekday is ${n.weekday}?`,
-    ask: { kind: 'name', code: n.weekday },
-    givens: [{ label: 'Weekday number', value: String(n.weekday), from: 'weekdayCode' }],
-    table: null,
-    input: 'weekday',
-    max: 6,
-    choices: [],
-    answerLabel: 'The day',
-    working: `${n.weekday} is ${trueWeekdayName(n.weekday)}.`,
-    why: NAMING_WHY,
-    result: null,
-    note: null,
-    fills: null,
-    solving: 'weekday',
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/* The equations                                                       */
-/* ------------------------------------------------------------------ */
-
-function equationsFor(fullYear: number, n: WalkNumbers): GuidedEquation[] {
-  const yearCode: GuidedTerm = {
-    kind: 'term',
-    slot: 'yearCode',
-    label: `Year code, ${formatYear(n.yy)}`,
-    value: String(n.code),
-    pending: null,
-    from: 'yearCode',
-  };
-  const daysOn: GuidedTerm = {
-    kind: 'term',
-    slot: 'daysOn',
-    label: 'Days on',
-    value: String(n.daysOn),
-    pending: null,
-    from: 'daysOn',
-  };
+  daysOnRows.push(
+    {
+      label: 'Nearest doomsday',
+      expression: `closest at or under ${n.target}`,
+      value: String(n.nearest),
+      from: 'nearest',
+    },
+    {
+      label: 'Days on',
+      expression: `${n.target} − ${n.nearest}`,
+      value: String(n.daysOn),
+      from: 'daysOn',
+    },
+  );
 
   return [
     {
-      result: yearCode,
-      parts: [
-        { kind: 'op', text: '(' },
+      id: 'yearCode',
+      title: `The year code for ${year}`,
+      blurb: 'Every year gets a number from 0 to 6, worked out from the year alone.',
+      rows: [
         {
-          kind: 'term',
-          slot: 'reduced',
           label: 'Year, 28s off',
+          expression: n.cycles === 0 ? `${year} is under 28` : `${n.yy} − ${n.taken}`,
           value: String(n.reduced),
-          // The sum that will fill it, since both its numbers are already
-          // known. Every other slot has nothing truthful to show until its step.
-          pending: n.cycles === 0 ? null : `${n.yy} − ${n.taken}`,
           from: 'reduce',
         },
-        { kind: 'op', text: '+' },
         {
-          kind: 'term',
-          slot: 'leapDays',
           label: 'Leap days',
+          expression: `${n.reduced} ÷ 4`,
           value: String(n.leaps),
-          pending: null,
           from: 'leap',
         },
-        { kind: 'op', text: ')' },
-        { kind: 'op', text: 'mod 7' },
-      ],
-    },
-    {
-      result: daysOn,
-      parts: [
         {
-          kind: 'term',
-          slot: 'day',
-          label: n.shifted ? 'Date, a week on' : 'Your date',
-          value: String(n.target),
-          pending: null,
-          from: null,
+          label: 'Added up',
+          expression: `${n.reduced} + ${n.leaps}`,
+          value: String(n.sum),
+          from: 'sum',
         },
-        { kind: 'op', text: '−' },
         {
-          kind: 'term',
-          slot: 'nearest',
-          label: 'Nearest doomsday',
-          value: String(n.nearest),
-          pending: null,
-          from: 'nearest',
+          label: 'Year code',
+          expression: `${n.sum} mod 7`,
+          value: String(n.code),
+          from: 'yearCode',
         },
       ],
+      summary: `Year code ${n.code}`,
     },
     {
-      result: {
-        kind: 'term',
-        slot: 'weekday',
-        label: 'Weekday number',
-        value: String(n.weekday),
-        pending: null,
-        from: 'weekdayCode',
-      },
-      parts: [
-        { kind: 'op', text: '(' },
+      id: 'doomsday',
+      title: `The doomsday of ${fullYear}`,
+      blurb: 'One weekday that a handful of dates in the year all land on.',
+      rows: [
         {
-          kind: 'term',
-          slot: 'anchor',
-          label: `Century anchor, ${centuryLabel(centuryOf(fullYear))}`,
+          label: `Anchor for the ${n.century}`,
+          expression: '',
           value: String(n.anchor),
-          pending: null,
           from: null,
         },
-        { kind: 'op', text: '+' },
-        yearCode,
-        { kind: 'op', text: '+' },
-        daysOn,
-        { kind: 'op', text: ')' },
-        { kind: 'op', text: 'mod 7' },
+        {
+          label: 'Anchor plus year code',
+          expression: `${n.anchor} + ${n.code}`,
+          value: String(n.anchorSum),
+          from: 'anchorSum',
+        },
+        {
+          label: 'Doomsday number',
+          expression: `${n.anchorSum} mod 7`,
+          value: String(n.doomsday),
+          from: 'yearDoomsday',
+        },
+        {
+          label: 'Doomsday',
+          expression: `${n.doomsday} as a weekday`,
+          value: trueWeekdayName(n.doomsday),
+          from: 'doomsdayName',
+        },
       ],
+      summary: `Doomsday ${n.doomsday}, ${trueWeekdayName(n.doomsday)}`,
+    },
+    {
+      id: 'daysOn',
+      title: `From a doomsday to the ${ordinal(day)}`,
+      blurb: 'Your date sits a few days off one of those. Count them.',
+      rows: daysOnRows,
+      summary: `Days on ${n.daysOn}`,
+    },
+    {
+      id: 'weekday',
+      title: 'The weekday',
+      blurb: 'Put the doomsday and the days together.',
+      rows: [
+        {
+          label: 'Doomsday plus days on',
+          expression: `${n.doomsday} + ${n.daysOn}`,
+          value: String(n.weekdaySum),
+          from: 'weekdaySum',
+        },
+        {
+          label: 'Weekday number',
+          expression: `${n.weekdaySum} mod 7`,
+          value: String(n.weekday),
+          from: 'weekdayCode',
+        },
+        {
+          label: 'The day',
+          expression: `${n.weekday} as a weekday`,
+          value: trueWeekdayName(n.weekday),
+          from: 'weekdayName',
+        },
+      ],
+      summary: null,
     },
   ];
 }
@@ -886,7 +816,7 @@ function equationsFor(fullYear: number, n: WalkNumbers): GuidedEquation[] {
 /* ------------------------------------------------------------------ */
 
 /**
- * The whole method for one date, as twelve labelled steps and three equations.
+ * The whole method for one date, as twelve labelled steps inside four goals.
  *
  * Throws for a date outside 1800-2199 or for a day the month does not have,
  * which is `weekdayFor`'s range and the only range the calendar maths is tested
@@ -903,21 +833,8 @@ export function guidedWalk(date: CalendarDate): GuidedWalk {
     weekday,
     weekdayName: trueWeekdayName(weekday),
     dateLabel: formatDate(fullYear, month, day),
-    steps: [
-      reduceStep(n),
-      leapStep(n),
-      sumStep(n),
-      yearCodeStep(n),
-      anchorSumStep(fullYear, n),
-      yearDoomsdayStep(fullYear, n),
-      doomsdayNameStep(fullYear, n),
-      nearestStep(month, day, n),
-      daysOnStep(n),
-      weekdaySumStep(fullYear, n),
-      weekdayCodeStep(n),
-      weekdayNameStep(n),
-    ],
-    equations: equationsFor(fullYear, n),
+    steps: stepsFor(date, n),
+    goals: goalsFor(fullYear, month, day, n),
   };
 }
 
@@ -934,14 +851,6 @@ export function guidedClosingLine(walk: GuidedWalk, now: number): string {
   const dateMs = Date.UTC(walk.date.fullYear, walk.date.month - 1, walk.date.day);
   const verb = dateMs < todayMs ? 'was' : dateMs > todayMs ? 'will be' : 'is';
   return `${walk.dateLabel} ${verb} a ${walk.weekdayName}.`;
-}
-
-/** The four century anchors, in order, for the table on step 5. */
-export function centuryAnchorRows(): { century: number; label: string; anchor: Code }[] {
-  return Object.keys(CENTURY_ANCHORS)
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map((century) => ({ century, label: centuryLabel(century), anchor: CENTURY_ANCHORS[century] }));
 }
 
 /** True when the date is one this walk can take: in range, and a real day. */

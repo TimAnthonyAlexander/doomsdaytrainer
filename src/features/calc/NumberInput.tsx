@@ -16,6 +16,13 @@ interface NumberInputProps {
   disabled?: boolean;
   /** Paints the field after a wrong answer. Cleared by the next prompt. */
   wrong?: boolean;
+  /**
+   * Drops the label above the field, keeping it as the accessible name. For a
+   * caller that has already named the number immediately above — the Concept
+   * walk prints it on the row being answered — a second copy is one more thing
+   * to read past on the way to the thing being answered.
+   */
+  labelHidden?: boolean;
 }
 
 /**
@@ -36,6 +43,7 @@ export function NumberInput({
   onAnswer,
   disabled = false,
   wrong = false,
+  labelHidden = false,
 }: NumberInputProps) {
   const [value, setValue] = useState('');
   const timer = useAnswerTimer(promptKey);
@@ -61,9 +69,11 @@ export function NumberInput({
       onSubmit={submit}
       sx={{ display: 'flex', flexDirection: 'column', gap: `${space[2]}px` }}
     >
-      <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
-        {label}
-      </Typography>
+      {labelHidden ? null : (
+        <Typography variant="body2" sx={{ color: 'var(--text-secondary)' }}>
+          {label}
+        </Typography>
+      )}
       <Box sx={{ display: 'flex', gap: `${space[3]}px`, alignItems: 'stretch' }}>
         <Box
           // Remounted per prompt so the focus lands on the new question without

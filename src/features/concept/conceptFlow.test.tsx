@@ -58,33 +58,45 @@ function mount() {
 async function open(date = EXAMPLE): Promise<void> {
   const input = await screen.findByLabelText('Date');
   fireEvent.change(input, { target: { value: date } });
-  await screen.findByTestId('concept-progress');
-  expect(progress()).toBe('Step 1 of 12');
+  await screen.findByTestId('concept-ledger');
+  expect(stepsDone()).toBe(0);
 }
 
-/** "Step 3 of 12". Read whole, because the numbers are their own elements. */
-function progress(): string {
-  return screen.getByTestId('concept-progress').textContent ?? '';
+/** How far along, off the progress rule. */
+function stepsDone(): number {
+  return Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'));
 }
 
-function stepHeading(): string {
+/** What is being built right now. */
+function goalTitle(): string {
   return screen.getByRole('heading', { level: 2 }).textContent ?? '';
 }
 
-/** The equation strip, which is on screen at every step. */
-function strip(): HTMLElement {
-  return screen.getByTestId('concept-equations');
+/** The sum in the highlighted row: the thing the user is actually answering. */
+function expression(): string {
+  return screen.getByTestId('concept-expression').textContent ?? '';
 }
 
-/**
- * What the strip shows in the slot with this label. Joined with a pipe when a
- * slot appears in two equations, so both copies are asserted at once.
- */
-function slot(label: string): string {
-  return within(strip())
-    .getAllByText(label)
-    .map((element) => (element.parentElement?.textContent ?? '').slice(label.length))
-    .join('|');
+/** The row with this label, whatever state it is in. */
+function row(label: string): HTMLElement {
+  return screen.getByTestId(`row:${label}`);
+}
+
+/** "filled", "active" or "pending", or null when the row is not on screen. */
+function rowState(label: string): string | null {
+  return screen.queryByTestId(`row:${label}`)?.getAttribute('data-state') ?? null;
+}
+
+/** What a settled row is showing, with its label taken off the front. */
+function rowValue(label: string): string {
+  return (row(label).textContent ?? '').slice(label.length);
+}
+
+/** The goals already behind the user, each collapsed to one line. */
+function known(): string[] {
+  const box = screen.queryByTestId('concept-known');
+  if (!box) return [];
+  return [...box.children].map((child) => child.textContent ?? '');
 }
 
 /** The typed answer field, which is not the date picker. */
@@ -111,11 +123,11 @@ async function answer(value: number | string): Promise<void> {
 }
 
 function next(): void {
-  fireEvent.click(screen.getByRole('button', { name: /^(Next step|Finish)$/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^(Next|Finish)$/ }));
 }
 
 function hasNext(): boolean {
-  return screen.queryByRole('button', { name: /^(Next step|Finish)$/ }) !== null;
+  return screen.queryByRole('button', { name: /^(Next|Finish)$/ }) !== null;
 }
 
 /** Walks all twelve steps, answering each correctly. */
@@ -136,24 +148,27 @@ describe('the concept walkthrough', () => {
 
     const titles: string[] = [];
     for (const value of ANSWERS) {
-      titles.push(stepHeading());
+      titles.push(goalTitle());
       await answer(value);
       next();
     }
 
+    // Twelve steps, but four things being built. The screen names the thing,
+    // not the operation: "Take the sevens off" three times over said what the
+    // hand was doing and never what any of it was for.
     expect(titles).toEqual([
-      'Take the 28s off',
-      'Leap days',
-      'Add them',
-      'Take the sevens off',
-      'Add the anchor',
-      'Take the sevens off',
-      'Name it',
-      'The nearest doomsday',
-      'Count on',
-      'Add them',
-      'Take the sevens off',
-      'Name it',
+      'The year code for 87',
+      'The year code for 87',
+      'The year code for 87',
+      'The year code for 87',
+      'The doomsday of 1987',
+      'The doomsday of 1987',
+      'The doomsday of 1987',
+      'From a doomsday to the 20th',
+      'From a doomsday to the 20th',
+      'The weekday',
+      'The weekday',
+      'The weekday',
     ]);
 
     expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
@@ -164,83 +179,118 @@ describe('the concept walkthrough', () => {
     mount();
     await open();
 
-    const questions: string[] = [];
+    const asked: string[] = [];
     for (const value of ANSWERS) {
-      questions.push(screen.getByTestId('concept-question').textContent ?? '');
+      asked.push(expression());
       await answer(value);
       next();
     }
 
-    expect(questions).toEqual([
-      '87 − 84 = ?',
-      '3 ÷ 4 = ?',
-      '3 + 0 = ?',
-      '3 mod 7 = ?',
-      '3 + 3 = ?',
-      '6 mod 7 = ?',
-      'Which weekday is 6?',
-      'Which of those is closest to the 20th without going past it?',
-      '20 − 14 = ?',
-      '6 + 6 = ?',
-      '12 mod 7 = ?',
-      'Which weekday is 5?',
+    expect(asked).toEqual([
+      '87 − 84',
+      '3 ÷ 4',
+      '3 + 0',
+      '3 mod 7',
+      '3 + 3',
+      '6 mod 7',
+      '6 as a weekday',
+      'closest at or under 20',
+      '20 − 14',
+      '6 + 6',
+      '12 mod 7',
+      '5 as a weekday',
     ]);
   });
 
-  it('names the year code and the year doomsday as they are produced', async () => {
+  it('shows one goal at a time and collapses the ones behind it', async () => {
     await seed();
     mount();
     await open();
 
-    for (const value of [3, 0, 3]) {
+    // The first goal's four rows are up from the start, so the shape of what is
+    // coming is visible, but only the live one carries a sum.
+    expect(rowState('Year, 28s off')).toBe('active');
+    expect(rowState('Leap days')).toBe('pending');
+    expect(rowState('Year code')).toBe('pending');
+    // Nothing from the goals after it is on screen at all.
+    expect(rowState('Doomsday number')).toBeNull();
+    expect(rowState('Days on')).toBeNull();
+    expect(known()).toEqual([]);
+
+    await answer(3);
+    next();
+    expect(rowState('Year, 28s off')).toBe('filled');
+    expect(rowValue('Year, 28s off')).toBe('3');
+    expect(rowState('Leap days')).toBe('active');
+
+    for (const value of [0, 3, 3]) {
       await answer(value);
       next();
     }
-    await answer(3);
-    expect(screen.getByText('That is the year code for 87.')).toBeInTheDocument();
 
-    next();
-    await answer(6);
-    next();
-    await answer(6);
-    expect(screen.getByText('Every doomsday in 1987 falls on 6.')).toBeInTheDocument();
+    // The first goal is done, so it is one line now and the second is up.
+    expect(known()).toEqual(['Year code 3']);
+    expect(rowState('Year, 28s off')).toBeNull();
+    expect(goalTitle()).toBe('The doomsday of 1987');
+    expect(rowValue('Anchor for the 1900s')).toBe('3');
+
+    for (const value of [6, 6, 'Sat'] as const) {
+      await answer(value);
+      next();
+    }
+    expect(known()).toEqual(['Year code 3', 'Doomsday 6, Saturday']);
   });
 
-  it('shows the whole computation from the start and fills it in as it goes', async () => {
+  it('never hands over the year code, and never asks for a lookup', async () => {
     await seed();
     mount();
     await open();
 
-    // The date and the anchor are handed over. Everything else stands empty,
-    // and the first slot shows the sum that will fill it.
-    expect(slot('Your date')).toBe('20');
-    expect(slot('Century anchor, 1900s')).toBe('3');
-    expect(slot('Year, 28s off')).toBe('87 − 84');
-    expect(slot('Leap days')).toBe('–');
-    expect(slot('Year code, 87')).toBe('–|–');
-    expect(slot('Days on')).toBe('–|–');
-    expect(slot('Weekday number')).toBe('–');
-
-    await answer(3);
-    next();
-    expect(slot('Year, 28s off')).toBe('3');
-    // The code is still four steps away and is not on the strip yet.
-    expect(slot('Year code, 87')).toBe('–|–');
-
-    await answer(0);
-    next();
-    await answer(3);
-    next();
-    await answer(3);
-    next();
-    expect(slot('Year code, 87')).toBe('3|3');
-
-    for (const value of [6, 6, 'Sat', 14, 6, 12, 5, 'Fri'] as const) {
+    // The anchor and the doomsday dates are stated. Asking which anchor applies
+    // is a comprehension question, and this screen may not contain one.
+    for (const value of [3, 0, 3]) {
+      expect(rowState('Year code')).not.toBe('filled');
       await answer(value);
       next();
     }
-    expect(within(strip()).queryAllByText('–')).toHaveLength(0);
-    expect(slot('Weekday number')).toBe('5');
+    expect(rowState('Year code')).toBe('active');
+    await answer(3);
+    expect(rowValue('Year code')).toContain('3');
+  });
+
+  it('says what mod 7 means, every time it asks for it', async () => {
+    await seed();
+    mount();
+    await open();
+
+    const wanted = 'mod 7 means take 7 away until less than 7 is left.';
+    for (const [index, value] of ANSWERS.entries()) {
+      const sevens = [3, 5, 10].includes(index);
+      expect(screen.queryByText(wanted) !== null, `step ${index + 1}`).toBe(sevens);
+      await answer(value);
+      next();
+    }
+  });
+
+  it('drops the title and the date control once the walk is under way', async () => {
+    await seed();
+    mount();
+    await open();
+
+    expect(screen.getByRole('heading', { name: 'Concept' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Date')).toBeInTheDocument();
+
+    await answer(3);
+    next();
+
+    // Both gone, replaced by one quiet line naming the date.
+    expect(screen.queryByRole('heading', { name: 'Concept' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Date')).not.toBeInTheDocument();
+    expect(screen.getByText('20 March 1987')).toBeInTheDocument();
+
+    // And it comes back on request, without having to leave the screen.
+    fireEvent.click(screen.getByRole('button', { name: 'Change date' }));
+    expect(screen.getByLabelText('Date')).toBeInTheDocument();
   });
 
   it('holds a wrong answer on every kind of control and shows what was wanted', async () => {
@@ -270,7 +320,7 @@ describe('the concept walkthrough', () => {
     }
 
     // The weekday pad.
-    expect(stepHeading()).toBe('Name it');
+    expect(expression()).toBe('6 as a weekday');
     await answer('Sun');
     expect(screen.getByText('6 is Saturday.')).toBeInTheDocument();
     expect(hasNext()).toBe(false);
@@ -278,10 +328,10 @@ describe('the concept walkthrough', () => {
     next();
 
     // The doomsday-date buttons.
-    expect(stepHeading()).toBe('The nearest doomsday');
+    expect(goalTitle()).toBe('From a doomsday to the 20th');
     await answer(7);
     expect(
-      screen.getByText('The 14th is the closest doomsday at or before the 20th.'),
+      screen.getByText('The 14th is the closest one at or before the 20th.'),
     ).toBeInTheDocument();
     expect(hasNext()).toBe(false);
     await answer(14);
@@ -307,11 +357,12 @@ describe('the concept walkthrough', () => {
 
     await answer(3);
     next();
-    expect(stepHeading()).toBe('Leap days');
+    expect(rowState('Leap days')).toBe('active');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Change date' }));
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2001-09-11' } });
-    expect(progress()).toBe('Step 1 of 12');
-    expect(stepHeading()).toBe('Take the 28s off');
+    expect(stepsDone()).toBe(0);
+    expect(goalTitle()).toBe('The year code for 01');
   });
 
   it('keeps an unusable date out of the maths', async () => {
@@ -324,7 +375,7 @@ describe('the concept walkthrough', () => {
     for (const value of ['', '1799-06-05', '1987-02-31']) {
       fireEvent.change(screen.getByLabelText('Date'), { target: { value } });
     }
-    expect(progress()).toBe('Step 1 of 12');
+    expect(stepsDone()).toBe(0);
     expect(screen.getByLabelText('Date')).toHaveValue('1800-01-01');
   });
 });
@@ -336,14 +387,14 @@ describe('the step a date makes trivial', () => {
     // 2012: the year is 12, which is already under 28.
     await open('2012-06-09');
 
-    expect(stepHeading()).toBe('Take the 28s off');
-    expect(screen.getByText(/no 28s come off/)).toBeInTheDocument();
+    expect(expression()).toBe('12 is under 28');
+    expect(screen.getByText(/nothing comes off/)).toBeInTheDocument();
     // Nothing to answer, so there is nothing to answer with.
     expect(field()).toBeUndefined();
     expect(screen.queryByRole('button', { name: '0' })).not.toBeInTheDocument();
 
     next();
-    expect(stepHeading()).toBe('Leap days');
+    expect(rowState('Leap days')).toBe('active');
   });
 
   it('still counts the step, so the walk is twelve either way', async () => {
@@ -351,9 +402,9 @@ describe('the step a date makes trivial', () => {
     mount();
     await open('2012-06-09');
 
-    expect(progress()).toBe('Step 1 of 12');
+    expect(stepsDone()).toBe(0);
     next();
-    expect(progress()).toBe('Step 2 of 12');
+    expect(stepsDone()).toBe(1);
   });
 });
 
@@ -370,17 +421,13 @@ describe('a day below every doomsday date in the month', () => {
       next();
     }
 
-    expect(stepHeading()).toBe('The nearest doomsday');
-    expect(
-      screen.getByText(
-        'The 3rd has no doomsday at or before it. A week either way is the same weekday, so use the 10th.',
-      ),
-    ).toBeInTheDocument();
-    expect(slot('Date, a week on')).toBe('10');
+    expect(goalTitle()).toBe('From a doomsday to the 3rd');
+    expect(rowValue('A week on from it')).toBe('10');
+    expect(screen.getByText(/A week on is the same weekday/)).toBeInTheDocument();
 
     await answer(7);
     next();
-    expect(screen.getByText('10 − 7 = ?')).toBeInTheDocument();
+    expect(expression()).toBe('10 − 7');
 
     for (const value of [3, 9, 2, 'Tue'] as const) {
       await answer(value);
@@ -400,9 +447,7 @@ describe('the index convention', () => {
 
     const steps: string[] = [];
     for (const value of ANSWERS) {
-      steps.push(
-        `${strip().textContent ?? ''}${screen.getByTestId('concept-ask').textContent ?? ''}`,
-      );
+      steps.push(screen.getByTestId('concept-ledger').textContent ?? '');
       await answer(value);
       next();
     }
@@ -429,7 +474,7 @@ describe('the index convention', () => {
       next();
     }
 
-    expect(screen.getByText('Which weekday is 6?')).toBeInTheDocument();
+    expect(expression()).toBe('6 as a weekday');
     const pad = screen.getByRole('button', { name: 'Mon' }).parentElement as HTMLElement;
     expect(
       within(pad)
