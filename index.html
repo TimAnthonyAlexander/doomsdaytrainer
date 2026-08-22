@@ -1,0 +1,75 @@
+<!doctype html>
+<!-- Dark is the default mode, so the attribute is in the markup rather than only
+     in the script below. If the script never runs, the page is still dark. -->
+<html lang="en" data-theme="dark" style="background-color: #17161a">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Doomsday Trainer — the 100 year codes</title>
+    <meta
+      name="description"
+      content="Drill the 100 year codes of the Doomsday method to sub-second recall. Seven buttons, spaced repetition graded on how fast you answer. Runs offline, stores nothing on a server."
+    />
+    <meta name="theme-color" content="#17161A" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Doomsday" />
+
+    <!-- Resolves the stored mode before the stylesheet and the bundle, so a
+         dark-mode load never flashes the light ground. Mirrors
+         src/theme/themeStorage.ts; keep the two in step. -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('doomsday.themePreference');
+          var mode =
+            pref === 'light'
+              ? 'light'
+              : pref === 'system'
+                ? window.matchMedia('(prefers-color-scheme: light)').matches
+                  ? 'light'
+                  : 'dark'
+                : 'dark';
+          var ground = mode === 'dark' ? '#17161A' : '#FAF9F6';
+          document.documentElement.setAttribute('data-theme', mode);
+          document.documentElement.style.backgroundColor = ground;
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', ground);
+        } catch (error) {
+          /* Storage is blocked. The markup default stands. */
+        }
+      })();
+    </script>
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Doomsday Trainer" />
+    <meta
+      property="og:description"
+      content="Drill the 100 year codes to sub-second recall. Seven buttons, spaced repetition graded on how fast you answer."
+    />
+    <meta property="og:image" content="/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- The two faces on screen at first paint. The 500 weights load from the
+         stylesheet when something actually needs them. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/ibm-plex-sans-400.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/ibm-plex-mono-400.woff2"
+      crossorigin
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

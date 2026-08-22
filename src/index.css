@@ -1,0 +1,270 @@
+/* IBM Plex, self-hosted. The app makes no network calls, and a font from a CDN
+   is a network call that also breaks the first offline load. These are the
+   latin-subset woff2 files from the Google Fonts API; IBM Plex is OFL, so
+   shipping them here is fine. `unicode-range` is the range those files actually
+   cover, so anything outside it falls back instead of rendering boxes.
+   Weights 400 and 500 only, per STYLEGUIDE.md §3. Nothing asks for another
+   weight, and a weight that is not loaded gets synthesised into a fake bold.
+   Regenerate with scripts/fetch-fonts.mjs. */
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-sans-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ------------------------------------------------------------------ */
+/* Design tokens                                                       */
+/* ------------------------------------------------------------------ */
+
+/* These literals are the same values as src/theme/tokens.ts, which is the
+   authority. src/theme/tokens.test.ts fails the build if the two drift. They
+   are written out rather than injected at runtime because the first paint has
+   to be correct before any JavaScript has run. */
+
+:root {
+  color-scheme: light;
+
+  /* prettier-ignore */
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --type-prompt: 72px;
+  --type-key: 24px;
+  --type-title: 22px;
+  --type-heading: 17px;
+  --type-body: 15px;
+  --type-label: 13px;
+  --type-caption: 11px;
+  --type-cell: 11px;
+  --type-stat: 28px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --stroke-hairline: 1px solid var(--border);
+  --stroke-strong: 1px solid var(--border-strong);
+  --shadow-keypad: 0 -1px 0 0 var(--border);
+
+  --dur-instant: 0ms;
+  --dur-advance: 120ms;
+  --dur-flash: 160ms;
+  --dur-ui: 180ms;
+  --dur-hold: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  --bg: #faf9f6;
+  --surface-1: #f1efe8;
+  --surface-2: #ffffff;
+  --border: #dedcd3;
+  --border-strong: #c4c2b8;
+  --text-primary: #2c2c2a;
+  --text-secondary: #5f5e5a;
+  --text-muted: #888780;
+  --text-inverse: #ffffff;
+  --brand: #7f77dd;
+  --brand-deep: #534ab7;
+  --brand-light: #afa9ec;
+  --brand-tint: #eeedfe;
+  --brand-on-tint: #3c3489;
+  --grade-fast: #639922;
+  --grade-medium: #ef9f27;
+  --grade-slow: #d85a30;
+  --grade-wrong: #e24b4a;
+  --grade-fast-tint: #eaf3de;
+  --grade-wrong-tint: #fcebeb;
+  --mastery-0: #eae8e0;
+  --mastery-0-ink: #2c2c2a;
+  --mastery-1: #eeedfe;
+  --mastery-1-ink: #2c2c2a;
+  --mastery-2: #cecbf6;
+  --mastery-2-ink: #2c2c2a;
+  --mastery-3: #afa9ec;
+  --mastery-3-ink: #2c2c2a;
+  --mastery-4: #7f77dd;
+  --mastery-4-ink: #ffffff;
+  --mastery-5: #6861ca;
+  --mastery-5-ink: #ffffff;
+  --mastery-6: #534ab7;
+  --mastery-6-ink: #ffffff;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #17161a;
+  --surface-1: #1f1e24;
+  --surface-2: #27262e;
+  --border: #34333c;
+  --border-strong: #46454f;
+  --text-primary: #edebe4;
+  --text-secondary: #a5a29a;
+  --text-muted: #75736d;
+  --text-inverse: #17161a;
+  --brand: #afa9ec;
+  --brand-deep: #7f77dd;
+  --brand-light: #cecbf6;
+  --brand-tint: #26215c;
+  --brand-on-tint: #cecbf6;
+  --grade-fast: #97c459;
+  --grade-medium: #fac775;
+  --grade-slow: #f0997b;
+  --grade-wrong: #f09595;
+  --grade-fast-tint: #173404;
+  --grade-wrong-tint: #501313;
+  --mastery-0: #27262e;
+  --mastery-0-ink: #edebe4;
+  --mastery-1: #26215c;
+  --mastery-1-ink: #edebe4;
+  --mastery-2: #3c3489;
+  --mastery-2-ink: #edebe4;
+  --mastery-3: #534ab7;
+  --mastery-3-ink: #edebe4;
+  --mastery-4: #7f77dd;
+  --mastery-4-ink: #17161a;
+  --mastery-5: #9690e5;
+  --mastery-5-ink: #17161a;
+  --mastery-6: #afa9ec;
+  --mastery-6-ink: #17161a;
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout constants                                                    */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --nav-height: 60px;
+  --bar-height: 52px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  /* index.html paints this inline before the stylesheet arrives; repeating it
+     here keeps the two in step once the stylesheet has loaded. */
+  background-color: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--type-body);
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* The answer pad is tapped fast and repeatedly; a text selection dragged out of
+   a button is never wanted. Inputs opt back in. */
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+svg {
+  display: block;
+}
+
+/* §11. The focus ring is never removed, only moved. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--brand-tint);
+  color: var(--brand-on-tint);
+}
+
+/* §7. Every duration collapses to zero except --dur-hold, which is how long a
+   correct fill stays legible before the prompt advances. That is timing, not
+   motion, so it survives. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-advance: 0ms;
+    --dur-flash: 0ms;
+    --dur-ui: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
