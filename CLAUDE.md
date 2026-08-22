@@ -113,6 +113,34 @@ would name the phone's top bar "Year codes" while the user is on Learn. So
 test at all until the nav was restructured, which is exactly how that kind of
 change ships a dead link.
 
+### The shell is a frame, not a page
+
+`AppShell` is exactly `100dvh` with `overflow: hidden`, and `main` is the only
+scroller in the app. The rail, the phone's title bar, the notice bar and the
+bottom bar are rows of that frame, so all four are subtracted from the scroll
+area by the layout and none of them can move.
+
+It used to be a page: `minHeight: 100dvh`, a `sticky` title bar, a `fixed`
+bottom bar paid for a second time as bottom padding on the content, and
+`AppChrome` rendered above the router entirely. Every one of those is fine on
+its own and the combination broke the moment a notice appeared. A 52px "a
+reminder was due at 19:00" line added its height to a shell that was already a
+full viewport, so the document outgrew the window: a scrollbar came in on
+desktop and shifted the centred column sideways, every screen gained 52px of
+scroll it did not have a second earlier, and on a phone the bar sat outside the
+shell's insets and rendered under the notch. In a frame the same bar takes its
+height out of `main` and nothing else on screen moves.
+
+Two things follow that are easy to undo by accident. The window cannot scroll,
+so nothing restores scroll position on navigation and `AppShell` resets
+`main.scrollTop` itself — without it, arriving on a short screen from a long one
+starts halfway down it. And every row of the frame needs `flexShrink: 0`, or the
+scroller squeezes it instead of itself.
+
+`AppChrome` mounts inside the frame rather than in `App`, which is why
+`startServiceWorker()` is called from `App` directly: registration should not
+wait for onboarding to finish.
+
 ### The domain layer
 
 - `yearCodes.ts` holds the 100 codes as an explicit literal array, shipped
@@ -630,6 +658,9 @@ Tests to know about, because they encode decisions rather than behaviour:
   wrong silently
 - a stored weekday preference that is not a legal value falling back to the
   default instead of reaching the screen
+- the shell holding exactly one scroller, with the notice bar and the bottom bar
+  outside it. jsdom has no layout, so the frame's height cannot be asserted —
+  but the structure that produces it can, and the structure is what regressed
 - the guided walk agreeing with itself across all nine steps, over 750-odd
   dates, rather than only agreeing with `weekdayFor` at the end
 - no step before the fourth naming a number the year code, which is the one way

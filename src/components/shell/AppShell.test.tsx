@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData } from '@/domain/types';
@@ -129,11 +129,11 @@ describe('the shell frame', () => {
 
   it('sends an unfinished onboarding to the welcome screen', async () => {
     const data = defaultAppData(Date.now());
-    await waitFor(async () => {
-      await mount({ ...data, settings: { ...data.settings, onboardingComplete: false } });
-    });
-    await waitFor(() => {
-      expect(document.querySelector('main')).toBeNull();
-    });
+    await mount({ ...data, settings: { ...data.settings, onboardingComplete: false } });
+
+    await screen.findByText('onboarding');
+    // No frame at all until onboarding is done, so nothing there has to account
+    // for a rail or a bottom bar it never sees.
+    expect(document.querySelector('main')).toBeNull();
   });
 });
