@@ -83,6 +83,14 @@ domain layer has no `Math.random` at all, so its ordering is deterministic.
   answer, the worked line and the reason the step exists.
 - `calcStats.ts` aggregates performance per step, so the app can say which step
   is slow rather than only that the user is slow.
+- `rotation.ts` is the varied prompt order: `orderVaried` returns a permutation
+  with no neighbours and no same-decade years adjacent, and `nextUnburied` is
+  the review queue's version of it. Deterministic given a seed, with a small
+  LCG inside for tie-breaking, so the no-`Math.random` rule still holds.
+- `fluency.ts` decides whether an answer is recalled or worked out, entirely
+  beside SM-2. Two correct, unhinted, sub-threshold answers on different days.
+- `diagnostics.ts` measures which route the user is actually taking, by slope
+  rather than by speed.
 - `scope.ts`, `time.ts`, `weekdayLifetime.ts` round it out.
 
 ### Storage
@@ -108,6 +116,7 @@ v1  the 100 year-code items, settings, drills, session days
 v2  month doomsdays, century anchors, weekday attempts and runs
 v3  the weekday lifetime aggregate, built from existing attempts on upgrade
 v4  calculation-trainer attempts and per-step totals
+v5  per-item fluency, rebuilt from each item's stored attempts on upgrade
 ```
 
 Migrations that introduce an aggregate rebuild it from whatever raw history the
@@ -158,6 +167,7 @@ violation, and several were bugs before they were rules.
 6. **A wrong answer never advances.** Not on review, not on trouble, not on
    learn. The way forward is tapping the code the year actually has, so the last
    thing the hand does before the next prompt is the correct pairing.
+   Learn used to break this by restarting the block instead — see invariant 10.
 7. **Every number on screen carries a label saying what it is.** Two numbers
    stacked with nothing naming them cannot teach a pairing, and hints that print
    bare arithmetic teach nothing about where the values came from. This is the
@@ -166,6 +176,20 @@ violation, and several were bugs before they were rules.
    code. Onboarding demonstrates that rather than asserting it.
 9. **No network calls.** Fonts are self-hosted, there is no analytics, no
    accounts, no server. A build with a third-party reference in `dist/` is a bug.
+10. **Nothing may ask the 100 codes in ascending order twice.** Ordered
+    presentation is allowed exactly once per year, while it is being acquired;
+    everything after that is varied. This covers Learn's recall passes, the due
+    queue's tie-break, and any surface added later. The reason is the whole
+    point of `rotation.ts`: ascending practice teaches the run as one sequence,
+    and a sequence can only be entered at its start.
+11. **A hard answer window never scores a tap.** It may reveal a hint and it may
+    count a miss on a surface that writes no scheduling. It may not turn "no
+    answer" into an answer, because a forced guess on seven buttons is wrong
+    85.7% of the time and the wrong answer is what gets reinforced.
+12. **Mastery requires speed, not just survival.** `masteryBucket` reads
+    fluency for the middle of the ramp and the interval only above it. An item
+    the user works out every time cannot report as mastered, however long its
+    interval grows.
 
 ---
 
@@ -177,10 +201,27 @@ hints behind a button and shown unasked after two consecutive failures.
 **Learn** teaches the table. A decade is split at its leap-run boundaries into
 groups, taught one group at a time before the full ten is ever asked for, because
 ten unfamiliar pairs at once is past what working memory holds and a user who
-cannot hold them guesses. A wrong tap restarts the current group, so finishing a
-block means a clean run and "introduced" cannot mean "guessed through it". Blocks
-unlock in order; a finished block can always be redone, and redoing it is not
-charged against the daily new-item cap.
+cannot hold them guesses. Blocks unlock in order; a finished block can always be
+redone, and redoing it is not charged against the daily new-item cap.
+
+Each recall pass runs ascending only until every year in it has been produced
+correctly once, then switches to varied order. That switch point is not a guess:
+Battig, Brown & Nelson (1963) compared constant and varied presentation across
+five experiments and found that moving to varied order **after the first correct
+response to each pair** kept the entire benefit of constant order. It is
+therefore per item, not per block.
+
+The final pass over all ten also mixes in years from other decades, chosen
+weakest-fluency-first, because ten years of one decade practised against each
+other can be recited however they are shuffled. The mix-in count is fixed, so
+the tenth block is no longer than the first; what widens with progress is the
+review queue.
+
+Full interleaving from the start would be worse, not better. Interleaving's wins
+are in category induction, and for arbitrary paired associates it is
+null-to-negative — Hwang (2025) ran blocked, interleaved and blocked-then-
+interleaved over word pairs and pure interleaving came last of the three.
+Blocked-then-varied is the shape the evidence supports, and it is the shape here.
 
 **Calculate** is the other path to the same 100 codes, and does not replace
 memorisation. It teaches `(yy + floor(yy / 4)) mod 7` one step at a time with the
@@ -238,6 +279,16 @@ no reviews. Drawing a zero there would claim the user got instantly fast.
 
 All latency and accuracy figures on Progress are review-sourced only. Mixing
 drill attempts in would make both numbers meaningless, and the labels say so.
+
+Progress also carries the route report, which answers "am I recalling this or
+working it out?" — the one question a latency median cannot. Uittenhove,
+Thevenot & Barrouillet (2016) found response times still tracking operand size
+on problems adults *reported* as retrieved, so speed alone does not identify a
+route. Shape does. The report regresses per-item median latency against the
+year's position inside its decade (counting), against the size of the
+derivation's sum (calculating), and compares answers that followed a neighbour
+against answers that did not. Recall is flat on all three. Nothing there feeds
+the scheduler.
 
 **Settings**, **Onboarding** and **Trouble spots** round it out. Notifications
 are handled honestly: a local-first app with no server cannot do Web Push, the
@@ -297,10 +348,22 @@ Tests to know about, because they encode decisions rather than behaviour:
   ease factor rather than through a flag
 - an aborted drill writing nothing at all
 - the learn groups never spanning a leap boundary
+- the varied rotation never stepping to a neighbour or repeating a decade, over
+  every seed, and not being one fixed order wearing different entry points
+- the review queue refusing to hand back a decade in ascending order
+- a long interval alone never reaching the top of the mastery ramp
+- a fluency run refusing to advance twice in one sitting
+- the answer window expiring without writing an attempt
 - import rejection paths, each with the message the UI will show
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.
+
+One test draws real randomness: `datePool.test.ts` checks that a 31-day month is
+sampled more often than February. Its bound is deliberately loose — the true
+ratio is 1.097 and the bound is 1.02 — because at 60,000 draws the standard
+error is about 0.022, and a tighter bound failed roughly one run in fifty. Widen
+bounds like that rather than adding retries.
 
 **Do not verify by driving a browser unless asked.** The typechecker and the
 suite are the verification, and a browser walkthrough is slow and usually proves
@@ -361,3 +424,50 @@ feedback.
 The lesson for the next person: when a colour changes role, do not rename the
 export. Delete it and let the compiler list every place that has to be thought
 about.
+
+---
+
+## The second trap: the app taught the order, not the pairs
+
+The symptom, reported by the only user: "ask me 66 and I count on my fingers and
+sing the decade to myself." The 100 codes were being learned as one string, so
+they could only be entered at the start of a decade and walked to — the same way
+a literate adult who has sung the alphabet daily for twenty years still cannot
+answer "what is the 18th letter" without reciting from a chunk boundary. Klahr,
+Chase & Lovelace (1983) found 90-95% of adults report exactly that covert
+recitation, from entry points that match the Alphabet Song's phrasing, at
+170-310ms per step.
+
+Nothing looked broken. Every test passed, accuracy was fine, the mastery grid
+was filling in. Four separate mechanisms were causing it and each one read as
+reasonable on its own:
+
+1. `RecallPass` asked ascending and sent a wrong tap back to the **first year of
+   the block**. That is Ebbinghaus's serial anticipation method: the run gets
+   rehearsed from position zero over and over and the interior years are never
+   retrieved cold. It was written to mean "finishing proves a clean run".
+2. `introduceItems` stamped all ten years of a block with the same `dueAt`, and
+   `dueItems` broke ties on ascending `yy`. So the decade came back as 00, 01,
+   02 on its first review, and since the ten then moved through identical
+   intervals, it kept arriving in that order for months.
+3. The **default** hint was `structural`, which says "count up from the start of
+   the block". The app was offering the counting strategy as the strategy.
+   `anchor` is the same shape. Only `arithmetic` can be entered at any year.
+4. `gradeFor` gives a six-second correct answer a grade 3, a grade 3 advances
+   the interval, and `masteryBucket` read the interval. So "I counted and got
+   there" was scored as knowing it, and the item graduated to a 90-day interval
+   while the user was still reciting. **This is the one that mattered most**: the
+   first three built the chain, the fourth meant the app could never notice.
+
+The fixes are invariants 10, 11 and 12, plus `rotation.ts`, `fluency.ts` and
+`diagnostics.ts`. What is worth carrying forward is the shape of the mistake
+rather than the mistake: every one of those four was a local decision that was
+defensible where it sat, and the damage only existed in the combination. The
+grid said mastery and meant survival; the queue said due and meant alphabetical;
+the hint said help and meant procedure.
+
+Two rules follow from that, and they are why `diagnostics.ts` exists at all.
+**Measure the thing you claim, not a proxy for it** — a latency median cannot
+distinguish recall from a fast procedure, and a slope can. And **when a metric
+and a user disagree, the user is the measurement.** The grid was green for
+months. One sentence from the person using it was worth more than all of it.

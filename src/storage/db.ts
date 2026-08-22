@@ -3,6 +3,7 @@ import type { AppData, ItemState, Settings } from '@/domain/types';
 import { createItem } from '@/domain/scheduler';
 import { allYears } from '@/domain/yearCodes';
 import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
+import { buildFluency, emptyFluency } from '@/domain/fluency';
 import { buildWeekdayTotals, repairWeekdayTotals } from '@/domain/weekdayLifetime';
 import {
   buildCalcTotals,
@@ -129,6 +130,39 @@ const MIGRATIONS: Record<number, Migration> = {
       verifyTotals: buildVerifyTotals(verifyAttempts),
     };
   },
+
+  /**
+   * v4 → v5: `ItemState.fluency` on all three item maps.
+   *
+   * Built from each item's own `attemptHistory` rather than started at zero,
+   * which is the same rule every aggregate migration here follows. Someone who
+   * has been reviewing for weeks keeps the fluency their answers already show;
+   * only history trimmed past `MAX_ATTEMPT_HISTORY` before this build existed
+   * is unrecoverable, and that only ever shortens a run that the next two
+   * reviews rebuild.
+   *
+   * Settings are read through `mergeSettings` first, so a document written
+   * before `fastThresholdMs` existed still replays against a real number.
+   */
+  5: (data) => {
+    const settings = mergeSettings(data.settings);
+    const withFluency = (map: Record<string, ItemState> | undefined) => {
+      const out: Record<string, ItemState> = {};
+      for (const [key, item] of Object.entries(map ?? {})) {
+        const attempts = Array.isArray(item?.attemptHistory) ? item.attemptHistory : [];
+        out[key] = { ...item, fluency: buildFluency(attempts, settings) };
+      }
+      return out;
+    };
+    return {
+      ...data,
+      schemaVersion: 5,
+      settings,
+      items: withFluency(data.items),
+      monthItems: withFluency(data.monthItems),
+      centuryItems: withFluency(data.centuryItems),
+    };
+  },
 };
 
 export function migrateAppData(data: AppData): AppData {
@@ -186,6 +220,20 @@ function isItemShaped(value: unknown): value is ItemState {
 }
 
 /**
+ * Enough of a fluency block to fold the next answer into. The counters drive a
+ * grid cell rather than a schedule, so a bad one is cosmetic — but `NaN` in a
+ * counter would never compare its way back to fluent again.
+ */
+function isFluencyShaped(value: unknown): value is ItemState['fluency'] {
+  if (!isRecord(value)) return false;
+  return (
+    Number.isFinite(value.consecutiveFast) &&
+    Number.isFinite(value.consecutiveSlow) &&
+    typeof value.fluent === 'boolean'
+  );
+}
+
+/**
  * One map of items, filled out to exactly `keys`. Anything stored under a key
  * that is not in the set is dropped: the three item sets are fixed content, so
  * a stray entry is corruption rather than data worth keeping. So is an entry
@@ -200,7 +248,16 @@ function fillItems(stored: unknown, keys: readonly number[]): Record<string, Ite
     // Accept a zero-padded key too, in case a file was written by hand.
     const found = source[name] ?? source[name.padStart(2, '0')];
     out[name] = isItemShaped(found)
-      ? { ...found, yy: key, attemptHistory: records(found.attemptHistory) }
+      ? {
+          ...found,
+          yy: key,
+          // Filled rather than rebuilt: a document that reaches here has already
+          // been through the v5 migration, so a missing block means a partial
+          // import rather than an old build. Starting it empty costs two
+          // reviews; replaying a hand-written log could invent a run.
+          fluency: isFluencyShaped(found.fluency) ? found.fluency : emptyFluency(),
+          attemptHistory: records(found.attemptHistory),
+        }
       : createItem(key);
   }
   return out;

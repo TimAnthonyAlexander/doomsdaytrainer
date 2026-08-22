@@ -17,6 +17,8 @@ import {
   learnGroups,
   newItemsIntroducedToday,
   newlyIntroducedCount,
+  MIX_IN_SIZE,
+  mixInYears,
   nextBlock,
   stepAfter,
 } from './blocks';
@@ -301,5 +303,71 @@ describe('learnGroups', () => {
         }
       }
     }
+  });
+});
+
+describe('mixInYears', () => {
+  const FULL = SCOPES[0];
+
+  /** Introduced items, each with the interval and fluency given. */
+  function pool(spec: Record<number, { interval: number; fluent?: boolean }>) {
+    const out: Record<string, ItemState> = {};
+    for (const [yy, state] of Object.entries(spec)) {
+      const key = Number(yy);
+      const base = createItem(key);
+      out[itemKey(key)] = {
+        ...base,
+        introduced: true,
+        repetitions: 3,
+        interval: state.interval,
+        fluency: { ...base.fluency, fluent: state.fluent ?? false },
+      };
+    }
+    return out;
+  }
+
+  it('never returns a year from the block being taught', () => {
+    const block = decadeYears(6);
+    const chosen = mixInYears(block, pool({ 61: { interval: 1 }, 12: { interval: 1 } }), FULL);
+    expect(chosen).toEqual([12]);
+  });
+
+  it('leaves out years that were never introduced', () => {
+    const learned = pool({ 12: { interval: 1 } });
+    const withFresh = { ...learned, [itemKey(30)]: createItem(30) };
+    expect(mixInYears([], withFresh, FULL)).toEqual([12]);
+  });
+
+  it('respects the scope', () => {
+    const modern = SCOPES.find((scope) => scope.id === 'modern');
+    if (!modern) throw new Error('no modern scope');
+    const chosen = mixInYears([], pool({ 12: { interval: 1 }, 88: { interval: 1 } }), modern);
+    expect(chosen).not.toContain(12);
+    expect(chosen).toContain(88);
+  });
+
+  it('takes the weakest first: never fluent before fluent, then shortest interval', () => {
+    const chosen = mixInYears(
+      [],
+      pool({
+        10: { interval: 90, fluent: true },
+        20: { interval: 2, fluent: true },
+        30: { interval: 40 },
+        40: { interval: 1 },
+      }),
+      FULL,
+    );
+    expect(chosen).toEqual([40, 30, 20, 10]);
+  });
+
+  it('is capped, so the last block of the hundred is no longer than the first', () => {
+    const everything = pool(
+      Object.fromEntries(Array.from({ length: 90 }, (_unused, i) => [i, { interval: i + 1 }])),
+    );
+    expect(mixInYears(decadeYears(9), everything, FULL)).toHaveLength(MIX_IN_SIZE);
+  });
+
+  it('returns nothing on the very first block, when there is nothing to mix in', () => {
+    expect(mixInYears(decadeYears(0), items(), FULL)).toEqual([]);
   });
 });

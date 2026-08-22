@@ -31,12 +31,14 @@ export function shouldAutoHint(item: ItemState): boolean {
 }
 
 /**
- * An item counts as an anchor once it is introduced and has reached the
- * 4-9 day bucket. Anchoring off something the user is themselves still
- * learning would hand them two guesses instead of one fact.
+ * An item counts as an anchor once it is fluent. Anchoring off something the
+ * user is themselves still learning would hand them two guesses instead of one
+ * fact, and the old test — a 4-9 day interval — could not tell the difference
+ * between an anchor that arrives and one the user counts their way to. An
+ * anchor that has to be derived is not an anchor.
  */
 export function isAnchorKnown(item: ItemState | undefined): boolean {
-  return item !== undefined && item.introduced && masteryBucket(item) >= 3;
+  return item !== undefined && item.introduced && masteryBucket(item) >= 4;
 }
 
 /** The block this year sits in, and where that block starts. */

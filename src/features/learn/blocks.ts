@@ -160,6 +160,43 @@ export function stepAfter(yy: YearKey): number {
   return (codeFor(yy + 1) - codeFor(yy) + 7) % 7;
 }
 
+/** How many already-known years the final pass mixes in to space the block. */
+export const MIX_IN_SIZE = 10;
+
+/**
+ * Years from outside this block to interleave through its final pass.
+ *
+ * A block practised only against itself is ten years of one decade, and ten
+ * years of one decade can be recited. Mixing in years the user already has
+ * breaks that, and it costs nothing to find: the weakest introduced years are
+ * exactly the ones worth putting back in front of someone anyway.
+ *
+ * Deliberately a fixed count rather than "everything learned so far", so the
+ * last block of the hundred is no longer than the first. What widens with
+ * progress is the review queue, which is where the real mixing happens.
+ */
+export function mixInYears(
+  exclude: readonly YearKey[],
+  items: Record<string, ItemState>,
+  scope: Scope,
+  limit = MIX_IN_SIZE,
+): YearKey[] {
+  const excluded = new Set(exclude);
+  return Object.values(items)
+    .filter(
+      (item) => item.introduced && !excluded.has(item.yy) && inScope(item.yy, scope),
+    )
+    .sort((a, b) => {
+      // Weakest first: never fluent before fluent, then by how long the
+      // scheduler is willing to leave it alone.
+      const fluency = Number(a.fluency.fluent) - Number(b.fluency.fluent);
+      if (fluency !== 0) return fluency;
+      return a.interval === b.interval ? a.yy - b.yy : a.interval - b.interval;
+    })
+    .slice(0, Math.max(0, limit))
+    .map((item) => item.yy);
+}
+
 export interface DailyAllowance {
   /** settings.newItemsPerDay */
   cap: number;

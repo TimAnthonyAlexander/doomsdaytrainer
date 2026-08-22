@@ -8,7 +8,7 @@ import { codeFor, formatYear } from '@/domain/yearCodes';
 import { useAppState } from '@/state/useAppState';
 import { SessionHeader } from './SessionHeader';
 import { decadeLabel, decadeYears } from './blocks';
-import { answerRecall, currentYear, startRecall } from './recall';
+import { answerRecall, currentYear, progress, startRecall } from './recall';
 
 const OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
   value,
@@ -19,6 +19,15 @@ interface RecallPassProps {
   decade: number;
   /** Which years to ask for. Defaults to the whole decade. */
   years?: YearKey[];
+  /** Already-known years mixed in to space the block's years apart. */
+  mixIn?: YearKey[];
+  /** Varies the rotation between runs of the same block. */
+  seed?: number;
+  /**
+   * These years have already been produced correctly in an earlier pass, so
+   * their ordered ask is spent and this pass opens mixed.
+   */
+  alreadyProduced?: boolean;
   /** What the header calls this step. */
   stepLabel?: string;
   onDone: (wrongTaps: number) => void;
@@ -26,15 +35,28 @@ interface RecallPassProps {
 }
 
 /**
- * Pass 2. Same ten years, codes hidden, unlimited retries and no grade. Attempts
- * are recorded with source 'learn', which appends history and leaves scheduling
- * alone: nothing here is a review, so nothing here should move an interval.
+ * The recall pass: ascending until each year has been right once, varied after
+ * that. See `recall.ts` for why the switch happens where it does.
+ *
+ * Attempts are recorded with source 'learn', which appends history and leaves
+ * scheduling alone: nothing here is a review, so nothing here should move an
+ * interval. Learn attempts do not feed fluency either — the code was on screen
+ * a moment ago.
  */
-export function RecallPass({ decade, years: only, stepLabel, onDone, onExit }: RecallPassProps) {
+export function RecallPass({
+  decade,
+  years: only,
+  mixIn,
+  seed = 0,
+  alreadyProduced = false,
+  stepLabel,
+  onDone,
+  onExit,
+}: RecallPassProps) {
   const { settings, recordDrillAttempt } = useAppState();
-  const askedRef = useRef(only ?? decadeYears(decade));
-  const asked = askedRef.current;
-  const [state, setState] = useState(() => startRecall(asked));
+  const [state, setState] = useState(() =>
+    startRecall(only ?? decadeYears(decade), seed, mixIn, alreadyProduced),
+  );
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null);
   const timer = useRef<number | null>(null);
   const onDoneRef = useRef(onDone);
@@ -48,6 +70,7 @@ export function RecallPass({ decade, years: only, stepLabel, onDone, onExit }: R
   );
 
   const yy = currentYear(state);
+  const { position, total } = progress(state);
 
   const handleAnswer = (value: number, latencyMs: number) => {
     if (feedback !== null || yy === null) return;
@@ -89,14 +112,16 @@ export function RecallPass({ decade, years: only, stepLabel, onDone, onExit }: R
     <>
       <SessionHeader
         label={decadeLabel(decade)}
-        pass={stepLabel ?? 'All ten · pass 2 of 2'}
-        position={Math.min(state.index + 1, asked.length)}
-        total={asked.length}
+        pass={stepLabel ?? (state.phase === 'ordered' ? 'In order' : 'Mixed up')}
+        position={position}
+        total={total}
         onExit={onExit}
       />
 
       <Typography variant="body2" color="text.secondary">
-        {`The year is shown. Tap its code. One wrong tap starts these ${asked.length} again, so finishing means ${asked.length} right in a row.`}
+        {state.phase === 'ordered'
+          ? 'The year is shown. Tap its code. In order this time, once each.'
+          : 'Same years, mixed up now. Each one twice in a row without a miss.'}
       </Typography>
 
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -129,7 +154,7 @@ export function RecallPass({ decade, years: only, stepLabel, onDone, onExit }: R
               <Numeral color="inherit">{codeFor(state.lastWrongYear)}</Numeral>
               {', not '}
               <Numeral color="inherit">{state.lastWrong}</Numeral>
-              {'. Back to the start of the block.'}
+              {'. Tap the right one to go on.'}
             </Typography>
           ) : null}
         </Box>
@@ -140,7 +165,7 @@ export function RecallPass({ decade, years: only, stepLabel, onDone, onExit }: R
         onAnswer={handleAnswer}
         // A wrong tap keeps the same year on screen, so the key has to move on
         // the retry too or the pad would refuse the second answer.
-        promptKey={`${state.index}-${state.wrongTaps}`}
+        promptKey={`${state.phase}-${yy ?? 'none'}-${state.wrongTaps}-${position}`}
         feedback={feedback}
         disabled={feedback !== null}
         keyboard={settings.keyboardInput}

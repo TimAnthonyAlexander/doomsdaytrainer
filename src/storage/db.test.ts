@@ -297,11 +297,73 @@ describe('migrateAppData', () => {
   it('gives a v1, v2 and v3 document the calculation trainer, empty', () => {
     for (const doc of [v1Document(), v2Document([]), v3Document()]) {
       const migrated = migrateAppData(doc);
-      expect(migrated.schemaVersion).toBe(4);
+      expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
       expect(migrated.calcAttempts).toEqual([]);
       expect(migrated.calcTotals).toEqual(emptyCalcTotals());
       expect(migrated.verifyAttempts).toEqual([]);
       expect(migrated.verifyTotals).toEqual(emptyVerifyTotals());
+    }
+  });
+
+  it('builds fluency from a v4 document’s existing review answers, not from zero', () => {
+    // Same rule as every other aggregate migration here: someone who has been
+    // reviewing for weeks arrives with the fluency their answers already show.
+    const day = 24 * 60 * 60 * 1000;
+    const fast = (timestamp: number) => ({
+      timestamp,
+      correct: true,
+      latencyMs: 700,
+      answered: 0,
+      hintUsed: false,
+      source: 'review' as const,
+    });
+
+    const base = defaultAppData(1000);
+    const doc = {
+      ...base,
+      schemaVersion: 4,
+      items: {
+        ...base.items,
+        [itemKey(73)]: {
+          ...base.items[itemKey(73)],
+          introduced: true,
+          repetitions: 2,
+          attemptHistory: [fast(day * 100), fast(day * 101)],
+        },
+        [itemKey(41)]: {
+          ...base.items[itemKey(41)],
+          introduced: true,
+          repetitions: 2,
+          // Correct every time, but never inside the fast threshold.
+          attemptHistory: [
+            { ...fast(day * 100), latencyMs: 6000 },
+            { ...fast(day * 101), latencyMs: 6000 },
+          ],
+        },
+      },
+    } as unknown as AppData;
+
+    const migrated = migrateAppData(doc);
+    expect(migrated.items[itemKey(73)].fluency.fluent).toBe(true);
+    expect(migrated.items[itemKey(73)].fluency.consecutiveFast).toBe(2);
+    expect(migrated.items[itemKey(41)].fluency.fluent).toBe(false);
+    // And nothing about the schedule moved.
+    expect(migrated.items[itemKey(73)].repetitions).toBe(2);
+    expect(migrated.items[itemKey(41)].attemptHistory).toHaveLength(2);
+  });
+
+  it('gives every item map a fluency block, months and centuries included', () => {
+    const migrated = migrateAppData({ ...defaultAppData(1000), schemaVersion: 4 } as AppData);
+    for (const map of [migrated.items, migrated.monthItems, migrated.centuryItems]) {
+      for (const item of Object.values(map)) {
+        expect(item.fluency).toEqual({
+          consecutiveFast: 0,
+          consecutiveSlow: 0,
+          lastFastDay: null,
+          fluent: false,
+          fluentAt: null,
+        });
+      }
     }
   });
 

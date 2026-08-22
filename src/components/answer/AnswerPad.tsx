@@ -28,6 +28,19 @@ export interface AnswerPadProps {
   keyboard?: boolean;
   /** Keys that select option i. Default ['0'..'6']. */
   keys?: string[];
+  /**
+   * Optional answer window, in millis, measured from the same paint the latency
+   * clock starts at. Null or undefined means no window, which is the default.
+   *
+   * The pad never scores an expiry. It calls `onExpire` and stops accepting
+   * taps for this prompt; what running out means is the caller's decision,
+   * because it differs by surface. A window that turned into a tap would be
+   * recording a forced guess, and a forced guess on seven buttons is wrong
+   * 85.7% of the time — Siegler's learning rule strengthens whichever answer
+   * was produced, so that guess would make the item harder next time.
+   */
+  windowMs?: number | null;
+  onExpire?: () => void;
 }
 
 const DEFAULT_KEYS = ['0', '1', '2', '3', '4', '5', '6'];
@@ -119,19 +132,46 @@ export function AnswerPad({
   disabled = false,
   keyboard = true,
   keys = DEFAULT_KEYS,
+  windowMs = null,
+  onExpire,
 }: AnswerPadProps) {
   if (import.meta.env.DEV && options.length !== 7) {
     throw new Error(`AnswerPad needs exactly 7 options, got ${options.length}.`);
   }
 
   const [pressed, setPressed] = useState<number | null>(null);
+  const [expired, setExpired] = useState(false);
   const answered = useRef(false);
   const timer = useAnswerTimer(promptKey);
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
 
   useLayoutEffect(() => {
     answered.current = false;
     setPressed(null);
+    setExpired(false);
   }, [promptKey]);
+
+  // The window runs from the same paint the latency clock starts at, so it
+  // measures the time the user actually had the prompt in front of them.
+  useEffect(() => {
+    if (windowMs === null || windowMs <= 0 || disabled || feedback) return;
+    let id: ReturnType<typeof setTimeout> | null = null;
+    const poll = window.setInterval(() => {
+      if (!timer.running()) return;
+      window.clearInterval(poll);
+      id = setTimeout(() => {
+        if (answered.current) return;
+        answered.current = true;
+        setExpired(true);
+        onExpireRef.current?.();
+      }, windowMs);
+    }, 16);
+    return () => {
+      window.clearInterval(poll);
+      if (id !== null) clearTimeout(id);
+    };
+  }, [promptKey, windowMs, disabled, feedback, timer]);
 
   const select = useCallback(
     (value: number) => {
@@ -174,7 +214,9 @@ export function AnswerPad({
     ? feedback.chosen === feedback.correct
       ? 'Correct.'
       : `Incorrect. The answer is ${options.find((o) => o.value === feedback.correct)?.label ?? feedback.correct}.`
-    : '';
+    : expired
+      ? 'Time.'
+      : '';
 
   return (
     <Box>

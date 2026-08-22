@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { emptyFluency } from '@/domain/fluency';
 import { createItem, introduce } from '@/domain/scheduler';
 import { masteryBuckets, palette } from '@/theme/palette';
 import { colorTokens, masteryRamp, type ThemeMode } from '@/theme/tokens';
@@ -61,16 +62,37 @@ describe('itemColor', () => {
     expect(itemColor(createItem(42))).toBe(palette.mastery[0]);
   });
 
-  it('gives a mature item the last step', () => {
-    const item = { ...introduce(createItem(42), NOW), interval: 120 };
+  it('gives a mature, fluent item the last step', () => {
+    const item = {
+      ...introduce(createItem(42), NOW),
+      interval: 120,
+      repetitions: 8,
+      fluency: { ...emptyFluency(), consecutiveFast: 2, fluent: true, fluentAt: NOW },
+    };
     expect(itemColor(item)).toBe(palette.mastery[6]);
   });
 
-  it('walks up the ramp as the interval grows', () => {
-    const base = introduce(createItem(42), NOW);
-    const intervals = [0, 1, 5, 20, 60, 200];
-    const colors = intervals.map((interval) => itemColor({ ...base, interval }));
-    expect(colors).toEqual([
+  it('holds a long-interval item at the slow step until it is answered fast', () => {
+    // The correction this ramp exists for: the interval alone used to carry an
+    // item all the way to the top, so a year worked out from scratch every time
+    // looked identical to one that simply arrives.
+    const worked = { ...introduce(createItem(42), NOW), interval: 200, repetitions: 8 };
+    expect(itemColor(worked)).toBe(palette.mastery[2]);
+  });
+
+  it('walks up the ramp as speed and then retention arrive', () => {
+    const base = { ...introduce(createItem(42), NOW), repetitions: 4 };
+    const once = { ...emptyFluency(), consecutiveFast: 1 };
+    const twice = { ...emptyFluency(), consecutiveFast: 2, fluent: true, fluentAt: NOW };
+    const steps = [
+      { ...base, repetitions: 0 },
+      { ...base, interval: 20 },
+      { ...base, interval: 20, fluency: once },
+      { ...base, interval: 5, fluency: twice },
+      { ...base, interval: 60, fluency: twice },
+      { ...base, interval: 200, fluency: twice },
+    ];
+    expect(steps.map(itemColor)).toEqual([
       palette.mastery[1],
       palette.mastery[2],
       palette.mastery[3],

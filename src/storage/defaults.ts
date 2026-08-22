@@ -20,8 +20,13 @@ import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
  * `calcTotals`, plus `verifyAttempts` and `verifyTotals` for the recall
  * against calculation comparison. No new item map — the 28 base years are
  * year codes 00-27 and already live in `items`.
+ *
+ * v5 added `ItemState.fluency`: whether the answer arrives or gets worked out,
+ * held beside the SM-2 fields and read by the mastery grid in place of the
+ * interval. Rebuilt from each item's stored attempts on upgrade, so nobody
+ * loses the fluency they had already earned.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const DEFAULT_SETTINGS: Settings = {
   indexConvention: 'sunday',
@@ -30,7 +35,13 @@ export const DEFAULT_SETTINGS: Settings = {
   newItemsPerDay: 20,
   fastThresholdMs: 2000,
   mediumThresholdMs: 5000,
-  hintType: 'structural',
+  // Was 'structural', which told the user to find the block and count up from
+  // its first year. That is the counting strategy, offered as the strategy, and
+  // it was the default. The arithmetic hint is the only one of the three that
+  // can be entered at any year, so it is the only one that does not rehearse a
+  // walk. See src/features/review/hints.ts.
+  hintType: 'arithmetic',
+  answerWindowMs: null,
   autoAdvanceMs: 250,
   keyboardInput: true,
   reminderEnabled: false,

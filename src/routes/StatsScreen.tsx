@@ -14,6 +14,7 @@ import { DecadeLatency } from '@/features/stats/DecadeLatency';
 import { ItemDetail } from '@/features/stats/ItemDetail';
 import { LatencyChart } from '@/features/stats/LatencyChart';
 import { MasteryGrid } from '@/features/stats/MasteryGrid';
+import { RouteReport } from '@/features/stats/RouteReport';
 import { troubleItems } from '@/features/trouble/troublePool';
 import {
   accuracyOverLast,
@@ -110,6 +111,13 @@ export function StatsScreen() {
           value={overall === null ? '—' : formatMs(overall)}
         />
         <DecadeLatency rows={decades} />
+      </Section>
+
+      <Section
+        title="Recall or working it out"
+        note="Speed alone cannot tell these apart — a well-practised procedure can beat recall on the clock. What separates them is whether the time tracks the work, so each figure below is a slope over your own review answers."
+      >
+        <RouteReport items={itemList} />
       </Section>
 
       <Box

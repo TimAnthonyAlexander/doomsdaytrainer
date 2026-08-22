@@ -48,6 +48,23 @@ export type MonthKey = number;
 /** Key of a century-anchor item: 18..21, 18 = the 1800s. Stored in `ItemState.yy`. */
 export type CenturyKey = number;
 
+/**
+ * Whether the answer is being recalled or worked out. Held beside the SM-2
+ * fields and never read by them: see src/domain/fluency.ts for what earns it
+ * and why the scheduler deliberately ignores it.
+ */
+export interface Fluency {
+  /** Qualifying answers in a row, each on a different day. */
+  consecutiveFast: number;
+  /** Correct answers in a row that were too slow or used a hint. */
+  consecutiveSlow: number;
+  /** Day key of the most recent qualifying answer. Null when there is none. */
+  lastFastDay: string | null;
+  fluent: boolean;
+  /** Epoch millis of the first time this item became fluent, or null. */
+  fluentAt: number | null;
+}
+
 export interface ItemState {
   /**
    * Which item this is. A year code stores 00-99 here; the month and century
@@ -69,6 +86,11 @@ export interface ItemState {
   consecutiveFailures: number;
   /** Set when lapses crosses LEECH_THRESHOLD. */
   leech: boolean;
+  /**
+   * Recall speed, kept separate from scheduling. The interval says how long the
+   * answer survives; this says whether it arrives without being worked out.
+   */
+  fluency: Fluency;
   attemptHistory: Attempt[];
 }
 
@@ -97,6 +119,23 @@ export interface Settings {
   fastThresholdMs: number;
   mediumThresholdMs: number;
   hintType: HintType;
+  /**
+   * Optional answer window, in millis. Null means off, which is the default.
+   *
+   * A deadline reliably moves someone off a procedure and onto retrieval for
+   * items they already know (Campbell & Austin 2002), and there is no evidence
+   * it helps acquire a new pair. There is evidence it hurts: Seabrooke et al.
+   * (2019) found guessing before feedback improves memory for the items and
+   * *impairs* cued recall of the link, and Siegler's learning rule strengthens
+   * whichever answer was produced, right or wrong. On a seven-button pad a
+   * forced guess is wrong 85.7% of the time.
+   *
+   * So the window never scores a tap on a surface that schedules. In Review it
+   * expires into the hint, which caps the grade at 3 the same way asking for
+   * one does. In Drills, which write no scheduling state at all, it counts as a
+   * miss and moves on.
+   */
+  answerWindowMs: number | null;
   /** Millis, 0..1000. */
   autoAdvanceMs: number;
   keyboardInput: boolean;

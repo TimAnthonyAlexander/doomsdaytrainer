@@ -75,6 +75,8 @@ export interface DrillRun {
   /** Set only when the finished run could not be written to storage. */
   saveError: string | null;
   answer: (value: number, latencyMs: number) => void;
+  /** The answer window ran out. Recorded as a miss; drills schedule nothing. */
+  expire: (latencyMs: number) => void;
   abort: () => void;
 }
 
@@ -224,13 +226,22 @@ export function useDrillRun({
     return () => clearTimeout(id);
   }, [phase, plan.limitSeconds]);
 
-  const answer = useCallback(
-    (value: number, latencyMs: number) => {
+  /**
+   * One prompt resolved, by a tap or by the answer window running out.
+   *
+   * `value` is null when the window ran out. That is a miss here and nothing
+   * more delicate, because a drill writes no scheduling state: the buffer is
+   * flushed as history when the run completes and `applyReview` refuses drill
+   * sources outright. The same expiry in Review would be scoring a forced
+   * guess, which is why Review handles it differently.
+   */
+  const record = useCallback(
+    (value: number | null, latencyMs: number) => {
       if (phaseRef.current !== 'running') return;
       const current = yyRef.current;
       if (current === null) return;
 
-      const correct = value === codeFor(current);
+      const correct = value !== null && value === codeFor(current);
       const latency = Math.round(Math.max(0, latencyMs));
 
       bufferRef.current.push({
@@ -239,7 +250,7 @@ export function useDrillRun({
           timestamp: Date.now(),
           correct,
           latencyMs: latency,
-          answered: value as Code,
+          answered: value === null ? null : (value as Code),
           hintUsed: false,
           source: plan.mode,
         },
@@ -273,6 +284,17 @@ export function useDrillRun({
     [plan, rng],
   );
 
+  const answer = useCallback(
+    (value: number, latencyMs: number) => record(value, latencyMs),
+    [record],
+  );
+
+  /** The answer window ran out. A drill counts that as a miss and moves on. */
+  const expire = useCallback(
+    (latencyMs: number) => record(null, latencyMs),
+    [record],
+  );
+
   const abort = useCallback(() => {
     if (phaseRef.current === 'finished') return;
     phaseRef.current = 'finished';
@@ -296,6 +318,7 @@ export function useDrillRun({
     outcome,
     saveError,
     answer,
+    expire,
     abort,
   };
 }

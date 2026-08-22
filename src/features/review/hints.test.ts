@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemState } from '@/domain/types';
+import { emptyFluency } from '@/domain/fluency';
 import { createItem } from '@/domain/scheduler';
 import { codeFor } from '@/domain/yearCodes';
 import {
@@ -13,6 +14,15 @@ import {
 
 function item(overrides: Partial<ItemState> = {}): ItemState {
   return { ...createItem(0), ...overrides };
+}
+
+/** An item that has earned fluency, holding at `interval` days. */
+function fluent(interval: number): Partial<ItemState> {
+  return {
+    repetitions: 3,
+    interval,
+    fluency: { ...emptyFluency(), consecutiveFast: 2, fluent: true, fluentAt: 1 },
+  };
 }
 
 describe('structuralHint', () => {
@@ -95,13 +105,25 @@ describe('anchorHint', () => {
 });
 
 describe('isAnchorKnown', () => {
-  it('needs an introduced item at the 4-day bucket or better', () => {
+  // Was "an interval of 4 days or more". A long interval only says the answer
+  // survives, not that it arrives, so a year the user counts their way to could
+  // become the anchor another year was counted from.
+  it('needs an introduced, fluent item', () => {
     expect(isAnchorKnown(undefined)).toBe(false);
-    expect(isAnchorKnown(item({ introduced: false, interval: 40 }))).toBe(false);
-    expect(isAnchorKnown(item({ introduced: true, interval: 0 }))).toBe(false);
-    expect(isAnchorKnown(item({ introduced: true, interval: 3 }))).toBe(false);
-    expect(isAnchorKnown(item({ introduced: true, interval: 4 }))).toBe(true);
-    expect(isAnchorKnown(item({ introduced: true, interval: 90 }))).toBe(true);
+    expect(isAnchorKnown(item({ introduced: false, ...fluent(40) }))).toBe(false);
+    expect(isAnchorKnown(item({ introduced: true, repetitions: 3, interval: 40 }))).toBe(false);
+    expect(isAnchorKnown(item({ introduced: true, ...fluent(1) }))).toBe(true);
+    expect(isAnchorKnown(item({ introduced: true, ...fluent(90) }))).toBe(true);
+  });
+
+  it('refuses an item that is only fast once', () => {
+    const once = item({
+      introduced: true,
+      repetitions: 3,
+      interval: 40,
+      fluency: { ...emptyFluency(), consecutiveFast: 1 },
+    });
+    expect(isAnchorKnown(once)).toBe(false);
   });
 });
 
@@ -116,7 +138,7 @@ describe('shouldAutoHint', () => {
 
 describe('hintFor', () => {
   const lookup = (yy: number) =>
-    yy === 72 ? item({ yy: 72, introduced: true, interval: 30 }) : undefined;
+    yy === 72 ? item({ yy: 72, introduced: true, ...fluent(30) }) : undefined;
 
   it('dispatches on the user preference', () => {
     expect(hintFor(73, 'structural', lookup).type).toBe('structural');

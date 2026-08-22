@@ -7,6 +7,8 @@ import type {
   Settings,
   YearKey,
 } from './types';
+import { applyFluency, emptyFluency } from './fluency';
+import { nextUnburied, orderVaried } from './rotation';
 import { inScope } from './scope';
 import { addDays } from './time';
 
@@ -29,6 +31,7 @@ export function createItem(yy: YearKey): ItemState {
     introducedAt: null,
     consecutiveFailures: 0,
     leech: false,
+    fluency: emptyFluency(),
     attemptHistory: [],
   };
 }
@@ -74,6 +77,9 @@ export function applyReview(
   const grade = gradeFor(attempt.correct, attempt.latencyMs, attempt.hintUsed, settings);
   const easeFactor = nextEase(item.easeFactor, grade);
   const attemptHistory = [...item.attemptHistory, attempt];
+  // Scheduling does not read this and this does not read scheduling. A slow
+  // correct answer still earns its interval; it just stops being called mastery.
+  const fluency = applyFluency(item.fluency, attempt, settings);
 
   if (grade === 1) {
     const lapses = item.lapses + 1;
@@ -89,6 +95,7 @@ export function applyReview(
         lapses,
         consecutiveFailures: item.consecutiveFailures + 1,
         leech: item.leech || lapses >= LEECH_THRESHOLD,
+        fluency,
         attemptHistory,
       },
     };
@@ -110,6 +117,7 @@ export function applyReview(
       dueAt: addDays(now, interval),
       repetitions,
       consecutiveFailures: 0,
+      fluency,
       attemptHistory,
     },
   };
@@ -130,22 +138,66 @@ export function isDue(item: ItemState, now: number): boolean {
   return item.introduced && item.dueAt <= now;
 }
 
-/** Due, in scope, oldest first. Ordering is deterministic: dueAt, then yy. */
+/**
+ * Due, in scope, oldest first.
+ *
+ * The tie-break used to be ascending `yy`, and that one line was doing real
+ * damage. A learn block stamps its ten years with the same `dueAt`, so the
+ * decade came back as 00, 01, 02… on its first review, and because the ten then
+ * moved through identical intervals it kept arriving in that order for months.
+ * The queue was rehearsing the sequence the block had just taught.
+ *
+ * Ties now break on the varied rotation instead. `dueAt` still comes first, so
+ * nothing overdue is delayed; only the order within one due moment changes.
+ * Ordering stays deterministic — the seed is derived from the day, so a queue
+ * re-read during a session does not reshuffle under the user.
+ */
 export function dueItems(items: ItemState[], scope: Scope, now: number): ItemState[] {
-  return items
-    .filter((item) => item.introduced && inScope(item.yy, scope) && item.dueAt <= now)
-    .sort((a, b) => (a.dueAt === b.dueAt ? a.yy - b.yy : a.dueAt - b.dueAt));
+  const due = items.filter(
+    (item) => item.introduced && inScope(item.yy, scope) && item.dueAt <= now,
+  );
+  const rank = new Map<YearKey, number>();
+  orderVaried(
+    due.map((item) => item.yy),
+    Math.floor(now / 86_400_000),
+  ).forEach((yy, index) => rank.set(yy, index));
+
+  return due.sort((a, b) =>
+    a.dueAt === b.dueAt ? (rank.get(a.yy) ?? 0) - (rank.get(b.yy) ?? 0) : a.dueAt - b.dueAt,
+  );
 }
 
-/** 0..6, matching the mastery ramp in src/theme/palette.ts. */
+/**
+ * The next due item, skipping years made easy by what was just asked.
+ *
+ * `recent` is the years already answered this session, oldest first.
+ */
+export function nextDueItem(queue: ItemState[], recent: readonly YearKey[]): ItemState | null {
+  const yy = nextUnburied(
+    queue.map((item) => item.yy),
+    recent,
+  );
+  return yy === null ? null : (queue.find((item) => item.yy === yy) ?? null);
+}
+
+/**
+ * 0..6, matching the mastery ramp in src/theme/palette.ts.
+ *
+ * This used to be the interval and nothing else, which meant an item the user
+ * counted their way to every single time still climbed to the top of the ramp:
+ * a six-second correct answer grades 3, a grade 3 advances the interval, and
+ * the grid read the interval. The ramp now needs both — speed to get past the
+ * middle, retention to get to the top — because either one alone overstates.
+ *
+ * Buckets 4 and up all require fluency, so the grid drops for anything held
+ * only by a long interval. That drop is the correction, not a regression.
+ */
 export function masteryBucket(item: ItemState): number {
   if (!item.introduced) return 0;
-  const d = item.interval;
-  if (d <= 0) return 1;
-  if (d < 4) return 2;
-  if (d < 10) return 3;
-  if (d < 30) return 4;
-  if (d < 90) return 5;
+  if (item.repetitions === 0) return 1;
+  if (!item.fluency.fluent) return item.fluency.consecutiveFast > 0 ? 3 : 2;
+  if (item.interval < 10) return 4;
+  if (item.interval < 90) return 5;
   return 6;
 }
 

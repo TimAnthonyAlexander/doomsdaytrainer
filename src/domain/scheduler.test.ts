@@ -11,6 +11,7 @@ import {
   isLeech,
   masteryBucket,
 } from './scheduler';
+import { emptyFluency } from './fluency';
 import { SCOPES, resolveScope } from './scope';
 import { addDays } from './time';
 
@@ -22,6 +23,7 @@ const settings: Settings = {
   fastThresholdMs: 2000,
   mediumThresholdMs: 5000,
   hintType: 'structural',
+  answerWindowMs: null,
   autoAdvanceMs: 250,
   keyboardInput: false,
   reminderEnabled: false,
@@ -63,6 +65,13 @@ describe('createItem', () => {
       introducedAt: null,
       consecutiveFailures: 0,
       leech: false,
+      fluency: {
+        consecutiveFast: 0,
+        consecutiveSlow: 0,
+        lastFastDay: null,
+        fluent: false,
+        fluentAt: null,
+      },
       attemptHistory: [],
     });
   });
@@ -345,14 +354,18 @@ describe('dueItems', () => {
     expect(dueItems(items, scope, NOW).map((i) => i.yy)).toEqual([10]);
   });
 
-  it('sorts by dueAt then by year', () => {
+  it('sorts by dueAt first, whatever the rotation wants', () => {
     const items = [
       build(9, { dueAt: NOW - 1000 }),
       build(4, { dueAt: NOW - 2000 }),
       build(2, { dueAt: NOW - 1000 }),
       build(7, { dueAt: NOW - 2000 }),
     ];
-    expect(dueItems(items, FULL, NOW).map((i) => i.yy)).toEqual([4, 7, 2, 9]);
+    const order = dueItems(items, FULL, NOW).map((i) => i.yy);
+    // The older pair comes first as a pair; the tie inside each pair is the
+    // rotation's to break, and no longer ascending year.
+    expect([order[0], order[1]].sort((a, b) => a - b)).toEqual([4, 7]);
+    expect([order[2], order[3]].sort((a, b) => a - b)).toEqual([2, 9]);
   });
 
   it('is deterministic regardless of input order', () => {
@@ -363,8 +376,36 @@ describe('dueItems', () => {
     ];
     const forwards = dueItems(items, FULL, NOW).map((i) => i.yy);
     const backwards = dueItems([...items].reverse(), FULL, NOW).map((i) => i.yy);
-    expect(forwards).toEqual([77, 3, 50]);
+    // The oldest still leads. The two that tie no longer break on ascending
+    // year — that tie-break is what replayed a freshly learned decade back at
+    // the user as 00, 01, 02 — so only their relative order is the rotation's.
+    expect(forwards[0]).toBe(77);
+    expect(forwards.slice(1).sort((a, b) => a - b)).toEqual([3, 50]);
     expect(backwards).toEqual(forwards);
+  });
+
+  it('does not hand back a decade in ascending order', () => {
+    // The regression this whole change exists for: ten years introduced
+    // together share a dueAt, and ascending ties turned the queue into a
+    // recitation of the block that had just been taught.
+    const decade = Array.from({ length: 10 }, (_unused, i) => build(60 + i, { dueAt: NOW }));
+    const order = dueItems(decade, FULL, NOW).map((i) => i.yy);
+
+    expect([...order].sort((a, b) => a - b)).toEqual(decade.map((i) => i.yy));
+    expect(order).not.toEqual([60, 61, 62, 63, 64, 65, 66, 67, 68, 69]);
+    // Nothing steps to its own neighbour, which is the tap the chain rewards.
+    for (let i = 1; i < order.length; i++) {
+      expect(Math.abs(order[i] - order[i - 1])).not.toBe(1);
+    }
+  });
+
+  it('keeps one day’s order stable across repeated reads', () => {
+    // The queue is recomputed after every answer. A seed that moved within a
+    // session would reshuffle the remaining items under the user mid-session.
+    const items = Array.from({ length: 12 }, (_unused, i) => build(i * 7, { dueAt: NOW }));
+    const first = dueItems(items, FULL, NOW).map((i) => i.yy);
+    const later = dueItems(items, FULL, NOW + 45 * 60_000).map((i) => i.yy);
+    expect(later).toEqual(first);
   });
 
   it('does not mutate or reorder the input array', () => {
@@ -386,25 +427,40 @@ describe('masteryBucket', () => {
     expect(masteryBucket({ ...createItem(1), interval: 200 })).toBe(0);
   });
 
+  // The ramp used to be the interval and nothing else, so an item answered
+  // correctly but slowly every single time climbed to the top of the grid.
+  // Speed now gates the middle of the ramp and the interval gates the top.
+  it('will not pass the middle of the ramp on interval alone', () => {
+    for (const interval of [1, 4, 10, 30, 90, 400]) {
+      expect(masteryBucket(reviewing({ interval, repetitions: 4 }))).toBe(2);
+    }
+  });
+
+  it('is 1 until an answer has actually been right in review', () => {
+    expect(masteryBucket(reviewing({ interval: 0, repetitions: 0 }))).toBe(1);
+  });
+
+  it('is 3 after one fast answer, whatever the interval says', () => {
+    const once = { ...emptyFluency(), consecutiveFast: 1 };
+    expect(masteryBucket(reviewing({ interval: 1, repetitions: 1, fluency: once }))).toBe(3);
+    expect(masteryBucket(reviewing({ interval: 400, repetitions: 9, fluency: once }))).toBe(3);
+  });
+
   it.each([
-    [0, 1],
-    [1, 2],
-    [3, 2],
-    [4, 3],
-    [9, 3],
-    [10, 4],
-    [29, 4],
-    [30, 5],
+    [1, 4],
+    [9, 4],
+    [10, 5],
     [89, 5],
     [90, 6],
     [400, 6],
-  ])('interval %i is bucket %i', (interval, bucket) => {
-    expect(masteryBucket(reviewing({ interval }))).toBe(bucket);
+  ])('a fluent item at interval %i is bucket %i', (interval, bucket) => {
+    const state = { ...emptyFluency(), consecutiveFast: 2, fluent: true, fluentAt: NOW };
+    expect(masteryBucket(reviewing({ interval, repetitions: 4, fluency: state }))).toBe(bucket);
   });
 
   it('never leaves the 0..6 ramp', () => {
     for (let interval = 0; interval < 500; interval++) {
-      const bucket = masteryBucket(reviewing({ interval }));
+      const bucket = masteryBucket(reviewing({ interval, repetitions: 4 }));
       expect(bucket).toBeGreaterThanOrEqual(0);
       expect(bucket).toBeLessThanOrEqual(6);
     }

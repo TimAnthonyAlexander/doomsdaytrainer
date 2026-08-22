@@ -5,6 +5,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attempt, ItemState } from '@/domain/types';
+import { emptyFluency } from '@/domain/fluency';
 import { createItem, introduce } from '@/domain/scheduler';
 import { addDays, dayKey } from '@/domain/time';
 import { StatsScreen } from '@/routes/StatsScreen';
@@ -103,7 +104,17 @@ describe('StatsScreen on a fresh install', () => {
 
   it('names every one of the seven mastery steps in the legend', async () => {
     await mount();
-    for (const label of ['Not started', 'Learning', '1–3 days', '4–9 days', '10–29 days', '30–89 days', '90 days +']) {
+    // The ramp reports fluency now, not the interval, so the middle steps name
+    // what the answer is doing rather than how long it has survived.
+    for (const label of [
+      'Not started',
+      'Introduced',
+      'Still slow',
+      'One fast answer',
+      'Fluent',
+      'Fluent, 10–89 days',
+      'Fluent, 90 days +',
+    ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
     expect(screen.getByText('Leech, 6+ lapses')).toBeInTheDocument();
@@ -163,14 +174,37 @@ describe('StatsScreen with a seeded store', () => {
 
   it('marks the leech and the out-of-scope years in the cell labels', async () => {
     await mount();
-    expect(screen.getByRole('button', { name: '41, Learning, 7 lapses, outside scope' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '73, 10–29 days' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '41, Introduced, 7 lapses, outside scope' })).toBeInTheDocument();
+    // 73 holds a twelve-day interval and used to read as "10–29 days" on that
+    // alone. It has never been answered fast, so the grid says so instead.
+    expect(screen.getByRole('button', { name: '73, Still slow' })).toBeInTheDocument();
+  });
+
+  it('separates a fluent year from one held up only by its interval', async () => {
+    // Seeded on top of the fixture, so 73 is still the slow twelve-day item and
+    // 88 differs from it in one field only.
+    await seed((data) => {
+      const slow: ItemState = {
+        ...introduce(createItem(73), NOW),
+        interval: 12,
+        repetitions: 4,
+        dueAt: addDays(NOW, 3),
+      };
+      return put(put(data, slow), {
+        ...slow,
+        yy: 88,
+        fluency: { ...emptyFluency(), consecutiveFast: 2, fluent: true, fluentAt: NOW },
+      });
+    });
+    await mount();
+    expect(screen.getByRole('button', { name: '73, Still slow' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '88, Fluent, 10–89 days' })).toBeInTheDocument();
   });
 
   it('opens per-item detail on a tap and closes again', async () => {
     const user = userEvent.setup();
     await mount();
-    await user.click(screen.getByRole('button', { name: '73, 10–29 days' }));
+    await user.click(screen.getByRole('button', { name: '73, Still slow' }));
 
     const sheet = await screen.findByRole('presentation');
     expect(within(sheet).getByRole('heading', { name: 'Year 73' })).toBeInTheDocument();

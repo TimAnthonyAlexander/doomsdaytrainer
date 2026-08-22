@@ -133,6 +133,10 @@ export function ReviewScreen() {
         // meaningless "continue".
         disabled={phase === 'correct'}
         keyboard={settings.keyboardInput}
+        // Off unless the user turned it on. Running out shows the hint and
+        // reopens the pad; it never records an answer nobody gave.
+        windowMs={phase === 'prompt' ? settings.answerWindowMs : null}
+        onExpire={session.expire}
       />
     </Screen>
   );

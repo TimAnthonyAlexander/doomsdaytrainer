@@ -10,6 +10,7 @@ const settings: Settings = {
   fastThresholdMs: 2000,
   mediumThresholdMs: 5000,
   hintType: 'structural',
+  answerWindowMs: null,
   autoAdvanceMs: 250,
   keyboardInput: false,
   reminderEnabled: false,

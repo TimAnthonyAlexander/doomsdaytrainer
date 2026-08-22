@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
+import { codeFor } from '@/domain/yearCodes';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, itemKey } from '@/storage/defaults';
 import { AppStateProvider } from '@/state/AppStateProvider';
@@ -141,7 +142,10 @@ describe('Review loop', () => {
 
     await screen.findByLabelText('Year 73');
     fireEvent.click(screen.getByRole('button', { name: 'Hint' }));
-    expect(screen.getByText(/sits in the block 72–75/)).toBeInTheDocument();
+    // The default hint is the arithmetic one now. Structural told the user to
+    // find the block and count up from its first year, which is the counting
+    // strategy the trainer is trying to starve.
+    expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument();
 
     await tap('0');
 
@@ -154,12 +158,15 @@ describe('Review loop', () => {
     });
   });
 
-  it('shows the structural hint unasked once an item keeps failing', async () => {
+  it('shows the hint unasked once an item keeps failing', async () => {
     await seed([{ yy: 73, dueAgo: 4000, consecutiveFailures: 2 }]);
     mount();
 
     await screen.findByLabelText('Year 73');
-    expect(screen.getByText(/sits in the block 72–75/)).toBeInTheDocument();
+    // The default hint is the arithmetic one now. Structural told the user to
+    // find the block and count up from its first year, which is the counting
+    // strategy the trainer is trying to starve.
+    expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hint' })).not.toBeInTheDocument();
 
     await tap('0');
@@ -197,5 +204,94 @@ describe('Review loop', () => {
     fireEvent.keyDown(window, { key: '0', code: 'Digit0' });
 
     expect(screen.getByRole('status')).toHaveTextContent('Correct.');
+  });
+
+  it('passes over the rest of a decade once one of its years has been asked', async () => {
+    // 63 is oldest, so it leads. 64 is due next by age, but answering it right
+    // after 63 is a +1 step rather than a recall, so the queue reaches past it.
+    // Anki buries siblings for the same reason; these are cousins.
+    await seed([
+      { yy: 63, dueAgo: 9000 },
+      { yy: 64, dueAgo: 8000 },
+      { yy: 12, dueAgo: 3000 },
+    ]);
+    mount();
+
+    await screen.findByLabelText('Year 63');
+    await tap(String(codeFor(63)));
+    await waitFor(() => expect(screen.getByLabelText('Year 12')).toBeInTheDocument());
+
+    await tap(String(codeFor(12)));
+    await waitFor(() => expect(screen.getByLabelText('Year 64')).toBeInTheDocument());
+  });
+
+  it('asks a buried year anyway rather than ending the session early', async () => {
+    // A narrow scope makes an all-cousins queue routine. Burying is a
+    // preference; it is never a reason to stop asking.
+    await seed([
+      { yy: 63, dueAgo: 9000 },
+      { yy: 64, dueAgo: 8000 },
+    ]);
+    mount();
+
+    await screen.findByLabelText('Year 63');
+    await tap(String(codeFor(63)));
+    await waitFor(() => expect(screen.getByLabelText('Year 64')).toBeInTheDocument());
+  });
+});
+
+describe('the optional answer window', () => {
+  it('is off by default, so a slow answer is still the user’s answer', async () => {
+    await seed([{ yy: 73, dueAgo: 4000 }]);
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    await wait(300);
+    expect(screen.queryByText(/73 \+ 18 = 91/)).not.toBeInTheDocument();
+
+    await tap(String(codeFor(73)));
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.items[itemKey(73)].attemptHistory[0]?.hintUsed).toBe(false);
+    });
+  });
+
+  it('running out shows the hint and records nothing at all', async () => {
+    await seed([{ yy: 73, dueAgo: 4000 }], { answerWindowMs: 100 });
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    await wait(400);
+
+    // The hint is on screen and the year has not moved.
+    expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
+
+    // Nothing was written. A window that scored a tap would be recording a
+    // forced guess, wrong six times in seven on a seven-button pad.
+    const stored = await loadAppData();
+    expect(stored.items[itemKey(73)].attemptHistory).toHaveLength(0);
+    expect(stored.items[itemKey(73)].repetitions).toBe(0);
+  });
+
+  it('still takes the answer after the window, capped at grade 3 by the hint', async () => {
+    await seed([{ yy: 73, dueAgo: 4000 }], { answerWindowMs: 100 });
+    mount();
+
+    await screen.findByLabelText('Year 73');
+    await wait(400);
+    await tap(String(codeFor(73)));
+
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      const item = stored.items[itemKey(73)];
+      expect(item.attemptHistory).toHaveLength(1);
+      expect(item.attemptHistory[0].hintUsed).toBe(true);
+      // Grade 3: ease drops from 2.5 rather than rising.
+      expect(item.easeFactor).toBeCloseTo(2.36, 5);
+      // And a hinted answer can never count towards fluency.
+      expect(item.fluency.consecutiveFast).toBe(0);
+      expect(item.fluency.fluent).toBe(false);
+    });
   });
 });

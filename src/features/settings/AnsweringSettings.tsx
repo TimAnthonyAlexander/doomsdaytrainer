@@ -2,6 +2,8 @@ import Box from '@mui/material/Box';
 import InputAdornment from '@mui/material/InputAdornment';
 import Slider from '@mui/material/Slider';
 import Switch from '@mui/material/Switch';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import TextField from '@mui/material/TextField';
 import type { KeyboardEvent } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
@@ -9,7 +11,10 @@ import type { Settings } from '@/domain/types';
 import { monoFontFamily } from '@/theme/theme';
 import { Field, SettingsSection, SwitchField } from './SettingsSection';
 import {
+  ANSWER_WINDOW_CHOICES,
   AUTO_ADVANCE_MAX,
+  answerWindowToChoice,
+  answerWindowToSetting,
   AUTO_ADVANCE_MIN,
   AUTO_ADVANCE_STEP,
   msFromText,
@@ -111,6 +116,27 @@ export function AnsweringSettings({ settings, onChange }: AnsweringSettingsProps
             {`${autoAdvance} ms`}
           </Numeral>
         </Box>
+      </Field>
+
+      <Field
+        label="Answer window"
+        note="Off by default. A time limit reliably pushes you off a procedure and onto recall for years you already know, but there is no evidence it helps you learn a new one, and some that it hurts: a forced guess on seven buttons is wrong six times in seven, and the wrong answer is what gets reinforced. So in Review, running out shows the hint and waits — it never records an answer you did not give. In Drills, which write no scheduling, running out is a miss."
+      >
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          color="primary"
+          value={answerWindowToChoice(settings.answerWindowMs)}
+          onChange={(_event, next: number | null) => {
+            if (next !== null) onChange({ answerWindowMs: answerWindowToSetting(next) });
+          }}
+        >
+          {ANSWER_WINDOW_CHOICES.map((choice) => (
+            <ToggleButton key={choice.label} value={choice.value} sx={{ py: 1.25 }}>
+              {choice.label}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
       </Field>
 
       <SwitchField

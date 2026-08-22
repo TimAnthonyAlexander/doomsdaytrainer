@@ -210,7 +210,7 @@ describe('parseImportFile', () => {
     const back = parseImportFile(wrap(trimmed));
     expect(Object.keys(back.items)).toHaveLength(100);
     expect(back.settings.newItemsPerDay).toBe(4);
-    expect(back.settings.hintType).toBe('structural');
+    expect(back.settings.hintType).toBe('arithmetic');
   });
 
   const rejections: Array<[string, string, RegExp]> = [

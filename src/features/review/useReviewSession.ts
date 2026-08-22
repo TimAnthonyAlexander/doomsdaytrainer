@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Attempt, Code, ItemState, YearKey } from '@/domain/types';
-import { dueItems } from '@/domain/scheduler';
+import { dueItems, nextDueItem } from '@/domain/scheduler';
+import { LOOKBACK } from '@/domain/rotation';
 import { inScope, resolveScope } from '@/domain/scope';
 import { codeFor } from '@/domain/yearCodes';
 import { useAppState } from '@/state/useAppState';
@@ -32,6 +33,8 @@ export interface ReviewSession {
   /** True when the hint appeared because the item keeps failing. */
   autoHint: boolean;
   openHint: () => void;
+  /** The answer window ran out. Shows the hint; never records anything. */
+  expire: () => void;
   answer: (value: number, latencyMs: number) => void;
   advance: () => void;
   results: SessionResult[];
@@ -56,6 +59,7 @@ export function useReviewSession(): ReviewSession {
   const [results, setResults] = useState<SessionResult[]>([]);
   const [hintOpen, setHintOpen] = useState(false);
   const [retries, setRetries] = useState(0);
+  const [timedOut, setTimedOut] = useState(0);
 
   const scope = useMemo(() => resolveScope(settings), [settings]);
 
@@ -63,8 +67,15 @@ export function useReviewSession(): ReviewSession {
   // the queue can change during a session. Ordering is the domain layer's.
   const queue = useMemo(() => dueItems(itemList, scope, Date.now()), [itemList, scope]);
 
+  // Years already asked this session, oldest first. The queue is due-ordered,
+  // but asking 64 straight after 63 lets the step answer it, so the rest of a
+  // decade is passed over for a few prompts once one of its years comes up.
+  // Anki buries siblings for the same reason; these are cousins rather than
+  // siblings, which is why it has to be a rule of our own.
+  const [recent, setRecent] = useState<YearKey[]>([]);
+
   const pinned = answered ? (items[itemKey(answered.yy)] ?? null) : null;
-  const item = pinned ?? queue[0] ?? null;
+  const item = pinned ?? nextDueItem(queue, recent);
 
   const introducedCount = useMemo(
     () => itemList.filter((entry) => entry.introduced).length,
@@ -88,7 +99,7 @@ export function useReviewSession(): ReviewSession {
   }, [itemList, scope]);
 
   const autoHint = answered ? answered.autoHint : item !== null && shouldAutoHint(item);
-  const hintVisible = hintOpen || autoHint;
+  const hintVisible = hintOpen || autoHint || timedOut > 0;
 
   const hint = useMemo(() => {
     if (!item || !hintVisible) return null;
@@ -97,10 +108,23 @@ export function useReviewSession(): ReviewSession {
 
   const openHint = useCallback(() => setHintOpen(true), []);
 
+  /**
+   * The optional answer window ran out.
+   *
+   * It shows the hint and reopens the pad. It does not record an attempt and it
+   * does not advance: a deadline that turned into a tap would be scoring a
+   * forced guess, and Seabrooke et al. (2019) found guessing before feedback
+   * improves memory for the items while *impairing* cued recall of the link,
+   * which is the one thing this app is trying to build. The hint the user now
+   * has caps the grade at 3 when they do answer, which is the honest price.
+   */
+  const expire = useCallback(() => setTimedOut((count) => count + 1), []);
+
   const advance = useCallback(() => {
     setAnswered(null);
     setHintOpen(false);
     setRetries(0);
+    setTimedOut(0);
     setRound((value) => value + 1);
   }, []);
 
@@ -127,7 +151,7 @@ export function useReviewSession(): ReviewSession {
       const latency = Math.round(latencyMs);
       // A hint on screen caps the grade at 3 whether or not it was asked for:
       // the help was given either way, and the domain layer applies the cap.
-      const hintUsed = hintOpen || shouldAutoHint(item);
+      const hintUsed = hintOpen || timedOut > 0 || shouldAutoHint(item);
 
       const attempt: Attempt = {
         timestamp: Date.now(),
@@ -140,10 +164,11 @@ export function useReviewSession(): ReviewSession {
 
       setAnswered({ yy: item.yy, chosen: value as Code, correct, autoHint: shouldAutoHint(item) });
       setResults((prev) => [...prev, { correct, latencyMs: latency }]);
+      setRecent((prev) => [...prev, item.yy].slice(-LOOKBACK));
 
       void recordReview(item.yy, attempt).then(() => noteSessionActivity('review', 1));
     },
-    [item, answered, hintOpen, recordReview, noteSessionActivity, advance],
+    [item, answered, hintOpen, timedOut, recordReview, noteSessionActivity, advance],
   );
 
   const phase: ReviewPhase = answered ? (answered.correct ? 'correct' : 'wrong') : 'prompt';
@@ -156,10 +181,13 @@ export function useReviewSession(): ReviewSession {
     // Phase is in the key so the correction tap after a wrong answer is a fresh
     // prompt to the pad. Without it the pad, which answers once per key, would
     // swallow it.
-    promptKey: `${item ? item.yy : 'none'}#${round}#${phase}#${retries}`,
+    // The timeout is in the key too: the pad closes itself when the window
+    // runs out, so it needs a new prompt before it will take the answer.
+    promptKey: `${item ? item.yy : 'none'}#${round}#${phase}#${retries}#${timedOut}`,
     hint,
     autoHint,
     openHint,
+    expire,
     answer,
     advance,
     results,

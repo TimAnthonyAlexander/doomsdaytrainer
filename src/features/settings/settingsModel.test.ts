@@ -74,14 +74,23 @@ describe('reminder time', () => {
 describe('hint previews', () => {
   it('renders one real, distinct example per type', () => {
     const choices = hintChoices();
-    expect(choices.map((choice) => choice.type)).toEqual(['structural', 'arithmetic', 'anchor']);
-    expect(choices[0].hint.text).toBe('73 sits in the block 72–75.');
-    expect(choices[1].hint.text).toBe('73 + 18 = 91');
+    // Arithmetic leads: it is the only one of the three that can be entered at
+    // any year rather than walked to from somewhere else.
+    expect(choices.map((choice) => choice.type)).toEqual(['arithmetic', 'structural', 'anchor']);
+    expect(choices[0].hint.text).toBe('73 + 18 = 91');
+    expect(choices[1].hint.text).toBe('73 sits in the block 72–75.');
     expect(choices[2].hint.text).toBe('You already know 72.');
   });
 
+  it('marks exactly the two hints that ask the user to count along the table', () => {
+    const byType = new Map(hintChoices().map((choice) => [choice.type, choice.caution]));
+    expect(byType.get('arithmetic')).toBeNull();
+    expect(byType.get('structural')).toMatch(/count up/i);
+    expect(byType.get('anchor')).toMatch(/step forward/i);
+  });
+
   it('does not let the anchor example collapse into the structural one', () => {
-    const [structural, , anchor] = hintChoices();
+    const [, structural, anchor] = hintChoices();
     expect(anchor.hint.type).toBe('anchor');
     expect(anchor.hint.text).not.toBe(structural.hint.text);
   });

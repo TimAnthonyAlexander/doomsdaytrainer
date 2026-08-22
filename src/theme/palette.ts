@@ -56,15 +56,19 @@ export const palette = {
 } as const;
 
 /**
- * The seven interval buckets. Structure, not styling: the mastery grid's legend
+ * The seven mastery buckets. Structure, not styling: the mastery grid's legend
  * and its cell labels both read these, and the count has to stay at seven.
+ *
+ * They stopped being pure interval buckets when the grid started reporting
+ * fluency. `detail` is the one-line explanation the legend shows, because
+ * "Still slow" on its own does not say what would move the cell along.
  */
 export const masteryBuckets = [
-  { label: 'Not started', minInterval: -1 },
-  { label: 'Learning', minInterval: 0 },
-  { label: '1–3 days', minInterval: 1 },
-  { label: '4–9 days', minInterval: 4 },
-  { label: '10–29 days', minInterval: 10 },
-  { label: '30–89 days', minInterval: 30 },
-  { label: '90 days +', minInterval: 90 },
+  { label: 'Not started', detail: 'Not introduced yet.' },
+  { label: 'Introduced', detail: 'Learned, not yet answered right in review.' },
+  { label: 'Still slow', detail: 'Right, but worked out rather than recalled.' },
+  { label: 'One fast answer', detail: 'Recalled once inside the fast threshold.' },
+  { label: 'Fluent', detail: 'Two fast answers, on different days.' },
+  { label: 'Fluent, 10–89 days', detail: 'Fast, and holding across weeks.' },
+  { label: 'Fluent, 90 days +', detail: 'Fast, and holding across months.' },
 ] as const;

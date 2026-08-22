@@ -126,6 +126,10 @@ export function DrillRunView({
         promptKey={run.promptKey}
         disabled={run.phase !== 'running'}
         keyboard={settings.keyboardInput}
+        // A drill is where a hard window belongs: nothing here writes to the
+        // scheduler, so running out is a miss and not a corrupted item.
+        windowMs={settings.answerWindowMs}
+        onExpire={() => run.expire(settings.answerWindowMs ?? 0)}
       />
     </Screen>
   );

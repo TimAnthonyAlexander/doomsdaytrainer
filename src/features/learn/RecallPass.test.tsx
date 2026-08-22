@@ -58,25 +58,27 @@ async function mount(onDone = vi.fn()) {
 beforeEach(deleteDb);
 
 describe('RecallPass', () => {
-  it('sends the user back to the first year of the block after a wrong tap', async () => {
+  it('keeps the year on screen after a wrong tap instead of restarting the block', async () => {
+    // The old rule sent the user back to the first year of the block. That is
+    // serial anticipation: the run gets rehearsed from position zero over and
+    // over and the years in the middle are never retrieved cold.
     const { container } = await mount();
     expect(screen.getByTestId('recall-prompt')).toHaveTextContent('40');
 
-    // Get two right, then miss the third.
     await tap(rightFor(40));
     await waitFor(() => expect(screen.getByTestId('recall-prompt')).toHaveTextContent('41'));
     await tap(rightFor(41));
     await waitFor(() => expect(screen.getByTestId('recall-prompt')).toHaveTextContent('42'));
 
     await tap(wrongFor(42));
-    // The miss states the real answer, then the block restarts.
+    // The miss states the real answer and the year stays put.
     expect(container.textContent).toContain(`42 is ${rightFor(42)}, not ${wrongFor(42)}`);
-    expect(screen.getByTestId('recall-prompt')).toHaveTextContent('40');
+    expect(screen.getByTestId('recall-prompt')).toHaveTextContent('42');
 
     // The retry has to land: the pad answers once per prompt, so a wrong tap
     // must move the prompt key or the second answer would be swallowed.
-    await tap(rightFor(40));
-    await waitFor(() => expect(screen.getByTestId('recall-prompt')).toHaveTextContent('41'));
+    await tap(rightFor(42));
+    await waitFor(() => expect(screen.getByTestId('recall-prompt')).toHaveTextContent('43'));
     await drain();
   });
 
@@ -97,20 +99,15 @@ describe('RecallPass', () => {
     expect(item.lapses).toBe(0);
   });
 
-  // Twelve real holds at 500ms each: learn mode shows the code you tapped long
-  // enough to read it, so this walk genuinely takes longer than the default.
-  it('only finishes on ten right in a row, and still reports the wrong taps', { timeout: 20000 }, async () => {
-    const { onDone } = await mount();
+  // The domain test in recall.test.ts walks whole blocks and asserts the
+  // ordering, the streaks and the termination. What is worth paying 500ms a tap
+  // for here is only the wiring: that the screen really does leave ascending
+  // order behind when the ordered pass ends.
+  it('leaves ascending order once every year has been produced once', { timeout: 20000 }, async () => {
+    await mount();
 
-    // Two right, one wrong: back to 40 with nothing completed.
-    await tap(rightFor(40));
-    await waitFor(() => expect(screen.getByTestId('recall-prompt')).toHaveTextContent('41'));
-    await tap(wrongFor(41));
-    expect(screen.getByTestId('recall-prompt')).toHaveTextContent('40');
-    expect(onDone).not.toHaveBeenCalled();
-
-    // Now a clean run of all ten.
     for (let yy = 40; yy <= 49; yy++) {
+      expect(screen.getByTestId('recall-prompt')).toHaveTextContent(String(yy));
       await tap(rightFor(yy));
       if (yy < 49) {
         await waitFor(() =>
@@ -118,7 +115,20 @@ describe('RecallPass', () => {
         );
       }
     }
-    await waitFor(() => expect(onDone).toHaveBeenCalledWith(1));
+
+    // Battig, Brown & Nelson (1963): first correct per item is where constant
+    // order stops paying. The pass may legitimately open the mixed phase on any
+    // year, 40 included, so what is asserted is the ordering, not the entry.
+    await waitFor(() => expect(screen.getByText(/mixed up now/i)).toBeInTheDocument(), {
+      timeout: 5000,
+    });
+
+    const prompt = () => Number(screen.getByTestId('recall-prompt').textContent);
+    const first = prompt();
+    await tap(rightFor(first));
+    await waitFor(() => expect(prompt()).not.toBe(first), { timeout: 5000 });
+    expect(Math.abs(prompt() - first)).not.toBe(1);
     await drain();
   });
+
 });

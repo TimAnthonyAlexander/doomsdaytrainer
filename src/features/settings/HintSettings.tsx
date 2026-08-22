@@ -25,7 +25,7 @@ export function HintSettings({ settings, onChange }: HintSettingsProps) {
     <SettingsSection title="Hints">
       <Field
         label="Hint type"
-        note={`What a hint shows when you ask for one during review, here for year ${formatYear(HINT_EXAMPLE_YEAR)}. Asking caps that answer at grade 3.`}
+        note={`What a hint shows when you ask for one during review, here for year ${formatYear(HINT_EXAMPLE_YEAR)}. Asking caps that answer at grade 3. A hint that asks you to count along the table gets you the answer and builds the habit of walking to it, so those two are marked.`}
       >
         <ToggleButtonGroup
           orientation="vertical"
@@ -54,6 +54,11 @@ export function HintSettings({ settings, onChange }: HintSettingsProps) {
               {choice.hint.note ? (
                 <Typography variant="caption" component="div" color="text.secondary" sx={{ mt: 0.5 }}>
                   {choice.hint.note}
+                </Typography>
+              ) : null}
+              {choice.caution ? (
+                <Typography variant="caption" component="div" color="text.disabled" sx={{ mt: 0.5 }}>
+                  {choice.caution}
                 </Typography>
               ) : null}
             </ToggleButton>
