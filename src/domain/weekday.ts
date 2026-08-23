@@ -71,11 +71,11 @@ export const ALL_MONTHS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
 /** 18..21, in order. */
 export const ALL_CENTURIES: readonly number[] = [18, 19, 20, 21];
 
-/**
- * Every distinct value a month doomsday can take, ascending. The month drill's
- * answer pad is exactly this set, in exactly this order, forever.
- */
-export const MONTH_DOOMSDAY_VALUES: readonly number[] = [...MONTH_DOOMSDAYS].sort((a, b) => a - b);
+/** The two months whose doomsday moves in a leap year, and the only two. */
+export function doomsdayShifts(month: number): boolean {
+  assertMonth(month);
+  return month === 1 || month === 2;
+}
 
 /* ------------------------------------------------------------------ */
 /* Guards                                                              */
@@ -105,11 +105,16 @@ export function isLeapYear(fullYear: number): boolean {
   return fullYear % 400 === 0;
 }
 
+/** 28..31, from the leap flag rather than from a year. Month is 1-based. */
+export function monthLength(month: number, leapYear: boolean): number {
+  assertMonth(month);
+  if (month === 2) return leapYear ? 29 : 28;
+  return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31;
+}
+
 /** 28..31. Month is 1-based. */
 export function daysInMonth(fullYear: number, month: number): number {
-  assertMonth(month);
-  if (month === 2) return isLeapYear(fullYear) ? 29 : 28;
-  return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31;
+  return monthLength(month, isLeapYear(fullYear));
 }
 
 /**
@@ -124,6 +129,30 @@ export function monthDoomsday(month: number, leapYear: boolean): number {
     if (month === 2) return 29;
   }
   return MONTH_DOOMSDAYS[month - 1];
+}
+
+/**
+ * Every date in the month that falls on the year's doomsday, ascending.
+ *
+ * The table teaches one date per month, but a month has three, four or five of
+ * them: dates a whole number of weeks apart are the same weekday, so February's
+ * 7th, 14th and 21st sit on the doomsday exactly as its 28th does, and any of
+ * them works as the anchor the day step counts from. The taught date is the one
+ * with a mnemonic attached, not the only correct one, and a drill that marks
+ * the 7th wrong is stating something false about the calendar.
+ */
+export function doomsdayDates(month: number, leapYear: boolean): readonly number[] {
+  const anchor = monthDoomsday(month, leapYear);
+  const length = monthLength(month, leapYear);
+  const dates: number[] = [];
+  for (let day = ((anchor - 1) % 7) + 1; day <= length; day += 7) dates.push(day);
+  return dates;
+}
+
+/** Whether that date falls on the year's doomsday. Out-of-month days are false. */
+export function isDoomsdayDate(month: number, leapYear: boolean, day: number): boolean {
+  if (!Number.isInteger(day) || day < 1 || day > monthLength(month, leapYear)) return false;
+  return (day - monthDoomsday(month, leapYear)) % 7 === 0;
 }
 
 /** 18..21 for the supported range. */
@@ -176,6 +205,16 @@ export function weekdayFor(fullYear: number, month: number, day: number): Code {
 export function monthName(month: number): string {
   assertMonth(month);
   return MONTH_NAMES[month - 1];
+}
+
+/** "1st", "2nd", "3rd", "4th" … "21st", "31st". Days of a month only, so 1..31. */
+export function ordinalDay(day: number): string {
+  const tens = day % 100;
+  if (tens >= 11 && tens <= 13) return `${day}th`;
+  if (day % 10 === 1) return `${day}st`;
+  if (day % 10 === 2) return `${day}nd`;
+  if (day % 10 === 3) return `${day}rd`;
+  return `${day}th`;
 }
 
 /** "14 March 1987". Spelled out, so no reader has to guess day/month order. */

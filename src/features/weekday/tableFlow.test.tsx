@@ -66,6 +66,12 @@ async function openTables(): Promise<void> {
 
 beforeEach(deleteDb);
 
+/** One tap, after the prompt has painted so the timer is running. */
+async function tapDay(day: number): Promise<void> {
+  await nextPaint();
+  fireEvent.click(screen.getByRole('button', { name: `Day ${day}` }));
+}
+
 describe('Tables', () => {
   it('drills a month doomsday and schedules only that item', async () => {
     await seed({ autoAdvanceMs: 0 });
@@ -73,41 +79,106 @@ describe('Tables', () => {
     await openTables();
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('January');
-    await nextPaint();
-    fireEvent.click(screen.getByRole('button', { name: `Day ${monthDoomsday(1, false)}` }));
+    // January is asked twice: the common year, then the leap year.
+    await tapDay(monthDoomsday(1, false));
+    await waitFor(() =>
+      expect(screen.getByText('Which date is the doomsday in a leap year?')).toBeInTheDocument(),
+    );
+    await tapDay(monthDoomsday(1, true));
 
     await waitFor(async () => {
       const stored = await loadAppData();
       expect(stored.monthItems[monthItemKey(1)].introduced).toBe(true);
     });
     const stored = await loadAppData();
+    // Two questions, one item, one review. Two would advance the interval
+    // twice for a single showing.
     expect(stored.monthItems[monthItemKey(1)].repetitions).toBe(1);
+    expect(stored.monthItems[monthItemKey(1)].attemptHistory).toHaveLength(1);
     expect(stored.monthItems[monthItemKey(1)].attemptHistory[0].source).toBe('month');
+    expect(stored.monthItems[monthItemKey(1)].attemptHistory[0].correct).toBe(true);
     // Nothing else moved.
     expect(stored.monthItems[monthItemKey(2)].introduced).toBe(false);
     expect(stored.centuryItems['18'].introduced).toBe(false);
     expect(stored.weekdayAttempts).toEqual([]);
   });
 
-  it('offers twelve day buttons, always the same twelve', async () => {
+  it('writes nothing until both halves of a leap month are answered', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    mount();
+    await openTables();
+
+    await tapDay(monthDoomsday(1, false));
+    await waitFor(() =>
+      expect(screen.getByText('Which date is the doomsday in a leap year?')).toBeInTheDocument(),
+    );
+    const stored = await loadAppData();
+    expect(stored.monthItems[monthItemKey(1)].introduced).toBe(false);
+  });
+
+  it('marks the pair wrong when either half is, and stores the half that failed', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    mount();
+    await openTables();
+
+    await tapDay(28); // Wrong for January in a common year.
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue' }));
+    await tapDay(monthDoomsday(1, true)); // Right for the leap year.
+
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.monthItems[monthItemKey(1)].introduced).toBe(true);
+    });
+    const stored = await loadAppData();
+    const attempt = stored.monthItems[monthItemKey(1)].attemptHistory[0];
+    expect(attempt.correct).toBe(false);
+    expect(attempt.answered).toBe(28);
+  });
+
+  it('offers every day the month has, so every doomsday date can be tapped', async () => {
     await seed();
     mount();
     await openTables();
 
     const days = screen.getAllByRole('button').filter((b) => /^Day \d+$/.test(b.getAttribute('aria-label') ?? ''));
     expect(days.map((b) => b.getAttribute('aria-label'))).toEqual(
-      [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 28].map((n) => `Day ${n}`),
+      Array.from({ length: 31 }, (_unused, index) => `Day ${index + 1}`),
     );
   });
 
-  it('states the leap rule after a wrong January answer', async () => {
+  /**
+   * The user's anchor is the user's. January 10 is a week past the 3rd, so it
+   * is the same weekday and it anchors the day step just as well — it passes
+   * without the screen stopping to name the date the table happens to teach.
+   */
+  it('takes any date that falls on the doomsday, without arguing about it', async () => {
     await seed({ autoAdvanceMs: 0 });
     mount();
     await openTables();
 
-    await nextPaint();
-    fireEvent.click(screen.getByRole('button', { name: 'Day 28' }));
-    expect(await screen.findByText('January 3, and the 4th in a leap year.')).toBeInTheDocument();
+    await tapDay(10);
+    await waitFor(() =>
+      expect(screen.getByText('Which date is the doomsday in a leap year?')).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+    expect(screen.queryByText(/is the doomsday in a common year/)).toBeNull();
+
+    await tapDay(11); // A week past the 4th, and the leap half of the same anchor.
+    await waitFor(async () => {
+      const stored = await loadAppData();
+      expect(stored.monthItems[monthItemKey(1)].attemptHistory[0].correct).toBe(true);
+    });
+  });
+
+  it('states the answer after a wrong January answer', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    mount();
+    await openTables();
+
+    await tapDay(28);
+    expect(
+      await screen.findByText(/January 3 is the doomsday in a common year\./),
+    ).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument();
   });
 

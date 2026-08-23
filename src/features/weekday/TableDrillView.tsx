@@ -11,8 +11,14 @@ import { useAppState } from '@/state/useAppState';
 import { nextDueLabel } from '@/features/review/summary';
 import { palette } from '@/theme/palette';
 import { MonthPad } from './MonthPad';
-import { allTableEntries, entryAnswerNote, entryId, entryLabel } from './tableDrill';
-import { useTableSession } from './useTableSession';
+import {
+  allTableEntries,
+  entryAlternatesNote,
+  entryAnswerNote,
+  entryId,
+  entryLabel,
+} from './tableDrill';
+import { useTableSession, type TableSession } from './useTableSession';
 
 const CODE_OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
   value,
@@ -91,6 +97,23 @@ function TableList() {
 }
 
 /**
+ * What is being asked, in words.
+ *
+ * January and February name the year kind, because for those two the answer
+ * depends on it and a question that did not say which would have two right
+ * answers and mark one of them wrong. The other ten never mention leap years:
+ * their doomsday does not move, so raising the possibility would suggest it
+ * might.
+ */
+function questionFor(session: TableSession): string {
+  const prompt = session.prompt;
+  if (!prompt) return '';
+  if (prompt.kind === 'century') return 'Which code is the anchor?';
+  if (session.partCount === 1) return 'Which date is the doomsday?';
+  return `Which date is the doomsday in a ${prompt.leapYear ? 'leap' : 'common'} year?`;
+}
+
+/**
  * Sixteen fixed items on their own small surface. Same machinery as the year
  * codes — tap is the grade, latency decides it, SM-2 schedules it — and the
  * only place either table gets scheduled at all.
@@ -133,10 +156,17 @@ export function TableDrillView({ onBack }: TableDrillProps) {
     );
   }
 
-  const feedback =
-    session.chosen === null || session.correctAnswer === null
-      ? null
-      : { chosen: session.chosen, correct: session.correctAnswer };
+  const prompt = session.prompt;
+  if (!prompt) return null;
+
+  // A correct answer is a correct answer, whichever of the month's doomsdays it
+  // is: green, and gone. Only a wrong one holds. Stopping to say "the 28th is
+  // the one to remember" after a right answer is the same claim the twelve-value
+  // pad was making — that the method has one real doomsday per month — moved
+  // from the pad into the copy. It does not. It has an anchor, and the taught
+  // one is the anchor with a mnemonic attached, not the only one that works.
+  const held = phase === 'wrong';
+  const alternates = held ? entryAlternatesNote(prompt.kind, prompt.key, prompt.leapYear) : null;
 
   return (
     <>
@@ -155,27 +185,39 @@ export function TableDrillView({ onBack }: TableDrillProps) {
             entryLabel(entry.kind, entry.key)
           )}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {entry.kind === 'month' ? 'Which date is the doomsday?' : 'Which code is the anchor?'}
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+          {questionFor(session)}
         </Typography>
-        {phase === 'wrong' ? (
+        {held ? (
           <Typography variant="body2" sx={{ color: palette.brandDeep, textAlign: 'center' }}>
-            {entryAnswerNote(entry.kind, entry.key)}
+            {entryAnswerNote(prompt.kind, prompt.key, prompt.leapYear)}
+            {alternates === null ? '' : ` ${alternates}`}
           </Typography>
         ) : null}
       </Box>
 
-      {phase === 'wrong' ? (
+      {held ? (
         <Button fullWidth variant="outlined" color="inherit" autoFocus onClick={advance} sx={{ mb: 1 }}>
           Continue
         </Button>
       ) : null}
 
-      {entry.kind === 'month' ? (
+      {prompt.kind === 'month' ? (
         <MonthPad
+          month={prompt.key}
+          leapYear={prompt.leapYear}
           onAnswer={session.answer}
           promptKey={session.promptKey}
-          feedback={feedback}
+          feedback={
+            session.chosen === null || session.canonical === null
+              ? null
+              : {
+                  chosen: session.chosen,
+                  canonical: session.canonical,
+                  accepted: session.accepted,
+                  reveal: held,
+                }
+          }
           disabled={phase !== 'prompt'}
         />
       ) : (
@@ -183,7 +225,11 @@ export function TableDrillView({ onBack }: TableDrillProps) {
           options={CODE_OPTIONS}
           onAnswer={session.answer}
           promptKey={session.promptKey}
-          feedback={feedback}
+          feedback={
+            session.chosen === null || session.canonical === null
+              ? null
+              : { chosen: session.chosen, correct: session.canonical }
+          }
           disabled={phase !== 'prompt'}
           keyboard={settings.keyboardInput}
         />

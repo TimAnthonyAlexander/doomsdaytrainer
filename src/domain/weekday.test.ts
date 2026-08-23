@@ -7,16 +7,20 @@ import {
   MAX_YEAR,
   MIN_YEAR,
   MONTH_DOOMSDAYS,
-  MONTH_DOOMSDAY_VALUES,
   centuryAnchor,
   centuryLabel,
   centuryOf,
   daysInMonth,
+  doomsdayDates,
+  doomsdayShifts,
   explainWeekday,
   formatDate,
+  isDoomsdayDate,
   isLeapYear,
   monthDoomsday,
+  monthLength,
   monthName,
+  ordinalDay,
   weekdayAbbr,
   weekdayFor,
   yearDoomsday,
@@ -108,9 +112,11 @@ describe('the shipped tables', () => {
     expect(() => monthDoomsday(13, false)).toThrow(/Month outside/);
   });
 
-  it('lists every distinct doomsday value once, ascending', () => {
-    expect(MONTH_DOOMSDAY_VALUES).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 28]);
-    expect(new Set(MONTH_DOOMSDAY_VALUES).size).toBe(12);
+  it('names the two months whose doomsday moves, and only those two', () => {
+    expect(doomsdayShifts(1)).toBe(true);
+    expect(doomsdayShifts(2)).toBe(true);
+    for (let month = 3; month <= 12; month += 1) expect(doomsdayShifts(month)).toBe(false);
+    expect(() => doomsdayShifts(0)).toThrow(/Month outside/);
   });
 
   it('carries the four century anchors from the spec', () => {
@@ -150,6 +156,59 @@ describe('the shipped tables', () => {
     expect(() => weekdayFor(2001, 4, 31)).toThrow(/Day outside/);
     expect(() => weekdayFor(2001, 1, 0)).toThrow(/Day outside/);
     expect(() => weekdayFor(2000, 2, 29)).not.toThrow();
+  });
+});
+
+describe('doomsdayDates', () => {
+  it('starts from the taught date and steps back a week at a time', () => {
+    expect(doomsdayDates(1, false)).toEqual([3, 10, 17, 24, 31]);
+    expect(doomsdayDates(1, true)).toEqual([4, 11, 18, 25]);
+    expect(doomsdayDates(2, false)).toEqual([7, 14, 21, 28]);
+    expect(doomsdayDates(2, true)).toEqual([1, 8, 15, 22, 29]);
+    expect(doomsdayDates(3, false)).toEqual([7, 14, 21, 28]);
+    expect(doomsdayDates(12, false)).toEqual([5, 12, 19, 26]);
+  });
+
+  it('always contains the taught date and stays inside the month', () => {
+    for (const leapYear of [false, true]) {
+      for (const month of ALL_MONTHS) {
+        const dates = doomsdayDates(month, leapYear);
+        expect(dates).toContain(monthDoomsday(month, leapYear));
+        expect(dates[0]).toBeGreaterThanOrEqual(1);
+        expect(dates[dates.length - 1]).toBeLessThanOrEqual(monthLength(month, leapYear));
+        expect(dates.length).toBeGreaterThanOrEqual(4);
+      }
+    }
+  });
+
+  /**
+   * The claim the drill now grades on: February's 7th really is a doomsday, so
+   * marking it wrong was the app being wrong about the calendar. Checked the
+   * only way that settles it — against every date of every month of the whole
+   * supported range, in both directions. Every listed date falls on the year's
+   * doomsday, and every date that falls on it is listed.
+   */
+  it('is exactly the dates that land on the doomsday, every month of the range', () => {
+    for (let year = MIN_YEAR; year <= MAX_YEAR; year += 1) {
+      const leapYear = isLeapYear(year);
+      const doomsday = yearDoomsday(year);
+      for (const month of ALL_MONTHS) {
+        const listed = doomsdayDates(month, leapYear);
+        for (let day = 1; day <= daysInMonth(year, month); day += 1) {
+          const lands = weekdayFor(year, month, day) === doomsday;
+          expect(listed.includes(day)).toBe(lands);
+          expect(isDoomsdayDate(month, leapYear, day)).toBe(lands);
+        }
+      }
+    }
+  });
+
+  it('refuses a day the month does not have', () => {
+    expect(isDoomsdayDate(2, false, 29)).toBe(false);
+    expect(isDoomsdayDate(2, true, 29)).toBe(true);
+    expect(isDoomsdayDate(4, false, 31)).toBe(false);
+    expect(isDoomsdayDate(1, false, 0)).toBe(false);
+    expect(isDoomsdayDate(1, false, 1.5)).toBe(false);
   });
 });
 
@@ -255,6 +314,14 @@ describe('formatting', () => {
   it('spells the month out', () => {
     expect(formatDate(1987, 3, 14)).toBe('14 March 1987');
     expect(formatDate(2000, 12, 1)).toBe('1 December 2000');
+  });
+
+  it('ordinals every day a month can have, teens included', () => {
+    const all = Array.from({ length: 31 }, (_unused, index) => ordinalDay(index + 1));
+    expect(all.slice(0, 4)).toEqual(['1st', '2nd', '3rd', '4th']);
+    expect(all.slice(10, 13)).toEqual(['11th', '12th', '13th']);
+    expect(all.slice(20, 23)).toEqual(['21st', '22nd', '23rd']);
+    expect(all[30]).toBe('31st');
   });
 
   it('abbreviates weekdays to three unambiguous letters', () => {

@@ -5,10 +5,14 @@ import { MONTH_DOOMSDAYS } from '@/domain/weekday';
 import { defaultCenturyItems, defaultMonthItems } from '@/storage/defaults';
 import {
   allTableEntries,
+  entryAccepted,
+  entryAccepts,
+  entryAlternatesNote,
   entryAnswer,
   entryAnswerNote,
   entryId,
   entryLabel,
+  entryPrompts,
   nextTableDueAt,
   tableQueue,
 } from './tableDrill';
@@ -41,11 +45,78 @@ describe('entries', () => {
     expect(entryAnswer('century', 21)).toBe(0);
   });
 
-  it('states the leap shift for the two months that have one', () => {
-    expect(entryAnswerNote('month', 1)).toBe('January 3, and the 4th in a leap year.');
-    expect(entryAnswerNote('month', 2)).toBe('February 28, and the 29th in a leap year.');
+  it('states which year kind it just asked about', () => {
+    expect(entryAnswerNote('month', 1, false)).toBe('January 3 is the doomsday in a common year.');
+    expect(entryAnswerNote('month', 1, true)).toBe('January 4 is the doomsday in a leap year.');
+    expect(entryAnswerNote('month', 2, false)).toBe('February 28 is the doomsday in a common year.');
+    expect(entryAnswerNote('month', 2, true)).toBe('February 29 is the doomsday in a leap year.');
     expect(entryAnswerNote('month', 3)).toBe("March 14 falls on the year's doomsday.");
     expect(entryAnswerNote('century', 19)).toBe('1900s start on a Wednesday.');
+  });
+
+  it('names the other dates that fall on the same doomsday', () => {
+    expect(entryAlternatesNote('month', 2, false)).toBe(
+      'The 7th, 14th and 21st fall on it too: a week apart is the same weekday.',
+    );
+    expect(entryAlternatesNote('month', 1, false)).toBe(
+      'The 10th, 17th, 24th and 31st fall on it too: a week apart is the same weekday.',
+    );
+    expect(entryAlternatesNote('century', 19)).toBeNull();
+  });
+});
+
+describe('what an answer accepts', () => {
+  /**
+   * The bug this closes: February 7 was marked wrong. It is not wrong — it is
+   * three weeks before the 28th, so it is the same weekday, and it anchors the
+   * day step exactly as well. The table teaches one date per month; it does not
+   * get to call the other three false.
+   */
+  it('takes any date in the month that lands on the doomsday', () => {
+    for (const day of [7, 14, 21, 28]) {
+      expect(entryAccepts('month', 2, false, day)).toBe(true);
+    }
+    for (const day of [1, 8, 15, 22, 29]) {
+      expect(entryAccepts('month', 2, true, day)).toBe(true);
+    }
+    expect(entryAccepted('month', 2, false)).toEqual([7, 14, 21, 28]);
+  });
+
+  it('still refuses a date that lands anywhere else', () => {
+    for (const day of [1, 2, 6, 8, 13, 27]) {
+      expect(entryAccepts('month', 2, false, day)).toBe(false);
+    }
+    // The leap doomsday is not a common-year answer, and the other way round.
+    expect(entryAccepts('month', 2, false, 29)).toBe(false);
+    expect(entryAccepts('month', 2, true, 28)).toBe(false);
+    expect(entryAccepts('month', 1, false, 4)).toBe(false);
+    expect(entryAccepts('month', 1, true, 3)).toBe(false);
+  });
+
+  it('takes exactly one code for a century anchor', () => {
+    expect(entryAccepts('century', 19, false, 3)).toBe(true);
+    for (const code of [0, 1, 2, 4, 5, 6]) {
+      expect(entryAccepts('century', 19, false, code)).toBe(false);
+    }
+    expect(entryAccepted('century', 19)).toEqual([3]);
+  });
+});
+
+describe('entryPrompts', () => {
+  it('asks January and February twice, common year first', () => {
+    for (const month of [1, 2]) {
+      expect(entryPrompts('month', month)).toEqual([
+        { kind: 'month', key: month, leapYear: false },
+        { kind: 'month', key: month, leapYear: true },
+      ]);
+    }
+  });
+
+  it('asks the ten fixed months and the four centuries once', () => {
+    for (let month = 3; month <= 12; month += 1) {
+      expect(entryPrompts('month', month)).toEqual([{ kind: 'month', key: month, leapYear: false }]);
+    }
+    expect(entryPrompts('century', 20)).toEqual([{ kind: 'century', key: 20, leapYear: false }]);
   });
 });
 

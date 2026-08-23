@@ -4,16 +4,33 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useAnswerTimer } from '@/components/answer/useAnswerTimer';
 import { Numeral } from '@/components/ui/Numeral';
 import { palette } from '@/theme/palette';
-import { MONTH_PAD_VALUES } from './weekdayPad';
+import { monthPadDays } from './weekdayPad';
+
+interface MonthPadFeedback {
+  chosen: number;
+  /** The date the table teaches. */
+  canonical: number;
+  /** Every date that lands on the doomsday, the taught one included. */
+  accepted: readonly number[];
+  /**
+   * Draw the other doomsday dates as well. Only while the screen is holding —
+   * a correct answer on the taught date auto-advances in a quarter of a second,
+   * and three extra rings flashing past it teach nothing the user just proved.
+   */
+  reveal: boolean;
+}
 
 interface MonthPadProps {
+  /** 1-based. */
+  month: number;
+  leapYear: boolean;
   onAnswer: (value: number, latencyMs: number) => void;
   promptKey: string | number;
-  feedback?: { chosen: number; correct: number } | null;
+  feedback?: MonthPadFeedback | null;
   disabled?: boolean;
 }
 
-type Tone = 'idle' | 'pressed' | 'right' | 'wrong' | 'answer';
+type Tone = 'idle' | 'pressed' | 'right' | 'wrong' | 'answer' | 'alsoRight';
 
 /** Same rule as AnswerPad: neutral until answered, grading colours only then. */
 const TONE_SX: Record<Tone, Record<string, string>> = {
@@ -38,27 +55,42 @@ const TONE_SX: Record<Tone, Record<string, string>> = {
     color: palette.ink,
     boxShadow: `inset 0 0 0 2px ${palette.gradeFast}`,
   },
+  // The other dates that fall on the doomsday. Drawn, but drawn quieter than
+  // the taught one: they are true, and one of them is the thing to remember.
+  alsoRight: {
+    backgroundColor: palette.paper,
+    color: palette.ink,
+    boxShadow: `inset 0 0 0 1px ${palette.gradeFast}`,
+  },
 };
 
-function toneFor(value: number, feedback: MonthPadProps['feedback'], pressed: number | null): Tone {
-  if (feedback) {
-    if (feedback.chosen === value) return feedback.chosen === feedback.correct ? 'right' : 'wrong';
-    if (feedback.chosen !== feedback.correct && feedback.correct === value) return 'answer';
-    return 'idle';
-  }
-  return pressed === value ? 'pressed' : 'idle';
+function toneFor(value: number, feedback: MonthPadFeedback | null, pressed: number | null): Tone {
+  if (!feedback) return pressed === value ? 'pressed' : 'idle';
+  if (feedback.chosen === value) return feedback.accepted.includes(value) ? 'right' : 'wrong';
+  if (!feedback.reveal) return 'idle';
+  if (feedback.canonical === value) return 'answer';
+  return feedback.accepted.includes(value) ? 'alsoRight' : 'idle';
 }
 
 /**
- * The month-doomsday pad: twelve buttons, one per possible answer, in
- * ascending order and always in the same places.
+ * The month-doomsday pad: every day the month has, seven to a row.
  *
- * The twelve doomsday dates are a permutation of these twelve numbers, so this
- * is a forced choice over the real answer space rather than a multiple-choice
- * question with invented distractors. Seven buttons cannot express it, which
- * is the one reason this is not the shared `AnswerPad`.
+ * Seven columns is the one decision here. Dates a whole week apart land in the
+ * same column, so after an answer the dates that share the doomsday's weekday
+ * read as a vertical line rather than as four unrelated highlights — which is
+ * the fact the month has more than one doomsday *because of*.
+ *
+ * `AnswerPad` cannot do this: seven fixed buttons is the contract that trains
+ * position memory on the codes 0 to 6, and a month has 28 to 31 answers.
  */
-export function MonthPad({ onAnswer, promptKey, feedback = null, disabled = false }: MonthPadProps) {
+export function MonthPad({
+  month,
+  leapYear,
+  onAnswer,
+  promptKey,
+  feedback = null,
+  disabled = false,
+}: MonthPadProps) {
   const [pressed, setPressed] = useState<number | null>(null);
   const answered = useRef(false);
   const timer = useAnswerTimer(promptKey);
@@ -85,11 +117,11 @@ export function MonthPad({ onAnswer, promptKey, feedback = null, disabled = fals
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: { xs: '10px', sm: '12px' },
+        gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+        gap: { xs: '5px', sm: '8px' },
       }}
     >
-      {MONTH_PAD_VALUES.map((value) => {
+      {monthPadDays(month, leapYear).map((value) => {
         const tone = toneFor(value, feedback, pressed);
         return (
           <ButtonBase
@@ -99,8 +131,8 @@ export function MonthPad({ onAnswer, promptKey, feedback = null, disabled = fals
             aria-label={`Day ${value}`}
             onClick={() => select(value)}
             sx={{
-              minHeight: { xs: 56, sm: 60 },
-              borderRadius: 1.5,
+              minHeight: { xs: 44, sm: 52 },
+              borderRadius: 1.25,
               transition:
                 'background-color 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out',
               ...TONE_SX[tone],
@@ -111,7 +143,7 @@ export function MonthPad({ onAnswer, promptKey, feedback = null, disabled = fals
                 : null),
             }}
           >
-            <Numeral size={22} weight={600} lineHeight={1}>
+            <Numeral size={17} weight={600} lineHeight={1}>
               {value}
             </Numeral>
           </ButtonBase>

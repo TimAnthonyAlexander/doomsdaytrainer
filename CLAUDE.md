@@ -396,6 +396,43 @@ correct answer advances itself — so neither row was ever seen. They were not h
 to find; they were unreachable without going looking. The only user of the app
 did not know the day-step trainer existed.
 
+**Tables asks over the whole month, and a month has more than one doomsday.**
+The pad is every day the month actually has, 1 to 28, 29, 30 or 31, seven to a
+row. It used to be the twelve distinct doomsday values — 3, 4, 5, 6, 7, 8, 9,
+10, 11, 12, 14, 28 — on the argument that a permutation of the answers is a
+forced choice rather than multiple choice with invented distractors. That was
+wrong twice over. The set gives February and March away outright, since 28 and
+14 are the only answers nothing else can be. And it could not express the other
+correct dates at all: February's 7th is three weeks before the 28th, so it is
+the same weekday and anchors the day step exactly as well, and the drill was
+marking it wrong. `doomsdayDates` and `isDoomsdayDate` in `weekday.ts` are the
+rule, and a test checks them against every date of every month from 1800 to
+2199 in both directions — every listed date lands on the doomsday, and every
+date that lands on it is listed. Seven columns is the one visual decision:
+dates a week apart share a column, so after an answer the month's doomsdays
+read as the vertical line they are.
+
+An answer on one of those other dates is graded correct and advances like any
+other correct answer. It briefly did the opposite — held, the way a wrong answer
+does, to say which date the table teaches — and that was the twelve-value pad's
+claim moved into the copy rather than dropped. The method has no real doomsday
+per month. It has an anchor, and whichever of a month's three to five the user
+holds is theirs; the taught one is the anchor with a mnemonic attached. The
+alternates are named on the wrong path only, where they are teaching something
+the user did not have.
+
+**January and February are two questions and one item.** Their doomsday is the
+only thing in either table that moves with the year, so a single answer is half
+of what the item is, and asking one of the two at random lets a user pass for
+months without meeting the other. Both, always, common year first, because the
+leap date is defined as the shifted one. Nothing is written until both halves
+are answered, and then one attempt is recorded for the pair: correct only if
+both were, timed by the *slower* of the two taps. The slower rather than the
+sum, because the thresholds in Settings are the price of one answer — summing
+would put those two months a grade below the other ten for no reason but having
+been asked twice. Two reviews of one item in one sitting would be worse again:
+a single showing would advance the interval twice.
+
 Stats stayed on Weekday, because it reports on the dates answered there and
 nowhere else, and moved above the prompt as an icon button. It is the one control
 on that screen that is not a word: everything else in the header row is a
@@ -736,6 +773,12 @@ Tests to know about, because they encode decisions rather than behaviour:
 - the day step and the tables walked in through the `/doomsdays` grid rather
   than by rendering their views directly, because the way in is the part that
   broke
+- every date of every month from 1800 to 2199 checked both ways against
+  `doomsdayDates`, so "February 7 is also a doomsday" is settled by the
+  calendar rather than by argument, and the month pad able to express every one
+  of them
+- January answered common-then-leap writing one attempt rather than two, and
+  nothing at all until both halves are in
 - a stored weekday preference that is not a legal value falling back to the
   default instead of reaching the screen
 - the shell holding exactly one scroller, with the notice bar and the bottom bar

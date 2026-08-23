@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MONTH_DOOMSDAYS, weekdayFor } from '@/domain/weekday';
-import { MONTH_PAD_VALUES, weekdayOptions } from './weekdayPad';
+import { MONTH_DOOMSDAYS, doomsdayDates, weekdayFor } from '@/domain/weekday';
+import { monthPadDays, weekdayOptions } from './weekdayPad';
 
 describe('weekdayOptions', () => {
   it('is always seven, and always the seven days', () => {
@@ -57,15 +57,35 @@ describe('weekdayOptions', () => {
   });
 });
 
-describe('MONTH_PAD_VALUES', () => {
-  it('is exactly the twelve month doomsdays, ascending', () => {
-    expect(MONTH_PAD_VALUES).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 28]);
-    expect([...MONTH_PAD_VALUES].sort((a, b) => a - b)).toEqual([...MONTH_PAD_VALUES]);
+describe('monthPadDays', () => {
+  it('is every day the month has, ascending, and nothing else', () => {
+    expect(monthPadDays(1, false)).toHaveLength(31);
+    expect(monthPadDays(2, false)).toHaveLength(28);
+    expect(monthPadDays(2, true)).toHaveLength(29);
+    expect(monthPadDays(4, false)).toHaveLength(30);
+    expect(monthPadDays(2, false)[0]).toBe(1);
+    expect(monthPadDays(2, false)[27]).toBe(28);
   });
 
-  it('can answer every month', () => {
-    for (const doomsday of MONTH_DOOMSDAYS) {
-      expect(MONTH_PAD_VALUES).toContain(doomsday);
+  /**
+   * The pad used to be the twelve distinct doomsday values, which meant a
+   * February answer of 7 — the same weekday as the 28th, and a perfectly good
+   * anchor — could not be given at all. Every date the method accepts has to
+   * be reachable, or the drill is grading its own pad rather than the user.
+   */
+  it('can express every date that falls on the doomsday', () => {
+    for (const leapYear of [false, true]) {
+      for (let month = 1; month <= 12; month += 1) {
+        for (const day of doomsdayDates(month, leapYear)) {
+          expect(monthPadDays(month, leapYear)).toContain(day);
+        }
+      }
+    }
+  });
+
+  it('offers the taught date of every month', () => {
+    for (const [index, doomsday] of MONTH_DOOMSDAYS.entries()) {
+      expect(monthPadDays(index + 1, false)).toContain(doomsday);
     }
   });
 });
