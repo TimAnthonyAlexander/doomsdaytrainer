@@ -79,10 +79,17 @@ export function StatsScreen() {
 
   const close = useCallback(() => setSelected(null), []);
 
-  const scopeNote =
+  // Names its subject, not only its scope. Everything on this page is the year
+  // codes — the weekday trainer keeps its figures behind the stats button on
+  // its own screen, the day step under Day step, the derivation inside Calc —
+  // so a subtitle that opened "All 100 year codes" read as the app's summary
+  // rather than as one subject's, on the one screen in the nav that says how
+  // you are doing.
+  const scopeLine =
     scope.id === 'full'
-      ? 'All 100 year codes.'
-      : `${scope.label} scope, ${formatYear(scope.from)} to ${formatYear(scope.to)}. Years outside it are drawn empty.`;
+      ? 'The year codes, all 100 of them.'
+      : `The year codes, ${scope.label} scope, ${formatYear(scope.from)} to ${formatYear(scope.to)}. Years outside it are drawn empty.`;
+  const scopeNote = `${scopeLine} Weekday, day-step and calculation figures are on their own screens.`;
 
   const accuracyLabel =
     accuracy.total === 0

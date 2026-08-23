@@ -24,6 +24,17 @@ interface PracticeSettingsProps {
   onChange: (patch: Partial<Settings>) => void;
 }
 
+/**
+ * These settings do not all reach the same distance, and the labels now say so.
+ *
+ * The index convention renames weekdays wherever the app prints one, so it
+ * belongs to the method. Scope and the daily cap govern the 100 year codes and
+ * nothing else — not the tables, not the day step, not the weekday trainer, not
+ * the Concept walk — and while they were labelled "Scope" and "New codes per
+ * day" they read as the app's practice settings, which made the whole app look
+ * like a year-code trainer with some extra screens attached. Each names its
+ * subject now, and each note names what it leaves alone.
+ */
 export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) {
   const range = normaliseRange(settings.customScope);
   const [fromText, setFromText] = useDraft(formatYear(range.from));
@@ -40,7 +51,7 @@ export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) 
     <SettingsSection title="Practice">
       <Field
         label="Index convention"
-        note="This renames the weekdays the app shows you. It never changes a year code."
+        note="This renames the weekdays the app shows you, on every screen. It never changes a year code."
       >
         <ToggleButtonGroup
           exclusive
@@ -67,8 +78,8 @@ export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) 
       </Field>
 
       <Field
-        label="Scope"
-        note="Codes outside the scope stay stored and stop being scheduled. Nothing is deleted, and widening the scope brings their progress back."
+        label="Year-code scope"
+        note="Which of the 100 codes are scheduled. The rest stay stored and stop coming up; nothing is deleted, and widening the scope brings their progress back. It scopes the codes only — the month doomsdays, the century anchors, the day step, the weekday trainer and the Concept walk are always there in full."
       >
         <ToggleButtonGroup
           orientation="vertical"
@@ -137,8 +148,8 @@ export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) 
       </Field>
 
       <Field
-        label="New codes per day"
-        note="How many unlearned codes Learn mode will hand over in one day. Two decade blocks by default."
+        label="New year codes per day"
+        note="How many unlearned codes Learn mode will hand over in one day. Two decade blocks by default. It caps the codes only — the tables, the day step and the weekday trainer have no daily limit."
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Slider
@@ -146,7 +157,7 @@ export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) 
             min={NEW_ITEMS_MIN}
             max={NEW_ITEMS_MAX}
             step={1}
-            aria-label="New codes per day"
+            aria-label="New year codes per day"
             onChange={(_event, value) => setNewItems(value as number)}
             onChangeCommitted={(_event, value) => onChange({ newItemsPerDay: value as number })}
             sx={{ flex: 1 }}

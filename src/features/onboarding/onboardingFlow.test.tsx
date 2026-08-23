@@ -69,9 +69,9 @@ describe('onboarding flow', () => {
   it('writes every choice at the end and finishes on learn', async () => {
     const { user } = await mount();
 
-    expect(heading('100 number pairs')).not.toBeNull();
+    expect(heading('Any date, in your head')).not.toBeNull();
     await user.click(button('Next'));
-    expect(heading('Where the codes come from')).not.toBeNull();
+    expect(heading('Where the year codes come from')).not.toBeNull();
 
     await user.click(button('Next'));
     await user.click(button('0 = Monday'));
@@ -124,7 +124,7 @@ describe('onboarding flow', () => {
     await user.click(button('Skip'));
 
     expect(heading('Which day is code 0?')).not.toBeNull();
-    expect(heading('Where the codes come from')).toBeNull();
+    expect(heading('Where the year codes come from')).toBeNull();
     expect(screen.getByRole('group', { name: 'Step 3 of 5' })).toBeInTheDocument();
   });
 
@@ -152,7 +152,7 @@ describe('onboarding flow', () => {
     expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(button('Back'));
-    expect(heading('Where the codes come from')).not.toBeNull();
+    expect(heading('Where the year codes come from')).not.toBeNull();
 
     await user.click(button('Next'));
     expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');
@@ -200,7 +200,7 @@ describe('onboarding flow', () => {
     await mount();
 
     expect(await screen.findByText('weekday screen')).toBeInTheDocument();
-    expect(heading('100 number pairs')).toBeNull();
+    expect(heading('Any date, in your head')).toBeNull();
   });
 
   it('runs again on request and starts from the stored settings', async () => {
@@ -212,7 +212,7 @@ describe('onboarding flow', () => {
     });
     const { user } = await mount('/welcome?rerun=1');
 
-    expect(heading('100 number pairs')).not.toBeNull();
+    expect(heading('Any date, in your head')).not.toBeNull();
     await user.click(button('Next'));
     await user.click(button('Skip'));
     expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');

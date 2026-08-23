@@ -1,9 +1,11 @@
 # Doomsday Trainer
 
-A trainer for the 100 year codes of the Doomsday method, plus the month
-doomsdays, the century anchors, and a full date-to-weekday drill built on top of
-them. It is a memorisation tool, not a calculator: the target is producing any
-of the hundred codes from memory in under a second.
+A teacher and trainer for the Doomsday method: given any date, name the weekday
+it falls on, in your head. The method is walked end to end and every step of it
+is drilled on its own — the century anchors, the month doomsdays, the 100 year
+codes, and the count from a doomsday to the day actually asked for. It is a
+memorisation tool, not a calculator: the target is a weekday in under a second,
+which means each step has to be recalled rather than worked out.
 
 Everything runs on the device. No account, no server, no analytics, no network
 calls at all. Progress moves between devices through a JSON export.

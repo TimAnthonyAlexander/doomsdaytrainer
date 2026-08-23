@@ -58,10 +58,12 @@ export function ScopeStep({
 
   return (
     <>
-      <PageTitle>How much of the table</PageTitle>
+      <PageTitle>How many year codes</PageTitle>
       <Typography variant="body1" color="text.secondary">
-        All hundred is the default and it is the right pick for most people. A narrower range is
-        less to hold at once, and you can widen it later in settings without losing progress.
+        The year code is one step of the method, and the only step with a hundred things to
+        learn. All hundred is the default and it is the right pick for most people. A narrower
+        range is less to hold at once, and you can widen it later in settings without losing
+        progress.
       </Typography>
 
       <ToggleButtonGroup
@@ -100,6 +102,14 @@ export function ScopeStep({
           {field('to', 'To', customTo)}
         </Box>
       ) : null}
+
+      {/* Says what this setting does not reach, because it is the only setting
+          in the flow that narrows anything and the name of the app is not
+          "Year Codes". */}
+      <Typography variant="body2" color="text.secondary">
+        Nothing else is narrowed by this setting. Weekday, Doomsdays and Concept cover the rest
+        of the method and are in the nav from the start.
+      </Typography>
     </>
   );
 }

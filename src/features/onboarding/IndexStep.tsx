@@ -25,8 +25,9 @@ export function IndexStep({ value, onChange }: IndexStepProps) {
     <>
       <PageTitle>Which day is code 0?</PageTitle>
       <Typography variant="body1" color="text.secondary">
-        Some people learn this table with 0 meaning Sunday, some with 0 meaning Monday. Pick
-        whichever you were taught. It renames the weekdays the app shows you, and nothing else.
+        Some people learn the method with 0 meaning Sunday, some with 0 meaning Monday. Pick
+        whichever you were taught. It renames the weekdays the app shows you, on every screen,
+        and changes nothing else.
       </Typography>
 
       <ToggleButtonGroup

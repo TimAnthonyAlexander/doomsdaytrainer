@@ -1,8 +1,13 @@
 # Doomsday Trainer
 
-A trainer for the Doomsday method: the 100 year codes, the month doomsdays, the
-century anchors, and the arithmetic that generates all of them. Local-first,
-offline, no server, no accounts, no analytics.
+A teacher and trainer for the Doomsday method: given any date, name the weekday
+it falls on, in your head. The method is walked end to end and every step of it
+is drilled on its own — the century anchors, the month doomsdays, the 100 year
+codes, and the count from a doomsday to the day asked for. The codes are the
+largest of those and the one that takes longest to acquire, which is why most of
+the screens are theirs; they are a step of the method rather than the subject of
+the app, and **the copy has to keep saying so**. Local-first, offline, no server,
+no accounts, no analytics.
 
 Production: https://doomsday.timanthonyalexander.de
 
@@ -89,7 +94,7 @@ Six destinations, and the whole table is in `src/router.tsx`:
 /doomsdays              the grid         Tables and Day step
 /doomsdays/tables       Tables           the 12 month doomsdays and the 4 century anchors
 /doomsdays/day-step     Day step         the last step of the method, timed on its own
-/stats                  Progress
+/stats                  Stats            the year codes, and it says so
 /settings               Settings
 /welcome                Onboarding       outside the shell
 ```
@@ -635,12 +640,34 @@ derivation's sum (calculating), and compares answers that followed a neighbour
 against answers that did not. Recall is flat on all three. Nothing there feeds
 the scheduler.
 
+Its subtitle names its subject rather than only its scope. It read "All 100 year
+codes.", which on the app's one reporting destination said the app was the code
+table. It now opens "The year codes, all 100 of them" and points at the three
+surfaces that keep their own figures. Nothing on the page moved: the weekday
+trainer's numbers are still behind the stats button on its own screen, the day
+step's under Day step, the derivation's inside Calc.
+
 **Settings** and **Onboarding** round it out. Notifications
 are handled honestly: a local-first app with no server cannot do Web Push, the
 Notification Triggers API was removed from Chrome, and iOS gives nothing when the
 app is closed. So the capability layer reports what the browser can actually do,
 in a sentence meant to be rendered as-is, and the settings screen shows that
 rather than a switch that quietly does nothing.
+
+In Practice, every setting names how far it reaches. The index convention
+renames weekdays wherever the app prints one, so it belongs to the method.
+"Scope" and "New codes per day" govern the 100 codes and nothing else — not the
+tables, not the day step, not the weekday trainer, not the Concept walk — and
+under those names they read as the app's practice settings. They are
+"Year-code scope" and "New year codes per day" now, and each note says what it
+leaves alone. The weekday trainer's own two preferences stay in `localStorage`
+and out of this screen, which is deliberate and explained above: they are device
+state.
+
+The reset confirm button says **"Delete everything"**. It said "Delete all 100
+codes' progress" while the action wiped the tables, the weekday log, the day
+step, calc and verify as well. A confirm button is the last thing read before an
+irreversible write, and that one named a tenth of what it did.
 
 ---
 
@@ -723,6 +750,34 @@ need so nothing shifts width between renders.
 Copy rules are in BRIEF.md and they are enforced in review. No exclamation marks,
 no congratulation, no gamified language, no streak theatre. When a session ends
 the app states what happened: "24 reviews, 3 wrong, median 1.4s".
+
+### The shipped mark
+
+`scripts/generate-icons.mjs` writes `favicon.svg` and all five PNGs, run by hand
+like `generate-tts.mjs` and its output committed. It needs `rsvg-convert`
+(`brew install librsvg`); the Open Graph card carries type, so it downloads IBM
+Plex Sans to a temp directory and renders through a throwaway fontconfig rather
+than depending on whatever face the machine has installed.
+
+The reason it exists is that the mark is drawn in five files at four sizes and
+they went out of step. When the palette moved to purple, `favicon.svg`, the four
+PNGs and the manifest's `theme_color`/`background_color` all kept the old green
+`#1F4636` — the app was purple and every surface outside the bundle was not, and
+nothing in the build could notice. Colours are now the light-mode tokens in one
+place at the top of the script; change them there and re-run.
+
+The proportions are the part that has to hold: a key is 24 wide on a 30 pitch
+with a radius of 7, which is where `favicon.svg` started, and every other file
+is that at a different scale through one function. Regenerating reproduces the
+original `favicon.svg` geometry exactly. What differs per file is only how much
+of the edge the keys span — the browser icon carries its own corner radius at
+84%, while the maskable and Apple icons run their ground to the edge and pull
+the keys in to 53% and 66%, because both platforms apply a mask of their own and
+a maskable safe area is a circle 80% of the edge.
+
+The mark stayed what it was: the answer pad, three-three-one. Seven keys because
+there are seven weekdays, which makes it the method's shape rather than the code
+table's — the same geometry as `Mark` in `AppShell`.
 
 ---
 
@@ -848,7 +903,8 @@ both `scripts/generate-tts.mjs` and `src/features/audio/speech.ts`. Reusing the
 path would strand anyone who had already cached the old set, for a year.
 
 The clips are runtime-cached by `sw.ts` and deliberately kept out of the
-precache manifest, which stays around 870 KiB and is all code. Six megabytes of
+precache manifest, which stays around 920 KiB and is code, fonts and the icons.
+Six megabytes of
 audio at first install, most of it for years the user has not reached, would be
 paid by everyone and used by few.
 
@@ -958,3 +1014,72 @@ Ordered went, including from teaching.
 The lesson, again, is that a half-fix passes every test. The suite was green
 across the first change, and the screen that caused the problem was never once
 touched by it.
+
+---
+
+## The third trap: the app was a Doomsday trainer that said it was a year-code trainer
+
+The code was right and the words were wrong. Six destinations, four subjects,
+the whole method walked end to end on `/concept` — and the app introduced
+itself, on every surface that speaks for the product rather than for a screen,
+as a trainer for the 100 year codes.
+
+Onboarding's first screen was titled "100 number pairs" and said, in so many
+words, *"It does not work out dates for you and it does not teach the rest of
+the Doomsday method. Only the table."* Four of the six destinations contradicted
+that sentence. It was true when it was written.
+
+That is the shape of this one, and it is the part worth carrying forward:
+**product copy does not fail loudly.** A stale sentence compiles, passes every
+test, renders without a layout shift, and goes on telling new users something
+the app stopped doing months ago. Nothing in a build can catch it, because
+nothing in a build knows what the app is for. The only detector is somebody
+reading the words next to the thing they describe.
+
+Where it had spread:
+
+- **The head, the manifest and the Open Graph card.** `<title>`, the meta
+  description, `og:description`, the manifest description and the card's own
+  rendered tagline all said "the 100 year codes". Between them, that is the
+  browser tab, the search result, every link ever pasted, and the installed
+  app's own description.
+- **Onboarding.** The false intro screen, a scope step titled "How much of the
+  table", and a "Where the codes come from" that read as the subject rather than
+  as one step's derivation.
+- **Settings.** Year-code scope and the year-code daily cap presented as the
+  app's practice settings, and a reset button that named the codes while the
+  action wiped everything.
+- **Stats.** The app's only reporting destination, subtitled "All 100 year
+  codes." as though that were the app's summary.
+- **The brand assets.** Still the pre-token green, months after the palette went
+  purple.
+
+### What was deliberately not changed
+
+This was a copy and asset pass, and the scope was held to that on purpose. No
+user flow moved, no screen lands anywhere new, and nothing that was counted
+before is counted differently now. Specifically left alone:
+
+- **The onboarding order** stays `intro · why · index · scope · method`, and the
+  flow still commits to `/year-codes/learn`. Reordering it so the method is read
+  earlier is a defensible product change and it is not a copy fix.
+- **The due count is still the year codes alone**, in the nav badge and in every
+  reminder, and reminders still say "codes" and still open `/year-codes/revise`.
+  The sixteen tables go through the same SM-2 machinery, so a day on which only
+  they are ready genuinely does report nothing due — that is a real gap, and
+  closing it means changing what the app counts and where a notification lands,
+  which is not a wording problem and should not be smuggled in as one. Note that
+  the tables also write no session day, so `reviewStreak` and the evening
+  reminder's "already sat down with it today" test do not see them either. All
+  of it is one change, and it is still open.
+- **Stats reports the year codes only.** Its subtitle now says so instead of
+  implying otherwise. Surfacing the weekday, day-step and calculation figures
+  alongside them would be a new section on the page, not a sentence.
+
+So the rule that comes out of this one is narrow and worth keeping narrow: **a
+sentence that names the product's scope has a shelf life.** When a surface is
+added, the copy that says what the app does is part of that change. What is
+*not* a framing bug, and was left alone on purpose, is copy inside the year-code
+surfaces that talks about codes — Learn, Revise, Calc and Trouble are about the
+codes, and saying so there is accurate. The defect was only ever in the places
+that speak for the whole product.

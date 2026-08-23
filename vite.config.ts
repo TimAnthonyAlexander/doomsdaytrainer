@@ -24,13 +24,19 @@ export default defineConfig({
         name: 'Doomsday Trainer',
         short_name: 'Doomsday',
         description:
-          'Memorise the 100 year codes of the Doomsday method. Seven buttons, spaced repetition, latency-graded.',
+          'Learn the whole Doomsday method and drill every step of it: century anchors, month doomsdays, year codes, and the count to the day. Seven buttons, spaced repetition, latency-graded.',
         start_url: '/',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#FAF8F3',
-        theme_color: '#1F4636',
+        // The dark ground, because dark is the app's default and the inline
+        // script in index.html stamps it before first paint. These two were
+        // the pre-token green long after the palette moved to purple, so the
+        // splash screen and the OS status bar were the last of the old brand
+        // still on screen. They are `--bg` and nothing else; see
+        // src/theme/tokens.ts.
+        background_color: '#17161A',
+        theme_color: '#17161A',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

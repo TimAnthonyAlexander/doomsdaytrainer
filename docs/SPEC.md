@@ -75,7 +75,7 @@ attemptHistory[]   { timestamp, correct, latencyMs }
 
 Screen sequence:
 
-1. **What this is.** One paragraph. "You're memorizing 100 number pairs. Year → code. That's it."
+1. **What this is.** One paragraph: a full date in, a weekday out, and the four pieces the method gets there with. It said "you're memorizing 100 number pairs — year → code, that's it" for a while, which named one step as the whole product and was flatly contradicted by four of the six destinations.
 2. **Why the codes exist.** Optional, skippable, one screen. Shows the formula `(YY + floor(YY/4)) mod 7` and one worked example so the user knows the table isn't arbitrary.
 3. **Index choice.** User picks Sunday-indexed (`0=Sun`) or Monday-indexed (`0=Mon`). This does not change the year codes at all. It only changes the weekday names shown in optional context. Default: Sunday-indexed. Changeable in settings.
 4. **Scope choice.** Full 100, or a subset (see Scopes below). Default: full 100.

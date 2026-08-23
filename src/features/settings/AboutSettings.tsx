@@ -2,6 +2,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
+import { STEP_COUNT } from '@/features/onboarding/onboardingModel';
 import type { InstallPrompt } from '@/features/pwa';
 import { Field, SettingsSection } from './SettingsSection';
 import { APP_VERSION } from './settingsModel';
@@ -25,9 +26,16 @@ export function AboutSettings({ install }: { install: InstallPrompt }) {
         </Field>
       ) : null}
 
+      {/* Counted from the flow itself: the old note said four and the flow had
+          five, which is the one way a number in prose goes wrong quietly. */}
       <Field
         label="Onboarding"
-        note="The four intro screens again, including the worked example. Your progress is not touched."
+        note={
+          <>
+            All <Numeral size={13}>{STEP_COUNT}</Numeral> intro screens again, including the
+            explainer that walks the whole method. Your progress is not touched.
+          </>
+        }
       >
         <Button component={RouterLink} to="/welcome?rerun=1" variant="outlined" color="inherit">
           Run onboarding again

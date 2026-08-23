@@ -38,8 +38,6 @@ export function DataSettings({ data, onImport, onReset }: DataSettingsProps) {
   const [resetOpen, setResetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const itemCount = Object.keys(data.items).length;
-
   const pickFile = async (file: File | undefined) => {
     if (!file) return;
     setError(null);
@@ -68,7 +66,7 @@ export function DataSettings({ data, onImport, onReset }: DataSettingsProps) {
     <SettingsSection title="Data">
       <Field
         label="Export"
-        note="One JSON file with all of it: codes, weekday tables, settings, drill records. It is the only way to move progress to another device."
+        note="One JSON file with all of it: the year codes, the month doomsdays and century anchors, the weekday, day-step, calculation and verify history, drill records and settings. It is the only way to move progress to another device."
       >
         <Button variant="outlined" color="inherit" onClick={() => downloadExport(data)}>
           Export data
@@ -106,7 +104,7 @@ export function DataSettings({ data, onImport, onReset }: DataSettingsProps) {
 
       <Field
         label="Reset progress"
-        note="Every code goes back to unlearned and the app starts again at onboarding. Export first if you might want any of it back."
+        note="This clears everything, not just the codes. The 100 year codes and the sixteen tables go back to unlearned, and the weekday, day-step, calculation, verify and drill history is deleted along with your settings. The app starts again at onboarding. Export first if you might want any of it back."
       >
         <Button variant="outlined" color="error" onClick={() => setResetOpen(true)}>
           Reset progress
@@ -125,8 +123,12 @@ export function DataSettings({ data, onImport, onReset }: DataSettingsProps) {
       <ConfirmDialog
         open={resetOpen}
         title="Reset progress?"
-        description="Intervals, lapses, attempt history, drill records and settings all go back to their starting values."
-        confirmLabel={`Delete all ${itemCount} codes' progress`}
+        description="Intervals, lapses and attempt history on the year codes and the tables, every weekday, day-step, calculation and verify answer on record, drill records and settings all go back to their starting values."
+        // Not "delete all 100 codes' progress", which the button said while
+        // the action wiped the tables, the weekday log, the day step, calc and
+        // verify as well. A confirm button is the last thing read before an
+        // irreversible write, so it names the whole of what it does.
+        confirmLabel="Delete everything"
         onConfirm={() => {
           setResetOpen(false);
           void onReset();

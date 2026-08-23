@@ -23,7 +23,7 @@ export function WhyStep() {
 
   return (
     <>
-      <PageTitle>Where the codes come from</PageTitle>
+      <PageTitle>Where the year codes come from</PageTitle>
       <Typography variant="body1" color="text.secondary">
         Nothing in the table is arbitrary. Every year shifts the calendar one weekday forward, and
         every leap year that has passed shifts it one more. Add those up and take the remainder
@@ -48,8 +48,9 @@ export function WhyStep() {
       <Typography variant="body1" color="text.secondary">
         The table gives <Numeral weight={600} color={palette.ink}>{code}</Numeral> for{' '}
         <Numeral weight={600} color={palette.ink}>{year}</Numeral> too. You could derive all
-        hundred like this. Each one takes a few seconds, and a few seconds is exactly the problem,
-        so you learn them instead.
+        hundred this way, and the Calc screen teaches you how. It costs a few seconds each time
+        though, and the year code is one of four numbers a date needs, so it is worth knowing
+        outright.
       </Typography>
     </>
   );

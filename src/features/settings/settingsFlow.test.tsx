@@ -186,7 +186,7 @@ describe('Reset', () => {
     mount();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reset progress' }));
-    const confirm = await screen.findByRole('button', { name: "Delete all 100 codes' progress" });
+    const confirm = await screen.findByRole('button', { name: 'Delete everything' });
     fireEvent.click(confirm);
 
     await waitFor(async () => {
