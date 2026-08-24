@@ -7,11 +7,14 @@ import {
   explainDatePart,
   explainYearPart,
   yearPartAnswer,
+  yearPartVerdict,
 } from './methodParts';
+import { codeFor } from './yearCodes';
 import {
   ALL_MONTHS,
   MAX_YEAR,
   MIN_YEAR,
+  centuryAnchor,
   dateStep,
   daysInMonth,
   doomsdayDates,
@@ -20,6 +23,7 @@ import {
   monthLength,
   weekdayFor,
   yearDoomsday,
+  yearKeyOf,
 } from './weekday';
 
 /**
@@ -148,6 +152,53 @@ describe('the year half', () => {
   it('refuses a year outside the supported range', () => {
     expect(() => yearPartAnswer({ fullYear: MIN_YEAR - 1 })).toThrow(RangeError);
     expect(() => yearPartAnswer({ fullYear: MAX_YEAR + 1 })).toThrow(RangeError);
+  });
+});
+
+describe('yearPartVerdict', () => {
+  it('names a correct answer correct', () => {
+    for (let year = MIN_YEAR; year <= MAX_YEAR; year += 1) {
+      const question = { fullYear: year };
+      expect(yearPartVerdict(question, yearPartAnswer(question))).toBe('correct');
+    }
+  });
+
+  /**
+   * The one mistake this half has a name for: the year code recalled correctly
+   * and the century anchor never added to it.
+   */
+  it('names the bare year code as the forgotten anchor', () => {
+    // 1973: anchor 3, code 0, answer 3. Answering 0 is the code untouched.
+    expect(yearPartVerdict({ fullYear: 1973 }, 0)).toBe('century-forgotten');
+    expect(yearPartVerdict({ fullYear: 2000 }, codeFor(0))).toBe('century-forgotten');
+  });
+
+  it('calls anything else wrong', () => {
+    // 1973's answer is 3 and its code is 0, so 5 is neither.
+    expect(yearPartVerdict({ fullYear: 1973 }, 5)).toBe('wrong');
+    expect(yearPartVerdict({ fullYear: 1973 }, 1)).toBe('wrong');
+  });
+
+  /**
+   * The 2100s anchor is 0, so for those years the answer *is* the bare year
+   * code and arriving at it is right. Testing for the forgotten anchor before
+   * testing for correctness would call every correct 21xx answer a mistake.
+   */
+  it('does not accuse a 2100s answer of forgetting an anchor that is zero', () => {
+    expect(centuryAnchor(2173)).toBe(0);
+    for (let year = 2100; year <= MAX_YEAR; year += 1) {
+      const question = { fullYear: year };
+      expect(yearPartAnswer(question)).toBe(codeFor(yearKeyOf(year)));
+      expect(yearPartVerdict(question, codeFor(yearKeyOf(year)))).toBe('correct');
+    }
+  });
+
+  /** Every year outside the 2100s can express the mistake, because its anchor moves the code. */
+  it('separates the two verdicts wherever the anchor is not zero', () => {
+    for (let year = MIN_YEAR; year < 2100; year += 1) {
+      const question = { fullYear: year };
+      expect(yearPartVerdict(question, codeFor(yearKeyOf(year)))).toBe('century-forgotten');
+    }
   });
 });
 

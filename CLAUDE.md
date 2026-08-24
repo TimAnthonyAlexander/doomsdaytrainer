@@ -442,11 +442,45 @@ The pools are small enough to exhaust — a hundred years in the default range,
 avoids a window of the last twenty rather than keeping the growing "already
 seen" set the full-date trainer can afford over 146,097 dates.
 
-The worked answer these show after a wrong tap is `WorkingLines`, which was
-written out twice before — once in `WeekdayWorking` and once in the day-step
-view — and a third copy was the alternative to extracting it. Three columns and
-a definition list: a term, its derivation, its value. The label is not optional
-and there is no version of a row without one.
+The worked answer the date half shows after a wrong tap is `WorkingLines`,
+which was written out twice before — once in `WeekdayWorking` and once in the
+day-step view — and a third copy was the alternative to extracting it. Three
+columns and a definition list: a term, its derivation, its value. The label is
+not optional and there is no version of a row without one.
+
+The year half does not use it. It shows `YearPartReveal` instead, after every
+answer rather than only a wrong one: the century anchor big on the left, the
+year code big on the right, an operator between them, each labelled. That half
+has exactly two inputs and one operation, so the pair side by side is the whole
+of it, and `WorkingLines`' three rows there would be the anchor, the code and
+their sum — the same two numbers on screen twice. The two components share
+nothing on purpose. One is built to be read after a mistake to find out which
+step failed; the other is built to be glanced at.
+
+**The colours name the one mistake this half has.** `yearPartVerdict` in the
+domain decides between three: correct is both figures green; an answer equal to
+the bare year code is that code in amber and the anchor in red, because the
+code was recalled correctly and the anchor was never added to it; anything else
+is both red. Telling somebody "wrong" when they knew the code teaches them to
+doubt the half they got right.
+
+Correct is tested for first, and that ordering is the whole subtlety: the 2100s
+anchor is 0, so for those years the answer *is* the bare year code and arriving
+at it is right. Checking for the forgotten anchor first would call every correct
+21xx answer a mistake.
+
+The colour is never the only thing carrying the verdict — the pad flashes green
+or red under it, a wrong answer holds the screen and draws a Continue button,
+and the one verdict a colour cannot carry alone gets a sentence. Grading hues
+are allowed here for the same reason they are allowed on the pad: this is
+feedback, not a card or a header.
+
+The reveal's slot keeps its height whether or not the pair is in it. Without
+that, every correct answer would appear, re-centre the block above it and vanish
+a quarter of a second later, so the prompt would jog on every rep of a screen
+meant to be answered at speed. On a correct answer the pair lasts as long as the
+auto-advance delay in Settings, which is the same window the pad's own flash
+gets.
 
 **Day step** is the last step of that method timed on its own, and it lives
 under Doomsdays. "In March, the 14th is a Tuesday. What is the 5th?" — one
@@ -940,6 +974,11 @@ Tests to know about, because they encode decisions rather than behaviour:
 - a stored "February 30" never reaching a screen that would compute its offset
 - the halves recording no scheduling at all: items, month items, century items
   and session days byte for byte unchanged across an answer
+- the year half's reveal colouring all three verdicts, asserted as the actual
+  computed colour rather than as a class name, and the named mistake carrying a
+  sentence as well as a hue
+- a correct 21xx answer never being read as a forgotten anchor, which is the one
+  way that verdict goes wrong and the one way it goes wrong silently
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.

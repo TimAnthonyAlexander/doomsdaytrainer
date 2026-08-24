@@ -8,14 +8,17 @@ import { Screen } from '@/components/ui/Screen';
 import {
   datePartPrompt,
   methodPartQuestion,
+  yearPartVerdict,
   type MethodPart,
 } from '@/domain/methodParts';
-import { weekdayName } from '@/domain/weekday';
+import { centuryAnchor, weekdayName, yearKeyOf } from '@/domain/weekday';
+import { codeFor } from '@/domain/yearCodes';
 import type { WeekdayRangeId } from '@/domain/types';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
 import { summarise } from '@/features/review/summary';
 import { WorkingLines } from './WorkingLines';
+import { YearPartReveal } from './YearPartReveal';
 import { partLifetimeLine, partSessionLine } from './partStats';
 import { useMethodPartSession } from './useMethodPartSession';
 
@@ -59,6 +62,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
   const { settings, partTotals } = useAppState();
   const session = useMethodPartSession(part, rangeId);
   const { phase, advance, prompt } = session;
+  const answered = phase !== 'prompt';
 
   // Correct answers advance themselves. Errors never do: the working has to be
   // read, and reading it takes as long as it takes.
@@ -115,20 +119,46 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
         </Typography>
 
         {phase === 'wrong' ? (
-          <>
-            <Typography variant="h3" component="p" sx={{ color: palette.brandDeep }}>
-              {/* The year half's answer is a weekday, so its name is worth
-                  stating: a reader who knows 1973's doomsday was a Wednesday
-                  can check the 3 against something they already hold. The date
-                  half's answer is a count of days and has no name. */}
-              {prompt.part === 'year'
-                ? `${session.correctCode}  ${weekdayName(session.correctCode)}`
-                : String(session.correctCode)}
-            </Typography>
-            <Box sx={{ width: '100%', maxWidth: 360 }}>
-              <WorkingLines lines={session.lines} />
-            </Box>
-          </>
+          <Typography variant="h3" component="p" sx={{ color: palette.brandDeep }}>
+            {/* The year half's answer is a weekday, so its name is worth
+                stating: a reader who knows 1973's doomsday was a Wednesday
+                can check the 3 against something they already hold. The date
+                half's answer is a count of days and has no name. */}
+            {prompt.part === 'year'
+              ? `${session.correctCode}  ${weekdayName(session.correctCode)}`
+              : String(session.correctCode)}
+          </Typography>
+        ) : null}
+
+        {/* The year half shows its two inputs after every answer, right or
+            wrong, and that display replaces the labelled working here rather
+            than joining it — the working's three rows are the anchor, the code
+            and their sum, so keeping both would put the same two numbers on
+            screen twice. The date half keeps the working, whose rows are the
+            month doomsday, the subtraction and the reduction, and are not this
+            pair under another name. */}
+        {prompt.part === 'year' ? (
+          // The slot keeps its height whether or not the pair is in it. Without
+          // that, every correct answer would appear, re-centre the block above
+          // it and vanish again a quarter of a second later, so the prompt
+          // would jog on every rep of a screen meant to be answered at speed.
+          // Nothing here reserves room for the note: that only ever shows on a
+          // wrong answer, where the screen is already held and being read.
+          <Box sx={{ minHeight: 72, display: 'flex', alignItems: 'center' }}>
+            {answered ? (
+              <YearPartReveal
+                centuryAnchor={centuryAnchor(prompt.question.fullYear)}
+                yearCode={codeFor(yearKeyOf(prompt.question.fullYear))}
+                verdict={yearPartVerdict(prompt.question, session.chosen ?? -1)}
+              />
+            ) : null}
+          </Box>
+        ) : null}
+
+        {answered && prompt.part === 'date' && phase === 'wrong' ? (
+          <Box sx={{ width: '100%', maxWidth: 360 }}>
+            <WorkingLines lines={session.lines} />
+          </Box>
         ) : null}
       </Box>
 

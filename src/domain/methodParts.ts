@@ -101,6 +101,32 @@ export function datePartAnswer(question: DatePartQuestion): Code {
   return dateStep(question.month, question.day, question.leapYear);
 }
 
+/**
+ * What a year-half answer was, beyond right or wrong.
+ *
+ * `century-forgotten` is the one mistake this half has a name for: the answer
+ * is the year code unchanged, which is what comes out when the code is
+ * recalled correctly and the century anchor is never added to it. It is worth
+ * separating because it is not a memory failure at all — the user knew the
+ * code — and telling them "wrong" teaches them to doubt the half they got
+ * right.
+ */
+export type YearPartVerdict = 'correct' | 'century-forgotten' | 'wrong';
+
+/**
+ * Correct is checked first, and that ordering is the whole subtlety.
+ *
+ * The 2100s anchor is 0, so for those years `(0 + code) mod 7` is the code
+ * itself and answering the bare year code is the right answer arrived at
+ * properly. Testing for the forgotten anchor first would call every correct
+ * 21xx answer a mistake.
+ */
+export function yearPartVerdict(question: YearPartQuestion, answered: number): YearPartVerdict {
+  if (answered === yearPartAnswer(question)) return 'correct';
+  if (answered === codeFor(yearKeyOf(question.fullYear))) return 'century-forgotten';
+  return 'wrong';
+}
+
 /* ------------------------------------------------------------------ */
 /* The worked answer                                                   */
 /* ------------------------------------------------------------------ */

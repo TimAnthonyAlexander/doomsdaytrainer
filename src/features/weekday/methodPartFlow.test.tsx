@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
 import { datePartAnswer, yearPartAnswer } from '@/domain/methodParts';
+import { codeFor } from '@/domain/yearCodes';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
@@ -163,6 +164,102 @@ describe('the year half', () => {
     expect(after.monthItems).toEqual(before.monthItems);
     expect(after.centuryItems).toEqual(before.centuryItems);
     expect(after.days).toEqual(before.days);
+  });
+});
+
+/**
+ * The year half is two numbers and one addition, so after an answer it shows
+ * exactly that: the century anchor on the left, the year code on the right,
+ * coloured by what the answer was. Pinned to 2000, whose anchor is 2 and whose
+ * code is 0, so the right answer is 2 and the bare code is a different number
+ * from it — which is what makes the named mistake reachable at all.
+ */
+describe('the year half reveal', () => {
+  const anchorColour = () => getComputedStyle(screen.getByTestId('year-part-anchor')).color;
+  const codeColour = () => getComputedStyle(screen.getByTestId('year-part-code')).color;
+  const FORGOTTEN = /That is the year code on its own/;
+
+  it('shows both figures, labelled, on a correct answer', async () => {
+    // Long enough that the pair is still on screen when the assertions run;
+    // at the 250ms default it lasts exactly as long as the pad's green flash.
+    await seed({ autoAdvanceMs: 5000 });
+    pinDraw(0);
+    mount();
+    await openTrainer('Year');
+
+    await tapDigit(yearPartAnswer({ fullYear: 2000 }));
+
+    expect(await screen.findByTestId('year-part-anchor')).toHaveTextContent('2');
+    expect(screen.getByTestId('year-part-code')).toHaveTextContent('0');
+    // Invariant 7: neither figure is a bare numeral.
+    expect(screen.getByText('Century anchor')).toBeInTheDocument();
+    expect(screen.getByText('Year code')).toBeInTheDocument();
+    // Both green, and nothing accusing the user of a mistake they did not make.
+    expect(anchorColour()).toBe('var(--grade-fast)');
+    expect(codeColour()).toBe('var(--grade-fast)');
+    expect(screen.queryByText(FORGOTTEN)).toBeNull();
+  });
+
+  it('marks the year code amber and the anchor red when the anchor was left out', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    pinDraw(0);
+    mount();
+    await openTrainer('Year');
+
+    // 0 is 2000's year code untouched, which is the answer of someone who
+    // recalled the code and never added the anchor to it.
+    await tapDigit(codeFor(0));
+
+    expect(await screen.findByTestId('year-part-code')).toHaveTextContent('0');
+    expect(codeColour()).toBe('var(--grade-medium)');
+    expect(anchorColour()).toBe('var(--grade-wrong)');
+    // The colour is never the only thing saying so.
+    expect(screen.getByText(FORGOTTEN)).toBeInTheDocument();
+  });
+
+  it('marks both red for a wrong answer that is not that mistake', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    pinDraw(0);
+    mount();
+    await openTrainer('Year');
+
+    // Neither the answer (2) nor the bare code (0).
+    await tapDigit(5);
+
+    expect(await screen.findByTestId('year-part-anchor')).toBeInTheDocument();
+    expect(anchorColour()).toBe('var(--grade-wrong)');
+    expect(codeColour()).toBe('var(--grade-wrong)');
+    expect(screen.queryByText(FORGOTTEN)).toBeNull();
+  });
+
+  it('is not on screen before an answer', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    pinDraw(0);
+    mount();
+    await openTrainer('Year');
+
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByTestId('year-part-anchor')).toBeNull();
+    expect(screen.queryByTestId('year-part-code')).toBeNull();
+  });
+
+  /**
+   * The pair replaces the labelled working on this half rather than joining it.
+   * The working's three rows are the anchor, the code and their sum, so keeping
+   * both would put the same two numbers on screen twice.
+   */
+  it('replaces the labelled working rather than sitting beside it', async () => {
+    await seed({ autoAdvanceMs: 0 });
+    pinDraw(0);
+    mount();
+    await openTrainer('Year');
+
+    await tapDigit(5);
+
+    expect(await screen.findByTestId('year-part-anchor')).toBeInTheDocument();
+    expect(screen.queryByText("The year's doomsday")).toBeNull();
+    // The answer is still stated: a wrong answer has to say what was right.
+    expect(screen.getByText(/Wednesday|Sunday|Monday|Tuesday|Thursday|Friday|Saturday/)).toBeInTheDocument();
   });
 });
 
