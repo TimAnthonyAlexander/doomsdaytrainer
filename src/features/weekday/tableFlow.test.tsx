@@ -7,7 +7,7 @@ import { monthDoomsday } from '@/domain/weekday';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, monthItemKey } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
-import { FLIP_MS } from '@/components/ui/SplitFlap';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { DoomsdaysScreen } from '@/routes/DoomsdaysScreen';
 import { TablesScreen } from '@/routes/TablesScreen';
 import { nextPaint } from '@/test/paint';
@@ -70,14 +70,14 @@ beforeEach(deleteDb);
 /**
  * One tap, after the prompt has painted so the timer is running.
  *
- * The month name above the pad flips into place, and for the length of the
- * flip it is on screen without being readable — the pad holds its clock and
- * refuses taps until it settles (see `armed` in `MonthPad`/`AnswerPad`).
- * Order matters: the flip has to settle first, because arming the pad is what
- * schedules the frame the clock starts on.
+ * A changed month name above the pad moves into place, and until it settles the
+ * incoming value is still transparent and off-position — the pad holds its
+ * clock and refuses taps for that window (see `armed` in `MonthPad` and
+ * `AnswerPad`). Order matters: the transition has to settle first, because
+ * arming the pad is what schedules the frame the clock starts on.
  */
 async function tapDay(day: number): Promise<void> {
-  await wait(FLIP_MS + 20);
+  await wait(NUMERIC_SETTLE_MS + 20);
   await nextPaint();
   fireEvent.click(screen.getByRole('button', { name: `Day ${day}` }));
 }

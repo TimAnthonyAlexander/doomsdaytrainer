@@ -8,7 +8,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
-import { SplitFlap, SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
+import { NumericValue, NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import { formatInterval, formatMs } from '@/domain/time';
 import { useAppState } from '@/state/useAppState';
 import { nextDueLabel } from '@/features/review/summary';
@@ -126,18 +126,18 @@ export function TableDrillView({ onBack }: TableDrillProps) {
   const session = useTableSession();
   const { phase, advance, entry } = session;
 
-  // The flap cells need a bare pixel number to derive an even cell height
-  // from (see SplitFlap.tsx); the `sx.fontSize` breakpoint object below
+  // The cells need a bare pixel number to derive an even cell height
+  // from (see NumericValue.tsx); the `sx.fontSize` breakpoint object below
   // can't give them one. Resolves to the same two numbers the heading's own
   // `fontSize` already used, so the responsive sizing is unchanged.
   const theme = useTheme();
   const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 56 : 44;
 
   // The pad's latency clock stays at zero until this settles, matching the
-  // window the entry above it is mid-flip and not yet readable — see
+  // window the entry above it is mid-transition and not yet readable — see
   // useAnswerTimer.ts. Keyed on the same `promptKey` the pad restarts its
   // clock on, so the two arm and rearm together.
-  const settled = useFlipSettled(session.promptKey);
+  const settled = useNumericSettled(session.promptKey);
 
   useEffect(() => {
     if (phase !== 'correct') return;
@@ -197,13 +197,13 @@ export function TableDrillView({ onBack }: TableDrillProps) {
           {entry.kind === 'century' ? (
             // A century as its digits, one cell per character, the same face
             // every numeral in the app uses.
-            <SplitFlapText text={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} mono />
+            <NumericText text={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} mono />
           ) : (
             // A month as one word cell — it is a name, not a number, and
-            // flapping it letter by letter would animate every letter of
+            // moving it letter by letter would animate every letter of
             // "September" for a change that is really one word replacing
             // another.
-            <SplitFlap value={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} />
+            <NumericValue value={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} />
           )}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>

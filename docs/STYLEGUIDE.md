@@ -232,33 +232,41 @@ The app is a latency instrument. Animation that delays input or obscures timing
 is a defect.
 
 ```
---dur-instant   0ms      --dur-advance  120ms
---dur-flash     160ms    --dur-ui       180ms
---dur-hold      200ms    --dur-flip     320ms
+--dur-instant         0ms      --dur-advance  120ms
+--dur-flash           160ms    --dur-ui       180ms
+--dur-hold            200ms    --dur-numeric  280ms
+--dur-numeric-settle  140ms
 
---ease-out        cubic-bezier(0.2, 0, 0, 1)
---ease-flap-away  cubic-bezier(0.4, 0, 1, 1)
---ease-flap-in    cubic-bezier(0.3, 0.6, 0.4, 1)
+--ease-out      cubic-bezier(0.2, 0, 0, 1)
+--ease-numeric  cubic-bezier(0.16, 1, 0.3, 1)
 ```
 
-`--dur-flip` is the split-flap, and it is the longest duration here for a
-reason worth keeping written down. It was first tied to `--dur-advance` on the
-reading that both describe the prompt changing. A crossfade and a mechanism are
-not the same event: opacity has no intermediate shape worth seeing, so 120ms is
-plenty for one, while a flap is drawn as two half-rotations and 120ms leaves
-each half 60ms, which is under four frames at 60Hz. A rotation in four frames
-is not a fast animation. It is three discrete positions, and it reads as a
-rendering fault. Below roughly 150ms per half there is no duration at which
-this looks like anything but broken.
+### A value changing in place
 
-The two flap curves exist for the same reason. `--ease-out` front-loads its
-movement, which is right for something arriving and settling and wrong for a
-falling card: over a 60ms half it put about 65% of the rotation into the first
-frame and bunched the remainder against the end. A flap is one card falling
-through 180 degrees and stopping dead, so it accelerates throughout —
-`--ease-flap-away` starts it from rest, and `--ease-flap-in` continues the same
-fall, entering already carrying the speed the first half ended with rather than
-easing up from nothing and stalling at the seam.
+A number or a word that is replaced does not cut. The old glyph leaves
+vertically while fading out, the new one arrives from the opposite side while
+fading in, and the cell clips both at its own bounds so nothing travels over
+what sits above or below it. Both are on screen at partial opacity through the
+middle of it. Direction follows the value: increasing sends the new glyph up
+from below, decreasing reverses it, and a string decides once for all of its
+characters so a year moves as one number rather than coming apart into four.
+Only characters that actually change move.
+
+`--dur-numeric` is its own duration because borrowing `--dur-advance` is what
+broke the first attempt at this. A crossfade and a moving glyph are not the
+same event: opacity has no intermediate shape worth watching, so 120ms is
+plenty for one, and nowhere near enough to draw a travelling character in.
+
+`--ease-numeric` is weighted much harder toward deceleration than `--ease-out`,
+and that is load bearing rather than stylistic. It puts the incoming glyph
+almost in place within the first third, so the prompt becomes readable well
+before the motion ends. A symmetric curve would hold the value ambiguous for
+the whole duration, and the answer pad waits on that readability.
+
+`--dur-numeric-settle` is when the incoming glyph is legible, which is earlier
+than when the motion stops. It is what the pad's arming waits on. The outgoing
+glyph clearing the cell changes nothing about what the prompt says, so charging
+the user for it would be inventing latency.
 
 - The keypad has **no** press animation, no scale, no ripple.
 - Feedback fill applies at `--dur-instant`. The colour is there on the same
@@ -270,15 +278,15 @@ easing up from nothing and stalling at the seam.
 - Screen transitions use `--dur-ui` opacity only. No slide, no push.
 - The mastery grid animates cell colour changes over `--dur-ui` when the stats
   screen mounts. This is the only decorative motion in the app.
-- A prompt that flips is painted before it is readable, because for the length
-  of the flip one half of the cell carries the new glyph and the other still
-  carries the old. The answer pad therefore holds its latency clock, and
-  refuses taps, until the flip settles. Paint is the zero point only for a
-  prompt that arrives whole.
+- A prompt whose value is in transition is painted slightly before it is
+  readable, because the incoming glyph starts transparent and off-position. The
+  answer pad therefore holds its latency clock, and refuses taps, until
+  `--dur-numeric-settle`. Paint is the zero point only for a prompt that
+  arrives whole.
 - `prefers-reduced-motion: reduce` sets every duration above to `0ms` except
-  `--dur-hold`, which is timing, not motion. The flap goes further and drops
-  its rotating halves entirely: a zeroed keyframe still runs, and the structure
-  has to change rather than only the speed.
+  `--dur-hold`, which is timing, not motion. A changing value goes further and
+  drops its second glyph entirely: a zeroed keyframe still runs, so the
+  structure has to change rather than only the speed.
 
 ---
 

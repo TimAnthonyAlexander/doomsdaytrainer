@@ -6,7 +6,7 @@ import type { WeekdayMode } from '@/domain/types';
 import { formatDate, monthName, weekdayName } from '@/domain/weekday';
 import { formatYear } from '@/domain/yearCodes';
 import { Numeral } from '@/components/ui/Numeral';
-import { SplitFlap, SplitFlapText } from '@/components/ui/SplitFlap';
+import { NumericValue, NumericText } from '@/components/ui/NumericText';
 import { palette } from '@/theme/palette';
 import type { WeekdayPhase } from './useWeekdaySession';
 
@@ -38,8 +38,8 @@ export function WeekdayPrompt({
   phase,
   correctCode,
 }: WeekdayPromptProps) {
-  // The flap cells need a bare pixel number to derive an even cell height
-  // from (see SplitFlap.tsx); `sx.fontSize` breakpoint objects can't give
+  // The cells need a bare pixel number to derive an even cell height
+  // from (see NumericValue.tsx); `sx.fontSize` breakpoint objects can't give
   // them one. This resolves to the same two numbers the prompt's `fontSize`
   // already used, so the responsive sizing is unchanged.
   const theme = useTheme();
@@ -73,9 +73,9 @@ export function WeekdayPrompt({
           textWrap: 'balance',
         }}
       >
-        <SplitFlapText text={String(day)} size={promptSize} weight={600} mono />{' '}
-        <SplitFlap value={monthName(month)} size={promptSize} weight={600} />{' '}
-        <SplitFlapText text={String(fullYear)} size={promptSize} weight={600} mono />
+        <NumericText text={String(day)} size={promptSize} weight={600} mono />{' '}
+        <NumericValue value={monthName(month)} size={promptSize} weight={600} />{' '}
+        <NumericText text={String(fullYear)} size={promptSize} weight={600} mono />
       </Typography>
 
       {phase === 'wrong' ? (

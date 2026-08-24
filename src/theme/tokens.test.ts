@@ -105,21 +105,30 @@ describe('token values', () => {
       flash: 160,
       ui: 180,
       hold: 200,
-      flip: 320,
+      numeric: 280,
+      numericSettle: 140,
     });
   });
 
   /**
-   * The flap is drawn as two half-rotations, so what matters is what one half
-   * gets rather than the total. Under about 150ms a half is worth fewer than
-   * ten frames at 60Hz, and a rotation in fewer than ten frames stops reading
-   * as a rotation — it reads as a few discrete positions, which is a rendering
-   * fault to look at. This is the guard on that, and it is why `flip` is a
-   * duration of its own rather than `advance`, which is 120ms and was the
-   * value it was first given.
+   * A glyph that travels needs enough frames to be seen travelling. At 60Hz,
+   * 250ms is about fifteen, and below that a moving character starts reading
+   * as a few discrete positions rather than as motion — which is what
+   * borrowing `advance` (120ms, around seven frames) produced.
    */
-  it('gives the flap a duration a rotation can actually be drawn in', () => {
-    expect(duration.flip / 2).toBeGreaterThanOrEqual(150);
+  it('gives a changing value a duration the move can be drawn in', () => {
+    expect(duration.numeric).toBeGreaterThanOrEqual(250);
+  });
+
+  /**
+   * The pad waits on `numericSettle`, not on the whole transition, so this is
+   * the cost the transition adds to every answer. It has to be comfortably
+   * under the fast threshold or the animation would be deciding grades: at
+   * 140ms against a 2000ms default it is 7%, and the incoming glyph is already
+   * solid and near its final position by then.
+   */
+  it('arms the pad before the motion finishes, not after it', () => {
+    expect(duration.numericSettle).toBeLessThan(duration.numeric);
   });
 
   it('has a mastery ramp of seven steps with a matching ink per step', () => {

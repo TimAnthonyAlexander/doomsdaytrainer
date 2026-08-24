@@ -5,7 +5,7 @@ import { Activity } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Screen } from '@/components/ui/Screen';
-import { useFlipSettled } from '@/components/ui/SplitFlap';
+import { useNumericSettled } from '@/components/ui/NumericText';
 import type { WeekdayMode, WeekdayRangeId, WeekdayTask } from '@/domain/types';
 import { weekdayRanges } from '@/features/weekday/datePool';
 import { MethodPartTrainer } from '@/features/weekday/MethodPartTrainer';
@@ -161,16 +161,19 @@ function Trainer({ mode, rangeId, header }: TrainerProps) {
   const session = useWeekdaySession(mode, rangeId);
   const { phase, advance } = session;
 
-  // The date flips into place, so it is painted before it is readable: for the
-  // length of the flip the top half of each cell carries the new glyph and the
-  // bottom half still carries the old one. Paint is therefore no longer the
-  // moment the user could first see the prompt, which is what invariant 3
-  // defines the clock's zero point as. Holding the clock until the flip settles
-  // keeps every stored latency measured against a legible prompt — without it
-  // the flip's duration would be added to each one, cross the thresholds in
-  // Settings, and quietly change the grade, the fluency decision and every
-  // median on Stats.
-  const settled = useFlipSettled(session.promptKey);
+  // The date moves into place, so it is painted a little before it is
+  // readable: the incoming glyph starts transparent and off-position. Paint is
+  // therefore not quite the moment the user could first see the prompt, which
+  // is what invariant 3 defines the clock's zero point as.
+  //
+  // The wait is the settle point rather than the end of the motion. The easing
+  // is weighted hard toward deceleration, so the new value is solid and
+  // effectively in place by halfway; what remains is the old glyph clearing the
+  // cell, which changes nothing about what the prompt says. Charging the user
+  // for that would be inventing latency, and inventing latency against a
+  // 2000ms fast threshold changes grades, then fluency, then the mastery
+  // bucket, then every median on Stats.
+  const settled = useNumericSettled(session.promptKey);
 
   // Correct answers advance themselves. Errors never do: the working has to be
   // read, and reading it takes as long as it takes.

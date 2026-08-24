@@ -4,7 +4,7 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
-import { SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import { CYCLE, cyclesRemoved, sevenStep, type CalcStep } from '@/domain/calc';
 import type { CalcAttempt, YearKey } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
@@ -145,13 +145,13 @@ export function StepRunner({ yy, steps, reduced, keyboard, holdOnWrong, carry, o
 
   const step = currentItem(run);
 
-  // The year above is what flaps (see the JSX below); this is the same
+  // The year above is what moves (see the JSX below); this is the same
   // settling clock `AnswerPad`'s own `armed` prop is built on, so the pad
   // never starts timing an answer against a year that has not finished
   // landing. `yy` is fixed for the life of this component — both callers
   // remount it with `key={yy}` — so in practice this is only ever exercised
   // by a future caller that reuses the instance across years.
-  const yearSettled = useFlipSettled(yy);
+  const yearSettled = useNumericSettled(yy);
 
   const finish = (next: RunState<CalcStep>, given: number[]) => {
     if (next.done) {
@@ -220,7 +220,7 @@ export function StepRunner({ yy, steps, reduced, keyboard, holdOnWrong, carry, o
           Year
         </Typography>
         <Box aria-label={formatYear(yy)} sx={{ display: 'inline-block' }}>
-          <SplitFlapText text={formatYear(yy)} size={64} weight={500} mono />
+          <NumericText text={formatYear(yy)} size={64} weight={500} mono />
         </Box>
       </Box>
 

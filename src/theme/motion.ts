@@ -29,18 +29,19 @@ export const dur = {
   flash: 'var(--dur-flash)',
   ui: 'var(--dur-ui)',
   hold: 'var(--dur-hold)',
-  flip: 'var(--dur-flip)',
+  numeric: 'var(--dur-numeric)',
+  numericSettle: 'var(--dur-numeric-settle)',
 } as const;
 
 /**
- * `out` is the app's one general curve. The two flap curves belong to the
- * split-flap alone and should not be borrowed: they describe something falling
- * and hitting a stop, which is wrong for anything that arrives and settles.
+ * `out` is the app's one general curve. `numeric` belongs to a value changing
+ * in place and should not be borrowed for anything else: its deceleration is
+ * extreme enough to look wrong on a control, and it is tuned to make a glyph
+ * readable early rather than to feel good on a panel.
  */
 export const ease = {
   out: 'var(--ease-out)',
-  flapAway: 'var(--ease-flap-away)',
-  flapIn: 'var(--ease-flap-in)',
+  numeric: 'var(--ease-numeric)',
 } as const;
 
 /** `transition` shorthand for one or more properties on one duration. */

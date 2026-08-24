@@ -7,7 +7,7 @@ import { useEffect, useMemo } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
 import { Screen } from '@/components/ui/Screen';
-import { SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import {
   datePartPrompt,
   methodPartQuestion,
@@ -84,15 +84,15 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
   const { phase, advance, prompt } = session;
   const answered = phase !== 'prompt';
 
-  // See WeekdayPrompt.tsx: the flap needs a bare pixel number, which the
+  // See WeekdayPrompt.tsx: the cell needs a bare pixel number, which the
   // responsive `fontSize` below cannot give it directly.
   const theme = useTheme();
   const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 48 : 40;
 
   // The pad's latency clock stays at zero until this settles, matching the
-  // window the prompt below is actually mid-flip and not yet readable — see
+  // window the prompt below is actually mid-transition and not yet readable — see
   // useAnswerTimer.ts.
-  const settled = useFlipSettled(session.promptKey);
+  const settled = useNumericSettled(session.promptKey);
 
   // Correct answers advance themselves. Errors never do: the working has to be
   // read, and reading it takes as long as it takes.
@@ -146,7 +146,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
             textWrap: 'balance',
           }}
         >
-          <SplitFlapText text={promptText} size={promptSize} weight={600} />
+          <NumericText text={promptText} size={promptSize} weight={600} />
         </Typography>
 
         {phase === 'wrong' ? (

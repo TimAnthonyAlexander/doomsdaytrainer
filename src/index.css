@@ -97,10 +97,10 @@
   --dur-flash: 160ms;
   --dur-ui: 180ms;
   --dur-hold: 200ms;
-  --dur-flip: 320ms;
+  --dur-numeric: 280ms;
+  --dur-numeric-settle: 140ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
-  --ease-flap-away: cubic-bezier(0.4, 0, 1, 1);
-  --ease-flap-in: cubic-bezier(0.3, 0.6, 0.4, 1);
+  --ease-numeric: cubic-bezier(0.16, 1, 0.3, 1);
 
   --bg: #faf9f6;
   --surface-1: #f1efe8;
@@ -286,7 +286,8 @@ svg {
     --dur-advance: 0ms;
     --dur-flash: 0ms;
     --dur-ui: 0ms;
-    --dur-flip: 0ms;
+    --dur-numeric: 0ms;
+    --dur-numeric-settle: 0ms;
   }
 
   *,

@@ -253,16 +253,18 @@ export const shadow = { keypad: `0 -1px 0 0 ${cssVar('border')}` } as const;
 /* ------------------------------------------------------------------ */
 
 /**
- * `flip` is the split-flap, and it is deliberately the longest of these.
+ * `numeric` is a changed value moving to replace the one that was there: the
+ * old glyph leaving vertically as the new one arrives from the other side.
  *
- * It was first tied to `advance` on the reading that both are "the prompt
- * changing". They are not the same kind of event. `advance` describes a
- * crossfade, where 120ms is right because opacity has no intermediate shape
- * worth seeing. A flap is a mechanism, and it is drawn in two halves, so 120ms
- * gives each half 60ms — under four frames at 60Hz. Four frames of a rotation
- * is not a fast animation, it is three discrete positions, and it reads as a
- * rendering fault rather than as motion. At 320ms each half gets about ten
- * frames, which is the point where the arc stops looking stepped.
+ * It has its own duration because borrowing `advance` is what broke the first
+ * attempt at this. `advance` describes a crossfade, where 120ms is right
+ * because opacity has no intermediate shape worth watching. A glyph that
+ * travels does have one, and at 120ms there are barely seven frames to draw it
+ * in. This is a single-stage move, so unlike the two-stage flap it replaced,
+ * the whole duration is the whole animation.
+ *
+ * `numericSettle` is when the incoming glyph is readable, which is earlier
+ * than when the motion stops. See `NUMERIC_SETTLE_MS`.
  */
 export const duration = {
   instant: 0,
@@ -270,28 +272,23 @@ export const duration = {
   flash: 160,
   ui: 180,
   hold: 200,
-  flip: 320,
+  numeric: 280,
+  numericSettle: 140,
 } as const;
 
 /**
  * `out` is the app's curve for anything that arrives and settles.
  *
- * The two flap curves exist because a falling flap is not that shape. It is
- * one card falling through 180 degrees under gravity and stopping dead against
- * the next, so it accelerates the whole way and then simply ends. Drawn with
- * `out`, which front-loads its movement, a 60ms half put roughly 65% of the
- * rotation into the first frame and bunched the rest at the end — which is why
- * the flap looked broken at more than one duration.
- *
- * `flapAway` is the old card starting from rest and accelerating out of view.
- * `flapIn` is the same fall continuing, so it starts already carrying the
- * speed the first half ended with rather than easing up from nothing, which
- * would stall the motion at the halfway seam.
+ * `numeric` is the same idea pushed much further, and the asymmetry is load
+ * bearing rather than stylistic: weighting the travel hard toward deceleration
+ * puts the incoming glyph almost in place within the first third, so the
+ * prompt becomes readable well before the animation ends. A symmetric
+ * ease-in-out would hold the value ambiguous across the whole duration, and
+ * the answer pad waits on that readability.
  */
 export const easing = {
   out: 'cubic-bezier(0.2, 0, 0, 1)',
-  flapAway: 'cubic-bezier(0.4, 0, 1, 1)',
-  flapIn: 'cubic-bezier(0.3, 0.6, 0.4, 1)',
+  numeric: 'cubic-bezier(0.16, 1, 0.3, 1)',
 } as const;
 
 /**

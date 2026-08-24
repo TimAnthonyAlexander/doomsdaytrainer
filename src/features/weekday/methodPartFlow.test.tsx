@@ -196,7 +196,7 @@ describe('the pad hints', () => {
    * The key that answers 1 must still be found and announced as "1".
    *
    * The hint is looked up inside the key itself rather than page-wide: the
-   * year above the pad is not pinned here, and a flap cell is one digit per
+   * year above the pad is not pinned here, and a cell is one digit per
    * character now, so an unrelated "8" can legitimately land in the prompt
    * on any given draw.
    */
@@ -217,7 +217,7 @@ describe('the pad hints', () => {
    * that selects it, and this is not about that one.
    *
    * Scoped to the pad's own buttons rather than the whole screen: the date
-   * above the pad is now a row of flap cells, one digit per cell, so a lone
+   * above the pad is now a row of cells, one digit per cell, so a lone
    * "8" legitimately sits in the DOM whenever the drawn date's day or year
    * has one — that is the date, not a hint corner, and a page-wide text query
    * cannot tell the two apart.
