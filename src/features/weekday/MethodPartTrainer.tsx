@@ -32,9 +32,26 @@ import { useMethodPartSession } from './useMethodPartSession';
  * digits for exactly the same reason. The name is on the worked answer instead,
  * where it can be read as a check rather than tapped as a choice.
  */
+/**
+ * Both halves end in a reduction mod 7, and both overshoot: an anchor plus a
+ * code reaches 12, and a day minus its month doomsday reaches 30. So every key
+ * carries its own value plus seven, small, in the corner — a sum of 8 is a 1,
+ * and the 1 says so.
+ *
+ * All seven, not the three that stay single-digit. A strip that marked 7, 8 and
+ * 9 and stopped would be an aid that quietly is not there for 10, 11 and 12,
+ * which is worse than no aid: you learn to look, and then one day there is
+ * nothing to look at. The rule is uniform and so is the row.
+ *
+ * Nothing like this belongs on Calc's own pad. There the reduction is the
+ * lesson — "take the sevens off" is the step being drilled — and marking the
+ * keys would answer the question the screen exists to ask. Here it is friction
+ * on the way to the thing being trained, which is the anchor and the code.
+ */
 const DIGIT_OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
   value,
   label: String(value),
+  hint: String(value + 7),
 }));
 
 interface MethodPartTrainerProps {

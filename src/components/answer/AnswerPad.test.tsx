@@ -240,6 +240,56 @@ describe('AnswerPad', () => {
     expect(button('5').className).not.toBe(button('4').className);
   });
 
+  /**
+   * The corner hint is a second number the same key answers to: an 8 is a 1
+   * once the sevens come off. It must never reach the accessible name, or the
+   * key that answers 1 starts announcing itself as "1 8" and every
+   * `getByRole('button', { name: '1' })` in the suite stops finding it.
+   */
+  describe('the corner hint', () => {
+    const HINTED: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
+      value,
+      label: String(value),
+      hint: String(value + 7),
+    }));
+
+    it('draws it without touching the accessible name', () => {
+      render(<AnswerPad options={HINTED} onAnswer={vi.fn()} promptKey="a" />);
+
+      for (let value = 0; value <= 6; value += 1) {
+        const key = button(String(value));
+        expect(key).toHaveTextContent(String(value + 7));
+        expect(key.getAttribute('aria-label')).toBe(String(value));
+      }
+    });
+
+    it('hides it from the accessibility tree', () => {
+      render(<AnswerPad options={HINTED} onAnswer={vi.fn()} promptKey="a" />);
+      // The 13 on the 6 key is the clearest case: nothing else on the pad
+      // renders that text, so a query for it can only be the hint. The
+      // attribute is on the wrapper rather than on the glyph, so this asks
+      // whether the hint sits inside a hidden subtree, which is the thing that
+      // actually matters.
+      expect(screen.getByText('13').closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('still answers with the key value, not the hint', () => {
+      const onAnswer = vi.fn();
+      render(<AnswerPad options={HINTED} onAnswer={onAnswer} promptKey="a" />);
+      paint();
+
+      fireEvent.click(button('1'));
+      expect(onAnswer).toHaveBeenCalledTimes(1);
+      expect(onAnswer.mock.calls[0][0]).toBe(1);
+    });
+
+    it('draws nothing when an option has no hint', () => {
+      render(<AnswerPad options={OPTIONS} onAnswer={vi.fn()} promptKey="a" />);
+      expect(button('0')).toHaveTextContent('0');
+      expect(screen.queryByText('7')).toBeNull();
+    });
+  });
+
   it('paints the mistake and the right answer together', () => {
     const feedback: AnswerFeedback = { chosen: 2, correct: 6 };
     render(

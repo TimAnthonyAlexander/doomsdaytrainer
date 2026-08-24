@@ -475,6 +475,27 @@ and the one verdict a colour cannot carry alone gets a sentence. Grading hues
 are allowed here for the same reason they are allowed on the pad: this is
 feedback, not a card or a header.
 
+Every key on both halves' pad carries its own value plus seven, small and
+muted in the corner: an 8 is a 1 once the sevens come off, and the 1 says so.
+All seven keys, not the three that stay single-digit — a strip that marked 7, 8
+and 9 and stopped would be an aid that quietly is not there for 10, 11 and 12,
+which is worse than no aid, because you learn to look and then one day there is
+nothing to look at.
+
+`AnswerOption.hint` is what carries it, so the pad stays generic and the caller
+decides. Calc's pad deliberately takes none: there the reduction *is* the lesson
+— "take the sevens off" is the step being drilled — and marking the keys would
+answer the question the screen exists to ask. On the halves it is friction on
+the way to the thing being trained, which is the anchor and the code. The
+weekday pads take none either, where "also 7" means nothing.
+
+The hint is drawn inside an `aria-hidden` wrapper, in the corner opposite the
+existing keyboard-key hint. The wrapper is the part that matters: `Numeral`
+forwards type props and children and nothing else, so `aria-hidden` on the
+numeral itself was dropped in silence — the button's own `aria-label` kept the
+name right while the hint sat in the accessibility tree, which is a bug no
+assertion about names could have caught.
+
 The reveal's slot keeps its height whether or not the pair is in it. Without
 that, every correct answer would appear, re-centre the block above it and vanish
 a quarter of a second later, so the prompt would jog on every rep of a screen

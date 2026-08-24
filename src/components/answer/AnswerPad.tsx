@@ -9,6 +9,19 @@ import { useAnswerTimer } from './useAnswerTimer';
 export interface AnswerOption {
   value: number;
   label: string;
+  /**
+   * A second number this key also answers to, drawn small in its corner.
+   *
+   * For the digit pad that is the value plus seven: a sum of 8 is a 1, and
+   * marking the 1 with an 8 saves reducing it. The pad does not decide which
+   * keys get one — a caller sets it where the reduction is friction on the way
+   * to the thing being trained, and leaves it off where the reduction *is* the
+   * thing being trained.
+   *
+   * Never part of the button's accessible name. It is drawn `aria-hidden`, so
+   * the key that answers 1 is still announced and found as "1".
+   */
+  hint?: string;
 }
 
 export interface AnswerFeedback {
@@ -267,6 +280,37 @@ export function AnswerPad({
               <Numeral size={30} weight={600} lineHeight={1}>
                 {option.label}
               </Numeral>
+              {option.hint ? (
+                // The wrapper carries `aria-hidden` and the position because
+                // `Numeral` forwards neither: it takes type props and children
+                // and nothing else. Putting the attribute on the Numeral looked
+                // right and was dropped in silence, which left the hint in the
+                // accessibility tree while the button's own `aria-label` kept
+                // the name correct — a bug no name assertion could have caught.
+                <Box
+                  aria-hidden
+                  sx={{
+                    position: 'absolute',
+                    // The opposite corner from the keyboard hint, so a pad that
+                    // ever carried both would not stack them. Today no pad
+                    // does: the digit pad suppresses the keyboard hint because
+                    // its key and its label are the same character, and the
+                    // pads that show one take no `hint`.
+                    top: 6,
+                    left: 8,
+                    // `currentColor` rather than a fixed grey, so it follows the
+                    // key through every tone. Grey on an idle key, and still
+                    // legible on the filled green or red of a feedback flash,
+                    // where a fixed grey would go muddy.
+                    color: 'inherit',
+                    opacity: 0.45,
+                  }}
+                >
+                  <Numeral size={11} lineHeight={1}>
+                    {option.hint}
+                  </Numeral>
+                </Box>
+              ) : null}
               {/* Nothing to teach when the key is the label: for the digit pad
                   the hint would just print the number twice. */}
               {keyboard && keys[index] && keys[index] !== option.label ? (

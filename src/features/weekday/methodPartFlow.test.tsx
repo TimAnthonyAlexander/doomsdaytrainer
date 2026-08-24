@@ -174,6 +174,53 @@ describe('the year half', () => {
  * code is 0, so the right answer is 2 and the bare code is a different number
  * from it — which is what makes the named mistake reachable at all.
  */
+/**
+ * Both halves end in a reduction mod 7 and both overshoot, so every key says
+ * what it also answers to once the sevens come off.
+ */
+describe('the pad hints', () => {
+  it('marks every key with its own value plus seven, on both halves', async () => {
+    await seed();
+    mount();
+
+    for (const half of ['Year', 'Date'] as const) {
+      await openTrainer(half);
+      for (let value = 0; value <= 6; value += 1) {
+        const key = await screen.findByRole('button', { name: String(value) });
+        expect(key).toHaveTextContent(String(value + 7));
+      }
+    }
+  });
+
+  /** The key that answers 1 must still be found and announced as "1". */
+  it('keeps the hint out of the key name', async () => {
+    await seed();
+    mount();
+    await openTrainer('Year');
+
+    const key = await screen.findByRole('button', { name: '1' });
+    expect(key.getAttribute('aria-label')).toBe('1');
+    expect(screen.getByText('8').closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  /**
+   * The full-date trainer answers in weekday names, where "also 7" means
+   * nothing. Asserted as the absence of the marks rather than as the button's
+   * exact text: that pad does carry a corner hint already, the physical key
+   * that selects it, and this is not about that one.
+   */
+  it('leaves the weekday pad unmarked', async () => {
+    await seed();
+    mount();
+    await openTrainer('Full date');
+
+    await screen.findByRole('button', { name: 'Sun' });
+    for (const marked of [7, 8, 9, 10, 11, 12, 13]) {
+      expect(screen.queryByText(String(marked))).toBeNull();
+    }
+  });
+});
+
 describe('the year half reveal', () => {
   const anchorColour = () => getComputedStyle(screen.getByTestId('year-part-anchor')).color;
   const codeColour = () => getComputedStyle(screen.getByTestId('year-part-code')).color;
