@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState } from 'react';
 import { AnswerPad, type AnswerFeedback, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import type { Attempt, Code, YearKey } from '@/domain/types';
 import { codeFor, formatYear } from '@/domain/yearCodes';
 import { cueUrl, pairUrl } from '@/features/audio/speech';
@@ -55,6 +56,12 @@ export function StudyPass({ decade, years, stepLabel, onDone, onExit }: StudyPas
   const { position, total } = studyProgress(state);
   const showing = state.trial === 'show';
   const nextYear = state.years[state.index + 1] ?? null;
+  // A wrong tap keeps the same trial on screen, so the key has to move on the
+  // retry too or the pad would refuse the second answer.
+  const promptKey = `${state.trial}-${yy ?? 'none'}-${state.wrongTaps}`;
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(promptKey);
 
   useSpokenPrompt(
     yy === null ? null : showing ? pairUrl(yy) : cueUrl(yy),
@@ -124,10 +131,11 @@ export function StudyPass({ decade, years, stepLabel, onDone, onExit }: StudyPas
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             Year
           </Typography>
-          <Box data-testid="study-year">
-            <Numeral size={56} weight={600}>
-              {yy === null ? '' : formatYear(yy)}
-            </Numeral>
+          <Box
+            data-testid="study-year"
+            aria-label={yy === null ? undefined : `Year ${formatYear(yy)}`}
+          >
+            <NumericText text={yy === null ? '' : formatYear(yy)} size={56} weight={600} mono />
           </Box>
         </Box>
 
@@ -161,12 +169,11 @@ export function StudyPass({ decade, years, stepLabel, onDone, onExit }: StudyPas
       <AnswerPad
         options={OPTIONS}
         onAnswer={handleAnswer}
-        // A wrong tap keeps the same trial on screen, so the key has to move on
-        // the retry too or the pad would refuse the second answer.
-        promptKey={`${state.trial}-${yy ?? 'none'}-${state.wrongTaps}`}
+        promptKey={promptKey}
         feedback={feedback}
         disabled={feedback !== null}
         keyboard={settings.keyboardInput}
+        armed={settled}
       />
     </>
   );

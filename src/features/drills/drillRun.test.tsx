@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,7 @@ import { codeFor } from '@/domain/yearCodes';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { DEFAULT_SETTINGS, defaultAppData, itemKey } from '@/storage/defaults';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
 import { DrillRunView } from './DrillRunView';
@@ -89,11 +90,21 @@ async function mountDecadeRun(): Promise<void> {
   await screen.findByRole('heading', { level: 1 });
 }
 
+async function wait(ms: number): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  });
+}
+
 /**
- * Answers the prompt on screen. The frame first: the pad refuses a tap until
- * the prompt has painted, which is where its latency clock starts.
+ * Answers the prompt on screen, after the frame that starts its latency
+ * clock.
+ *
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
  */
 async function answerPrompt(user: UserEvent, code: number): Promise<void> {
+  await wait(NUMERIC_SETTLE_MS + 20);
   await nextPaint();
   await user.click(screen.getByRole('button', { name: String(code) }));
 }

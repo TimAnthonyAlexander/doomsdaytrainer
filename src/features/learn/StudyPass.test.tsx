@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { codeFor } from '@/domain/yearCodes';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { resetSpeech } from '@/features/audio/speech';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData } from '@/storage/db';
@@ -30,7 +31,14 @@ async function drain(): Promise<void> {
   });
 }
 
+/**
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
+ */
 async function tap(label: string): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, NUMERIC_SETTLE_MS + 20));
+  });
   await nextPaint();
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: label }));
@@ -111,11 +119,13 @@ describe('StudyPass', () => {
     await mount(onDone);
     const seen: number[] = [];
     for (let i = 0; i < BATCH.length * 2; i += 1) {
+      // One year on screen at a time: the year element holds two digits and
+      // nothing else, so there is no neighbour to step from. Read after the
+      // numeric transition settles — mid-flap the cell briefly carries both
+      // the outgoing and incoming glyph.
+      await waitFor(() => expect(year()).toMatch(/^\d{2}$/));
       const current = Number(year());
       seen.push(current);
-      // One year on screen at a time: the year element holds two digits and
-      // nothing else, so there is no neighbour to step from.
-      expect(year()).toMatch(/^\d{2}$/);
       await step(rightFor(current), onDone);
     }
     expect(onDone).toHaveBeenCalled();

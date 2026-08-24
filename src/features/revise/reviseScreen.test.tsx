@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '@mui/material/styles';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createItem, introduce } from '@/domain/scheduler';
 import type { AppData, DrillRecord, ItemState } from '@/domain/types';
 import { codeFor } from '@/domain/yearCodes';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { ReviseScreen } from '@/routes/ReviseScreen';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
@@ -212,6 +213,11 @@ describe('ReviseScreen handing off to a drill', () => {
       // Three seconds of count-in, then the ten codes.
       await screen.findByRole('heading', { level: 1 }, { timeout: 6000 });
       for (let i = 0; i < 10; i += 1) {
+        // The transition has to settle first, because arming the pad is what
+        // schedules the frame the clock starts on — see weekdayFlow.test.tsx.
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, NUMERIC_SETTLE_MS + 20));
+        });
         // The frame first: the pad refuses a tap until the prompt has painted.
         await nextPaint();
         await user.click(screen.getByRole('button', { name: String(codeFor(promptYear())) }));

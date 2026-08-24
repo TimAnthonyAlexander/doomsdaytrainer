@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { codeFor } from '@/domain/yearCodes';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData } from '@/storage/db';
 import { itemKey } from '@/storage/defaults';
@@ -30,8 +31,17 @@ async function drain(): Promise<void> {
   });
 }
 
-/** Every state update a tap triggers, the persisted attempt included, lands inside act. */
+/**
+ * Every state update a tap triggers, the persisted attempt included, lands
+ * inside act.
+ *
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
+ */
 async function tap(label: string): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, NUMERIC_SETTLE_MS + 20));
+  });
   // The pad refuses an answer until the prompt has painted, so wait for it.
   await nextPaint();
   await act(async () => {
@@ -123,11 +133,22 @@ describe('RecallPass', () => {
       timeout: 5000,
     });
 
-    const prompt = () => Number(screen.getByTestId('recall-prompt').textContent);
-    const first = prompt();
+    // Read after the numeric transition settles — mid-flap the cell briefly
+    // carries both the outgoing and incoming glyph.
+    const promptText = () => screen.getByTestId('recall-prompt').textContent ?? '';
+    await waitFor(() => expect(promptText()).toMatch(/^\d{2}$/));
+    const first = Number(promptText());
+    const firstText = promptText();
+
     await tap(rightFor(first));
-    await waitFor(() => expect(prompt()).not.toBe(first), { timeout: 5000 });
-    expect(Math.abs(prompt() - first)).not.toBe(1);
+    await waitFor(
+      () => {
+        expect(promptText()).toMatch(/^\d{2}$/);
+        expect(promptText()).not.toBe(firstText);
+      },
+      { timeout: 5000 },
+    );
+    expect(Math.abs(Number(promptText()) - first)).not.toBe(1);
     await drain();
   });
 

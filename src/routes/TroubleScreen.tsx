@@ -7,6 +7,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Numeral } from '@/components/ui/Numeral';
+import { useNumericSettled } from '@/components/ui/NumericText';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Screen } from '@/components/ui/Screen';
 import { formatMs } from '@/domain/time';
@@ -32,6 +33,10 @@ export function TroubleScreen() {
   const { settings } = useAppState();
   const session = useTroubleSession();
   const { phase, advance } = session;
+
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(session.promptKey);
 
   useEffect(() => {
     if (phase !== 'correct') return;
@@ -132,6 +137,7 @@ export function TroubleScreen() {
         }
         disabled={phase === 'correct'}
         keyboard={settings.keyboardInput}
+        armed={settled}
       />
     </Screen>
   );

@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState } from 'react';
 import { AnswerPad, type AnswerFeedback, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import type { Attempt, Code, YearKey } from '@/domain/types';
 import { cueUrl } from '@/features/audio/speech';
 import { useSpokenPrompt } from '@/features/audio/useSpokenPrompt';
@@ -52,6 +53,12 @@ export function KeepGoing({ decade, pool, seed = 0, onStop }: KeepGoingProps) {
 
   const yy = currentYear(state);
   const upcoming = upcomingYear(state);
+  // A wrong tap keeps the same year on screen, so the key has to move on the
+  // retry too or the pad would refuse the second answer.
+  const promptKey = `keep-${yy ?? 'none'}-${state.answered}-${state.wrong}`;
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(promptKey);
 
   // The cue only, the same as every other ask. A wrong tap leaves the year on
   // screen, so the url does not change and nothing is spoken over the correction.
@@ -112,10 +119,11 @@ export function KeepGoing({ decade, pool, seed = 0, onStop }: KeepGoingProps) {
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             Year
           </Typography>
-          <Box data-testid="recall-prompt">
-            <Numeral size={56} weight={600}>
-              {yy === null ? '' : formatYear(yy)}
-            </Numeral>
+          <Box
+            data-testid="recall-prompt"
+            aria-label={yy === null ? undefined : `Year ${formatYear(yy)}`}
+          >
+            <NumericText text={yy === null ? '' : formatYear(yy)} size={56} weight={600} mono />
           </Box>
         </Box>
 
@@ -146,12 +154,11 @@ export function KeepGoing({ decade, pool, seed = 0, onStop }: KeepGoingProps) {
       <AnswerPad
         options={OPTIONS}
         onAnswer={handleAnswer}
-        // A wrong tap keeps the same year on screen, so the key has to move on
-        // the retry too or the pad would refuse the second answer.
-        promptKey={`keep-${yy ?? 'none'}-${state.answered}-${state.wrong}`}
+        promptKey={promptKey}
         feedback={feedback}
         disabled={feedback !== null}
         keyboard={settings.keyboardInput}
+        armed={settled}
       />
     </>
   );

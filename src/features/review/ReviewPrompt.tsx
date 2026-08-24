@@ -1,11 +1,14 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { Lightbulb } from 'lucide-react';
 import { Fragment } from 'react';
 import type { Code, YearKey } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
 import { Numeral } from '@/components/ui/Numeral';
+import { NumericText } from '@/components/ui/NumericText';
 import type { Hint } from './hints';
 import type { ReviewPhase } from './useReviewSession';
 
@@ -37,6 +40,11 @@ export function ReviewPrompt({
   // Once an answer is in, a hint has nothing left to offer.
   const showHintButton = phase === 'prompt' && hint === null && !autoHint;
 
+  // See MethodPartTrainer.tsx: NumericText needs a bare pixel number, which
+  // the responsive `fontSize` on the heading below cannot give it directly.
+  const theme = useTheme();
+  const yearSize = useMediaQuery(theme.breakpoints.up('sm')) ? 104 : 88;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
       <Box
@@ -64,9 +72,7 @@ export function ReviewPrompt({
             aria-label={`Year ${formatYear(yy)}`}
             sx={{ m: 0, fontSize: { xs: 88, sm: 104 }, lineHeight: 1 }}
           >
-            <Numeral size="inherit" weight={600}>
-              {formatYear(yy)}
-            </Numeral>
+            <NumericText text={formatYear(yy)} size={yearSize} weight={600} mono />
           </Box>
         </Box>
         <Box sx={{ justifySelf: 'start', pl: 2 }}>

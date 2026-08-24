@@ -3,6 +3,7 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState } from 'react';
 import { AnswerPad, type AnswerFeedback, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import type { Attempt, Code, YearKey } from '@/domain/types';
 import { codeFor, formatYear } from '@/domain/yearCodes';
 import { cueUrl } from '@/features/audio/speech';
@@ -74,6 +75,12 @@ export function RecallPass({
   const yy = currentYear(state);
   const { position, total } = progress(state);
   const upcoming = state.queue[1] ?? null;
+  // A wrong tap keeps the same year on screen, so the key has to move on the
+  // retry too or the pad would refuse the second answer.
+  const promptKey = `${state.phase}-${yy ?? 'none'}-${state.wrongTaps}-${position}`;
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(promptKey);
 
   // The cue only, never the pair: this pass is the ask. A wrong tap leaves the
   // year on screen, so the url does not change and nothing is spoken over the
@@ -141,10 +148,11 @@ export function RecallPass({
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             Year
           </Typography>
-          <Box data-testid="recall-prompt">
-            <Numeral size={56} weight={600}>
-              {yy === null ? '' : formatYear(yy)}
-            </Numeral>
+          <Box
+            data-testid="recall-prompt"
+            aria-label={yy === null ? undefined : `Year ${formatYear(yy)}`}
+          >
+            <NumericText text={yy === null ? '' : formatYear(yy)} size={56} weight={600} mono />
           </Box>
         </Box>
 
@@ -175,12 +183,11 @@ export function RecallPass({
       <AnswerPad
         options={OPTIONS}
         onAnswer={handleAnswer}
-        // A wrong tap keeps the same year on screen, so the key has to move on
-        // the retry too or the pad would refuse the second answer.
-        promptKey={`${state.phase}-${yy ?? 'none'}-${state.wrongTaps}-${position}`}
+        promptKey={promptKey}
         feedback={feedback}
         disabled={feedback !== null}
         keyboard={settings.keyboardInput}
+        armed={settled}
       />
     </>
   );

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { codeFor } from '@/domain/yearCodes';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData } from '@/storage/db';
 import { itemKey } from '@/storage/defaults';
@@ -25,12 +26,29 @@ function settle(): Promise<void> {
   });
 }
 
-/** Whichever pass is on screen puts its year in one of these. */
-function promptYear(): number | null {
+function rawPromptText(): string | null {
   const el = screen.queryByTestId('study-year') ?? screen.queryByTestId('recall-prompt');
   if (el === null) return null;
   const text = el.textContent?.trim() ?? '';
-  return text === '' ? null : Number(text);
+  return text === '' ? null : text;
+}
+
+/**
+ * Whichever pass is on screen puts its year in one of these.
+ *
+ * Waits for the numeric transition to settle first: mid-flap the cell
+ * briefly carries both the outgoing and incoming glyph, which reads as a
+ * three-digit year and would send `tapCode` looking for a button that does
+ * not exist.
+ */
+async function promptYear(): Promise<number | null> {
+  await waitFor(() => {
+    const text = rawPromptText();
+    if (text === null) return;
+    expect(text).toMatch(/^\d{1,2}$/);
+  });
+  const text = rawPromptText();
+  return text === null ? null : Number(text);
 }
 
 function pad(): HTMLElement | null {
@@ -63,7 +81,14 @@ async function advanced(): Promise<void> {
   );
 }
 
+/**
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
+ */
 async function tapCode(yy: number): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, NUMERIC_SETTLE_MS + 20));
+  });
   await nextPaint();
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: String(codeFor(yy)) }));
@@ -114,7 +139,7 @@ async function walkToEndless(limit = 120): Promise<number> {
       continue;
     }
 
-    const yy = promptYear();
+    const yy = await promptYear();
     if (yy === null) throw new Error(`no year to answer, and no way forward: ${headline()}`);
     await tapCode(yy);
   }
@@ -141,11 +166,11 @@ describe('one learn block, start to finish', () => {
       // before it. This is the regression: the mixed pass and the batch recall
       // are the same component, so without a key React kept the finished
       // batch's state and the screen went blank behind a green pad.
-      expect(promptYear()).not.toBeNull();
+      expect(await promptYear()).not.toBeNull();
       expect(pad()).not.toBeDisabled();
 
       // And it really answers.
-      const first = promptYear();
+      const first = await promptYear();
       expect(first).not.toBeNull();
       await tapCode(first as number);
       await waitFor(() => expect(screen.getByText(/answered/)).toBeInTheDocument());

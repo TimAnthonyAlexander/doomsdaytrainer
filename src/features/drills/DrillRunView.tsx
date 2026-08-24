@@ -1,8 +1,10 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
-import { Numeral } from '@/components/ui/Numeral';
+import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import { Screen } from '@/components/ui/Screen';
 import type { DrillMode } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
@@ -49,6 +51,15 @@ export function DrillRunView({
 }: DrillRunViewProps) {
   const { settings } = useAppState();
   const run = useDrillRun({ mode, decade, onDiscard, countdownSeconds });
+
+  // See MethodPartTrainer.tsx: NumericText needs a bare pixel number, which
+  // the responsive `fontSize` below cannot give it directly.
+  const theme = useTheme();
+  const yearSize = useMediaQuery(theme.breakpoints.up('sm')) ? 104 : 88;
+
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(run.promptKey);
 
   if (run.phase === 'finished' && run.outcome) {
     return (
@@ -99,9 +110,7 @@ export function DrillRunView({
               aria-label={`Starting in ${run.countdown}`}
               sx={{ fontSize: { xs: 88, sm: 104 }, lineHeight: 1, color: 'text.secondary' }}
             >
-              <Numeral size="inherit" weight={600}>
-                {run.countdown}
-              </Numeral>
+              <NumericText text={String(run.countdown)} size={yearSize} weight={600} mono />
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
               {`${run.plan.title}. ${run.plan.coverage}.`}
@@ -113,9 +122,12 @@ export function DrillRunView({
             aria-label={run.yy === null ? 'Waiting' : `Year ${formatYear(run.yy)}`}
             sx={{ m: 0, fontSize: { xs: 88, sm: 104 }, lineHeight: 1 }}
           >
-            <Numeral size="inherit" weight={600}>
-              {run.yy === null ? '' : formatYear(run.yy)}
-            </Numeral>
+            <NumericText
+              text={run.yy === null ? '' : formatYear(run.yy)}
+              size={yearSize}
+              weight={600}
+              mono
+            />
           </Box>
         )}
       </Box>
@@ -130,6 +142,7 @@ export function DrillRunView({
         // scheduler, so running out is a miss and not a corrupted item.
         windowMs={settings.answerWindowMs}
         onExpire={() => run.expire(settings.answerWindowMs ?? 0)}
+        armed={settled}
       />
     </Screen>
   );

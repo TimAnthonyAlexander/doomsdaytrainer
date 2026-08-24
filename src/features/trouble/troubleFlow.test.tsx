@@ -1,8 +1,9 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppData, ItemState, Settings } from '@/domain/types';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, itemKey } from '@/storage/defaults';
 import { AppStateProvider } from '@/state/AppStateProvider';
@@ -51,8 +52,17 @@ function pad(label: string): HTMLElement {
   return screen.getByRole('button', { name: label });
 }
 
-/** Answers the prompt on screen, after the frame that starts its latency clock. */
+/**
+ * Answers the prompt on screen, after the frame that starts its latency
+ * clock.
+ *
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
+ */
 async function tap(label: string): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, NUMERIC_SETTLE_MS + 20));
+  });
   await nextPaint();
   fireEvent.click(pad(label));
 }

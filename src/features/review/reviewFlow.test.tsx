@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
 import { codeFor } from '@/domain/yearCodes';
+import { NUMERIC_SETTLE_MS } from '@/components/ui/NumericText';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, itemKey } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
@@ -83,8 +84,15 @@ function pad(label: string): HTMLElement {
   return screen.getByRole('button', { name: label });
 }
 
-/** Answers the prompt on screen, after the frame that starts its latency clock. */
+/**
+ * Answers the prompt on screen, after the frame that starts its latency
+ * clock.
+ *
+ * Order matters: the transition has to settle first, because arming the pad
+ * is what schedules the frame the clock starts on. See weekdayFlow.test.tsx.
+ */
 async function tap(label: string): Promise<void> {
+  await wait(NUMERIC_SETTLE_MS + 20);
   await nextPaint();
   fireEvent.click(pad(label));
 }
@@ -243,6 +251,7 @@ describe('Review loop', () => {
     mount();
 
     await screen.findByLabelText('Year 73');
+    await wait(NUMERIC_SETTLE_MS + 20);
     await nextPaint();
     fireEvent.keyDown(window, { key: '0', code: 'Digit0' });
 
@@ -304,10 +313,12 @@ describe('the optional answer window', () => {
     mount();
 
     await screen.findByLabelText('Year 73');
-    await wait(400);
 
-    // The hint is on screen and the year has not moved.
-    expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument();
+    // The hint is on screen and the year has not moved. Each expiry advances
+    // the pad's prompt key, which is also what the numeric transition arms
+    // against, so a fixed wait can land inside a later re-arm window; polling
+    // for the hint rather than sleeping a fixed span sidesteps that race.
+    await waitFor(() => expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument());
     expect(screen.getByLabelText('Year 73')).toBeInTheDocument();
 
     // Nothing was written. A window that scored a tap would be recording a
@@ -322,7 +333,9 @@ describe('the optional answer window', () => {
     mount();
 
     await screen.findByLabelText('Year 73');
-    await wait(400);
+    // See the test above: tap right after the hint appears, rather than after
+    // a fixed sleep that could land inside a later disarmed window.
+    await waitFor(() => expect(screen.getByText(/73 \+ 18 = 91/)).toBeInTheDocument());
     await tap(String(codeFor(73)));
 
     await waitFor(async () => {

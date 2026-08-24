@@ -6,6 +6,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Numeral } from '@/components/ui/Numeral';
+import { useNumericSettled } from '@/components/ui/NumericText';
 import { Screen } from '@/components/ui/Screen';
 import { SoundToggle } from '@/features/audio/SoundToggle';
 import { cueUrl } from '@/features/audio/speech';
@@ -36,6 +37,10 @@ export function ReviewRun({ onDone }: ReviewRunProps) {
   const { settings, updateSettings } = useAppState();
   const session = useReviewSession();
   const { phase, advance } = session;
+
+  // The pad's latency clock stays at zero until the year settles into place —
+  // see useAnswerTimer.ts and NumericText.tsx.
+  const settled = useNumericSettled(session.promptKey);
 
   /*
    * The spoken cue starts on the same commit that paints the year, which is the
@@ -173,6 +178,7 @@ export function ReviewRun({ onDone }: ReviewRunProps) {
         // reopens the pad; it never records an answer nobody gave.
         windowMs={phase === 'prompt' ? settings.answerWindowMs : null}
         onExpire={session.expire}
+        armed={settled}
       />
     </Screen>
   );
