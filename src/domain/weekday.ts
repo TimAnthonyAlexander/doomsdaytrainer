@@ -155,6 +155,30 @@ export function isDoomsdayDate(month: number, leapYear: boolean, day: number): b
   return (day - monthDoomsday(month, leapYear)) % 7 === 0;
 }
 
+/**
+ * How far a day sits from its own month's doomsday, reduced mod 7.
+ *
+ * The second half of the method, and the half that needs no year: September's
+ * doomsday is the 5th, so the 6th is one step past it and the answer is 1. It
+ * does not matter which of the month's doomsdays the reader anchors on, which
+ * is the point of reducing — the 5th, the 12th, the 19th and the 26th are a
+ * whole number of weeks apart, so `6 - 5`, `6 - 12` and `6 - 26` are 1, -6 and
+ * -20, and all three are 1 mod 7.
+ *
+ * The leap flag is not decoration and cannot be defaulted. January and
+ * February are the only two months whose doomsday moves, and it moves by a
+ * day, so `dateStep(2, 6, false)` is 6 and `dateStep(2, 6, true)` is 5. Any
+ * caller asking about those two months has to know which year kind it means.
+ */
+export function dateStep(month: number, day: number, leapYear: boolean): Code {
+  assertMonth(month);
+  const length = monthLength(month, leapYear);
+  if (!Number.isInteger(day) || day < 1 || day > length) {
+    throw new RangeError(`Day outside the month: month ${month}, day ${day}`);
+  }
+  return ((((day - monthDoomsday(month, leapYear)) % 7) + 7) % 7) as Code;
+}
+
 /** 18..21 for the supported range. */
 export function centuryOf(fullYear: number): number {
   assertYear(fullYear);

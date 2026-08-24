@@ -16,6 +16,7 @@ import {
   tallyByMonth,
   type Tally,
 } from './weekdayStats';
+import { datePartRows, hasPartHistory, yearPartRows } from './partStats';
 
 interface WeekdayStatsViewProps {
   onBack: () => void;
@@ -88,13 +89,16 @@ function Breakdown({ title, note, rows }: { title: string; note: string; rows: R
  * grid has nothing to say about it.
  */
 export function WeekdayStatsView({ onBack }: WeekdayStatsViewProps) {
-  const { data } = useAppState();
+  const { data, partTotals } = useAppState();
   const attempts = data.weekdayAttempts;
 
   const overall = useMemo(() => overallTally(attempts), [attempts]);
   const modes = useMemo(() => tallyByMode(attempts), [attempts]);
   const months = useMemo(() => tallyByMonth(attempts), [attempts]);
   const centuries = useMemo(() => tallyByCentury(attempts), [attempts]);
+  const yearHalf = useMemo(() => yearPartRows(partTotals), [partTotals]);
+  const dateHalf = useMemo(() => datePartRows(partTotals), [partTotals]);
+  const halvesAnswered = useMemo(() => hasPartHistory(partTotals), [partTotals]);
 
   return (
     <>
@@ -151,6 +155,31 @@ export function WeekdayStatsView({ onBack }: WeekdayStatsViewProps) {
         note="Four anchors. A slow century is a slow anchor."
         rows={centuries.map((century) => ({ ...century, label: century.label }))}
       />
+
+      {/* The halves, and only once either has been answered. Empty tables under
+          a screen about full dates would read as something broken rather than
+          as something not yet done. Their figures are all-time, read from
+          `partTotals` rather than from a raw log, so they do not move when the
+          log is trimmed — which is why they sit under their own heading
+          instead of beside the four blocks above, whose numbers come from the
+          bounded `weekdayAttempts`. */}
+      {halvesAnswered ? (
+        <>
+          <Typography variant="h3" component="h2" sx={{ mt: 1 }}>
+            The halves
+          </Typography>
+          <Breakdown
+            title="Year half, by century"
+            note="Anchor plus year code, all time. A slow century is a slow anchor."
+            rows={yearHalf}
+          />
+          <Breakdown
+            title="Date half, by month"
+            note="Days from the month's doomsday, all time. The slowest month is the doomsday to go back to."
+            rows={dateHalf}
+          />
+        </>
+      ) : null}
     </>
   );
 }

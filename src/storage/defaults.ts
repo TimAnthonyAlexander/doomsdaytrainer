@@ -4,6 +4,7 @@ import { allYears } from '@/domain/yearCodes';
 import { ALL_CENTURIES, ALL_MONTHS } from '@/domain/weekday';
 import { emptyWeekdayTotals } from '@/domain/weekdayLifetime';
 import { emptyDayStepTotals } from '@/domain/dayStepLifetime';
+import { emptyMethodPartTotals } from '@/domain/methodPartLifetime';
 import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
 
 /**
@@ -30,8 +31,14 @@ import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
  * v6 added the day-step trainer: `dayStepAttempts` and `dayStepTotals`, the
  * last step of the method timed on its own. No new item map — a (doomsday, day)
  * pair is not a fixed item set, so nothing there is scheduled.
+ *
+ * v7 added the method's two halves as modes of the weekday screen:
+ * `partAttempts` and `partTotals`, the year half cut by century and the date
+ * half cut by month. No new item map, for the same reason as v6 — a year is
+ * not a fixed item set the way the 100 codes are, and neither is a (month,
+ * day) pair.
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const DEFAULT_SETTINGS: Settings = {
   indexConvention: 'sunday',
@@ -112,6 +119,8 @@ export function defaultAppData(now: number): AppData {
     weekdayRuns: [],
     dayStepAttempts: [],
     dayStepTotals: emptyDayStepTotals(),
+    partAttempts: [],
+    partTotals: emptyMethodPartTotals(),
     calcAttempts: [],
     calcTotals: emptyCalcTotals(),
     verifyAttempts: [],
@@ -159,6 +168,22 @@ export const MAX_WEEKDAY_RUNS = 200;
  * which is that the whole document is rewritten under one key on every answer.
  */
 export const MAX_DAY_STEP_ATTEMPTS = 1200;
+
+/**
+ * Halves kept in the raw log, both together.
+ *
+ * The breakdown cuts each half once, and the finer of the two cuts is the date
+ * half's twelve months, so that is the cell that has to stay meaningful. 1200
+ * split across two halves leaves each month around 50 recent samples, which is
+ * enough for a median to move when practice moves it and is the same order as
+ * the day step's fourteen cells.
+ *
+ * As everywhere else here, the lifetime figures do not depend on this at all:
+ * `AppData.partTotals` holds the counts and the latency histogram, so trimming
+ * cannot change a single all-time number. The ceiling exists because the whole
+ * document is rewritten under one key on every answer.
+ */
+export const MAX_PART_ATTEMPTS = 1200;
 
 /**
  * Calculation steps kept in the raw log. One derivation writes three or four

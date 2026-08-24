@@ -11,6 +11,11 @@ import {
   repairDayStepTotals,
 } from '@/domain/dayStepLifetime';
 import {
+  buildMethodPartTotals,
+  isMethodPartAttemptShaped,
+  repairMethodPartTotals,
+} from '@/domain/methodPartLifetime';
+import {
   buildCalcTotals,
   buildVerifyTotals,
   isCalcAttemptShaped,
@@ -194,6 +199,32 @@ const MIGRATIONS: Record<number, Migration> = {
       dayStepTotals: buildDayStepTotals(dayStepAttempts),
     };
   },
+
+  /**
+   * v6 → v7: the method's two halves, as modes of the weekday screen. The year
+   * half — `(century anchor + year code) mod 7` — and the date half —
+   * `(day - month doomsday) mod 7` — get one shared raw log and one aggregate,
+   * the year half cut by century and the date half cut by month.
+   *
+   * Nothing else moves, and no new item map appears. A year is not a fixed
+   * item set the way the 100 codes are, and a (month, day) pair is not one
+   * either, so neither half is ever scheduled — the same rule the dates on the
+   * weekday trainer and the day-step pairs already follow. A v6 document has
+   * no half history, so the log starts empty; a document that somehow carries
+   * raw attempts without an aggregate has the aggregate built from them rather
+   * than started at zero.
+   */
+  7: (data) => {
+    const partAttempts = Array.isArray(data.partAttempts)
+      ? data.partAttempts.filter(isMethodPartAttemptShaped)
+      : [];
+    return {
+      ...data,
+      schemaVersion: 7,
+      partAttempts,
+      partTotals: buildMethodPartTotals(partAttempts),
+    };
+  },
 };
 
 export function migrateAppData(data: AppData): AppData {
@@ -325,6 +356,12 @@ export function normaliseAppData(data: AppData, now: number): AppData {
   const dayStepAttempts = Array.isArray(data.dayStepAttempts)
     ? data.dayStepAttempts.filter(isDayStepAttemptShaped)
     : [];
+  // Stricter again: a half carries the part it belongs to, and the date half
+  // carries a day that has to exist in the month it names. A stored
+  // "February 30" would reach a screen that tries to work out its offset.
+  const partAttempts = Array.isArray(data.partAttempts)
+    ? data.partAttempts.filter(isMethodPartAttemptShaped)
+    : [];
   return {
     ...data,
     schemaVersion: SCHEMA_VERSION,
@@ -342,6 +379,10 @@ export function normaliseAppData(data: AppData, now: number): AppData {
     // Same contract again: rebuilt from the raw log when the aggregate is
     // missing, repaired cell by cell when it is there and wrong.
     dayStepTotals: repairDayStepTotals(data.dayStepTotals, dayStepAttempts),
+    partAttempts,
+    // And again for the two halves: rebuilt from the raw log when the
+    // aggregate is missing, repaired cell by cell when it is there and wrong.
+    partTotals: repairMethodPartTotals(data.partTotals, partAttempts),
     calcAttempts,
     // Same contract as `weekdayTotals`: a missing aggregate is rebuilt from
     // the raw log, a partial or corrupt one is repaired step by step, and

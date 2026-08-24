@@ -1,17 +1,9 @@
-import Box from '@mui/material/Box';
 import { centuryLabel, monthName, trueWeekdayName, type WeekdayWorking as Working } from '@/domain/weekday';
 import { formatYear } from '@/domain/yearCodes';
-import { Numeral } from '@/components/ui/Numeral';
-import { palette } from '@/theme/palette';
+import { WorkingLines, type WorkingLine } from './WorkingLines';
 
 interface WeekdayWorkingProps {
   working: Working;
-}
-
-interface Line {
-  label: string;
-  expression: string;
-  value: string;
 }
 
 function signed(value: number): string {
@@ -28,7 +20,7 @@ function signed(value: number): string {
  */
 export function WeekdayWorking({ working }: WeekdayWorkingProps) {
   const leap = working.leapYear && (working.month === 1 || working.month === 2);
-  const lines: Line[] = [
+  const lines: WorkingLine[] = [
     {
       label: 'Century anchor',
       expression: centuryLabel(working.century),
@@ -56,42 +48,5 @@ export function WeekdayWorking({ working }: WeekdayWorkingProps) {
     },
   ];
 
-  return (
-    <Box
-      component="dl"
-      sx={{
-        m: 0,
-        width: '100%',
-        display: 'grid',
-        gridTemplateColumns: 'auto 1fr auto',
-        columnGap: { xs: 1.5, sm: 2.5 },
-        rowGap: 0.75,
-        alignItems: 'baseline',
-      }}
-    >
-      {lines.map((line, index) => (
-        <Box key={line.label} sx={{ display: 'contents' }}>
-          <Box component="dt" sx={{ m: 0 }}>
-            <Numeral size={12} color={palette.inkMuted}>
-              {line.label}
-            </Numeral>
-          </Box>
-          <Box component="dd" sx={{ m: 0, justifySelf: 'end' }}>
-            <Numeral size={12} color={palette.inkFaint}>
-              {line.expression}
-            </Numeral>
-          </Box>
-          <Box component="dd" sx={{ m: 0, justifySelf: 'end' }}>
-            <Numeral
-              size={13}
-              weight={index === lines.length - 1 ? 600 : 400}
-              color={index === lines.length - 1 ? palette.brandDeep : palette.ink}
-            >
-              {line.value}
-            </Numeral>
-          </Box>
-        </Box>
-      ))}
-    </Box>
-  );
+  return <WorkingLines lines={lines} />;
 }

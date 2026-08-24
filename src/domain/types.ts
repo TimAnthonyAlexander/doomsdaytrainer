@@ -202,6 +202,17 @@ export type TableKind = 'month' | 'century';
 /** Assisted shows the year code above the date; unassisted shows nothing. */
 export type WeekdayMode = 'assisted' | 'unassisted';
 
+/**
+ * Which of the three trainers the weekday screen is showing.
+ *
+ * `full` is a whole date to a weekday, which is the method end to end. The
+ * other two are its halves, asked alone — see `MethodPart` and
+ * src/domain/methodParts.ts. Separate from `WeekdayMode`, which is a different
+ * axis: assisted and unassisted are how much help a *full date* comes with,
+ * and neither half has any help to give.
+ */
+export type WeekdayTask = 'full' | MethodPart;
+
 /** Independent of the year-code `ScopeId`. Dates, not two-digit years. */
 export type WeekdayRangeId = 'century' | 'living' | 'full';
 
@@ -349,6 +360,87 @@ export interface DayStepTotals {
 }
 
 /* ------------------------------------------------------------------ */
+/* The method's two halves                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Which half of the calculation a prompt asked for. See
+ * src/domain/methodParts.ts — `year` is `(anchor + code) mod 7`, `date` is
+ * `(day - month doomsday) mod 7`, and adding the two gives the weekday.
+ *
+ * Declared here rather than only in that module because the persisted log is
+ * discriminated by it.
+ */
+export type MethodPart = 'year' | 'date';
+
+/**
+ * One half answered on the weekday screen.
+ *
+ * A discriminated union rather than one flat row with half its fields nulled,
+ * because the two halves genuinely take different questions: the year half is
+ * given a year and no date, the date half a month and a day and no year. A row
+ * that carried both with nulls could express "a year half that also had a
+ * month", which is not a thing, and every reader would have to re-check which
+ * fields were real.
+ *
+ * Neither half enters spaced repetition, for the same reason the full-date
+ * trainer does not: a year is not a fixed item set the way the 100 codes are,
+ * a (month, day) pair is not one either, and the year code inside the year
+ * half is handed no differently than a wrong full date hands it — which of the
+ * two lookups failed is unknowable from one tap.
+ */
+export type MethodPartAttempt =
+  | {
+      part: 'year';
+      /** Epoch millis. */
+      timestamp: number;
+      /** 1800..2199. */
+      fullYear: number;
+      correct: boolean;
+      /** Prompt paint → tap, in millis. */
+      latencyMs: number;
+      /** The digit tapped, 0..6. Null when the answer window ran out. */
+      answered: Code | null;
+    }
+  | {
+      part: 'date';
+      /** Epoch millis. */
+      timestamp: number;
+      /** 1..12, 1 = January. */
+      month: number;
+      day: number;
+      /** Which doomsday was in force. Only January and February move. */
+      leapYear: boolean;
+      correct: boolean;
+      /** Prompt paint → tap, in millis. */
+      latencyMs: number;
+      /** The digit tapped, 0..6. Null when the answer window ran out. */
+      answered: Code | null;
+    };
+
+/**
+ * Every half-answer ever given, each half cut the one way that is actionable.
+ *
+ * The year half is cut by century, because the two things inside it are the
+ * anchor and the code, and the codes already have a mastery grid of their own
+ * on Stats — so a per-decade cut here would be a second, worse copy of that,
+ * while a per-century cut is the only place the four anchors are timed.
+ * The date half is cut by month, because the twelve month doomsdays are what
+ * it is made of and "March costs twice what June does" names a drill.
+ *
+ * Each cut covers every attempt of its half, so summing one gives that half's
+ * overall figures and there is no third stored copy to fall out of step. Same
+ * trim-proof shape and bucket edges as every other aggregate here, so the same
+ * estimator reads all of them.
+ */
+export interface MethodPartTotals {
+  /** Keyed by century, "18".."21". */
+  yearByCentury: Record<string, DayStepBucketTotals>;
+  /** Keyed by month, "1".."12". */
+  dateByMonth: Record<string, DayStepBucketTotals>;
+}
+
+/* ------------------------------------------------------------------ */
 /* Calculation trainer                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -482,6 +574,13 @@ export interface AppData {
   dayStepAttempts: DayStepAttempt[];
   /** Every day step ever answered, by size and by direction. Never trimmed. */
   dayStepTotals: DayStepTotals;
+  /**
+   * The most recent halves answered on the weekday screen, oldest first.
+   * Bounded — read `partTotals` for anything that must cover all of history.
+   */
+  partAttempts: MethodPartAttempt[];
+  /** Every half ever answered, by century and by month. Never trimmed. */
+  partTotals: MethodPartTotals;
   /**
    * The most recent steps answered on the calculation trainer, oldest first.
    * Bounded — read `calcTotals` for anything that must cover all of history.

@@ -7,6 +7,7 @@ import type {
   DrillRecord,
   GradeResult,
   ItemState,
+  MethodPartAttempt,
   Settings,
   TableKind,
   VerifyResultInput,
@@ -19,10 +20,12 @@ import { dayKey } from '@/domain/time';
 import { addWeekdayAttempt } from '@/domain/weekdayLifetime';
 import { addCalcAttempt, addVerifyResult, buildVerifyAttempt } from '@/domain/calcStats';
 import { addDayStepAttempt } from '@/domain/dayStepLifetime';
+import { addMethodPartAttempt } from '@/domain/methodPartLifetime';
 import {
   MAX_ATTEMPT_HISTORY,
   MAX_CALC_ATTEMPTS,
   MAX_DAY_STEP_ATTEMPTS,
+  MAX_PART_ATTEMPTS,
   MAX_VERIFY_ATTEMPTS,
   MAX_WEEKDAY_ATTEMPTS,
   MAX_WEEKDAY_RUNS,
@@ -216,6 +219,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [commit],
   );
 
+  const recordMethodPartAttempt = useCallback(
+    async (attempt: MethodPartAttempt) => {
+      const next = await patchAppData((draft) => ({
+        ...draft,
+        partAttempts: capTail([...draft.partAttempts, attempt], MAX_PART_ATTEMPTS),
+        // Written on the same document write as the raw half, so the two can
+        // never disagree. The raw log is trimmed; this is not.
+        partTotals: addMethodPartAttempt(draft.partTotals, attempt),
+      }));
+      commit(next);
+    },
+    [commit],
+  );
+
   const recordCalcAttempt = useCallback(
     async (attempt: CalcAttempt) => {
       const next = await patchAppData((draft) => ({
@@ -319,6 +336,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       centuryItemList: Object.values(current.centuryItems).sort(byKey),
       weekdayTotals: current.weekdayTotals,
       dayStepTotals: current.dayStepTotals,
+      partTotals: current.partTotals,
       calcTotals: current.calcTotals,
       verifyTotals: current.verifyTotals,
       updateSettings,
@@ -329,6 +347,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       recordWeekdayAttempt,
       recordWeekdayRun,
       recordDayStepAttempt,
+      recordMethodPartAttempt,
       recordCalcAttempt,
       recordVerifyResult,
       reviewTableItem,
@@ -348,6 +367,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     recordWeekdayAttempt,
     recordWeekdayRun,
     recordDayStepAttempt,
+    recordMethodPartAttempt,
     recordCalcAttempt,
     recordVerifyResult,
     reviewTableItem,

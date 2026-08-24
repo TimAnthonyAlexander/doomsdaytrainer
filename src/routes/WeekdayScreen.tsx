@@ -2,11 +2,12 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import { Activity } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Screen } from '@/components/ui/Screen';
-import type { WeekdayMode, WeekdayRangeId } from '@/domain/types';
+import type { WeekdayMode, WeekdayRangeId, WeekdayTask } from '@/domain/types';
 import { weekdayRanges } from '@/features/weekday/datePool';
+import { MethodPartTrainer } from '@/features/weekday/MethodPartTrainer';
 import { PlainToggle, type ToggleChoice } from '@/features/weekday/PlainToggle';
 import { WeekdayPrompt } from '@/features/weekday/WeekdayPrompt';
 import { WeekdayStatsView } from '@/features/weekday/WeekdayStatsView';
@@ -17,8 +18,10 @@ import { weekdayOptions } from '@/features/weekday/weekdayPad';
 import {
   readWeekdayMode,
   readWeekdayRange,
+  readWeekdayTask,
   writeWeekdayMode,
   writeWeekdayRange,
+  writeWeekdayTask,
 } from '@/features/weekday/weekdayPrefs';
 import { useAppState } from '@/state/useAppState';
 
@@ -73,12 +76,76 @@ function StatsButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-interface TrainerProps {
+/**
+ * The three trainers on this screen, in the order the calculation needs them.
+ *
+ * "Full date" is the method end to end and the reason the screen exists. The
+ * other two are its halves, timed alone: `(anchor + year code) mod 7` from a
+ * year, and `(day - month doomsday) mod 7` from a month and a day. A whole date
+ * is two lookups and two sums, and one tap at the end of it can only say that
+ * the whole thing was slow — the same argument that put the day step on its own
+ * screen, one level up.
+ */
+const TASK_CHOICES: readonly ToggleChoice<WeekdayTask>[] = [
+  { value: 'full', label: 'Full date' },
+  { value: 'year', label: 'Year' },
+  { value: 'date', label: 'Date' },
+];
+
+interface HeaderProps {
+  task: WeekdayTask;
   mode: WeekdayMode;
   rangeId: WeekdayRangeId;
+  onTask: (task: WeekdayTask) => void;
   onMode: (mode: WeekdayMode) => void;
   onRange: (rangeId: WeekdayRangeId) => void;
   onView: (view: View) => void;
+}
+
+/**
+ * The controls, on two rows, and which ones appear depends on the trainer.
+ *
+ * The trainer is its own row because it is the biggest choice on the screen and
+ * because the row under it is already two toggles wide at 375px. Help is a
+ * full-date control and nothing else: assisted hands over the year code, and
+ * the year half *is* the year code plus an anchor, so handing it over would be
+ * handing over the answer. The range picks which years are drawn, so it stays
+ * for the year half and goes for the date half, which has no year in it at all.
+ */
+function Header({ task, mode, rangeId, onTask, onMode, onRange, onView }: HeaderProps) {
+  const rangeChoices = useMemo<ToggleChoice<WeekdayRangeId>[]>(
+    () => weekdayRanges(Date.now()).map((range) => ({ value: range.id, label: range.label })),
+    [],
+  );
+
+  return (
+    <Box sx={{ display: 'grid', gap: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+        <PlainToggle label="Trainer" choices={TASK_CHOICES} value={task} onChange={onTask} />
+        <StatsButton onOpen={() => onView('stats')} />
+      </Box>
+      {task === 'date' ? null : (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          {task === 'full' ? (
+            <PlainToggle label="Help" choices={MODE_CHOICES} value={mode} onChange={onMode} />
+          ) : null}
+          <PlainToggle
+            label={task === 'full' ? 'Date range' : 'Year range'}
+            choices={rangeChoices}
+            value={rangeId}
+            onChange={onRange}
+          />
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+interface TrainerProps {
+  mode: WeekdayMode;
+  rangeId: WeekdayRangeId;
+  /** The controls above the prompt. The screen owns them; this draws them. */
+  header: ReactNode;
 }
 
 /**
@@ -88,7 +155,7 @@ interface TrainerProps {
  * is actually on screen: leaving it closes the open run, and that has to
  * happen when the user opens the stats, not only when they leave the route.
  */
-function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
+function Trainer({ mode, rangeId, header }: TrainerProps) {
   const { settings, weekdayTotals } = useAppState();
   const session = useWeekdaySession(mode, rangeId);
   const { phase, advance } = session;
@@ -100,11 +167,6 @@ function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
     const id = setTimeout(advance, Math.max(0, settings.autoAdvanceMs));
     return () => clearTimeout(id);
   }, [phase, advance, settings.autoAdvanceMs]);
-
-  const rangeChoices = useMemo<ToggleChoice<WeekdayRangeId>[]>(
-    () => weekdayRanges(Date.now()).map((range) => ({ value: range.id, label: range.label })),
-    [],
-  );
 
   const options = useMemo<AnswerOption[]>(
     () =>
@@ -120,13 +182,7 @@ function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
 
   return (
     <Screen gap={2} sx={{ flex: 1 }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <PlainToggle label="Help" choices={MODE_CHOICES} value={mode} onChange={onMode} />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PlainToggle label="Date range" choices={rangeChoices} value={rangeId} onChange={onRange} />
-          <StatsButton onOpen={() => onView('stats')} />
-        </Box>
-      </Box>
+      {header}
 
       <Box
         sx={{
@@ -189,11 +245,17 @@ function Trainer({ mode, rangeId, onMode, onRange, onView }: TrainerProps) {
  */
 export function WeekdayScreen() {
   const [view, setView] = useState<View>('dates');
+  const [task, setTask] = useState<WeekdayTask>(readWeekdayTask);
   const [mode, setMode] = useState<WeekdayMode>(readWeekdayMode);
   const [rangeId, setRangeId] = useState<WeekdayRangeId>(readWeekdayRange);
 
   // Written on the change, not on every render: a preference is only touched
   // when the user touches it.
+  const chooseTask = useCallback((next: WeekdayTask) => {
+    setTask(next);
+    writeWeekdayTask(next);
+  }, []);
+
   const chooseMode = useCallback((next: WeekdayMode) => {
     setMode(next);
     writeWeekdayMode(next);
@@ -212,5 +274,25 @@ export function WeekdayScreen() {
     );
   }
 
-  return <Trainer mode={mode} rangeId={rangeId} onMode={chooseMode} onRange={chooseRange} onView={setView} />;
+  const header = (
+    <Header
+      task={task}
+      mode={mode}
+      rangeId={rangeId}
+      onTask={chooseTask}
+      onMode={chooseMode}
+      onRange={chooseRange}
+      onView={setView}
+    />
+  );
+
+  if (task === 'full') {
+    return <Trainer mode={mode} rangeId={rangeId} header={header} />;
+  }
+
+  // Keyed by the half, so switching draws a fresh prompt of the right kind on
+  // the mount rather than painting one frame of the old one under the new
+  // toggle. The session hook resets on a range change on its own; this covers
+  // the one change that also changes what a prompt *is*.
+  return <MethodPartTrainer key={task} part={task} rangeId={rangeId} header={header} />;
 }

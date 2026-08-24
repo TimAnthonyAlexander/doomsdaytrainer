@@ -18,11 +18,19 @@
  * unknown id with the full range, so a corrupt value would silently widen the
  * pool from one century to four hundred years instead of failing.
  */
-import type { WeekdayMode, WeekdayRangeId } from '@/domain/types';
+import type { WeekdayMode, WeekdayRangeId, WeekdayTask } from '@/domain/types';
 import { readFlag, writeFlag } from '@/features/notifications/deviceFlags';
 
 export const WEEKDAY_MODE_KEY = 'doomsday.weekdayMode';
 export const WEEKDAY_RANGE_KEY = 'doomsday.weekdayRange';
+export const WEEKDAY_TASK_KEY = 'doomsday.weekdayTask';
+
+/**
+ * The whole date. The two halves exist to be practised deliberately, and the
+ * screen is the app's index route — opening it on half of the method would
+ * make the front door of the app a drill for one step of it.
+ */
+export const DEFAULT_WEEKDAY_TASK: WeekdayTask = 'full';
 
 /**
  * Unassisted on a fresh device. Assisted hands over the year code, which is the
@@ -49,6 +57,19 @@ export function readWeekdayMode(): WeekdayMode {
 
 export function writeWeekdayMode(mode: WeekdayMode): void {
   writeFlag(WEEKDAY_MODE_KEY, mode);
+}
+
+function isTask(value: string | null): value is WeekdayTask {
+  return value === 'full' || value === 'year' || value === 'date';
+}
+
+export function readWeekdayTask(): WeekdayTask {
+  const stored = readFlag(WEEKDAY_TASK_KEY);
+  return isTask(stored) ? stored : DEFAULT_WEEKDAY_TASK;
+}
+
+export function writeWeekdayTask(task: WeekdayTask): void {
+  writeFlag(WEEKDAY_TASK_KEY, task);
 }
 
 export function readWeekdayRange(): WeekdayRangeId {

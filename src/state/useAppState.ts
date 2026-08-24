@@ -9,6 +9,8 @@ import type {
   DrillRecord,
   GradeResult,
   ItemState,
+  MethodPartAttempt,
+  MethodPartTotals,
   Settings,
   TableKind,
   VerifyAttempt,
@@ -48,6 +50,12 @@ export interface AppStateValue {
    */
   dayStepTotals: DayStepTotals;
   /**
+   * Lifetime counts and latency histograms for the method's two halves, the
+   * year half by century and the date half by month. Survives the trimming of
+   * `data.partAttempts`.
+   */
+  partTotals: MethodPartTotals;
+  /**
    * Lifetime counts and a latency histogram for every calculation step, kept
    * apart so the slow step is visible. Survives the trimming of
    * `data.calcAttempts`.
@@ -76,6 +84,14 @@ export interface AppStateValue {
    * than recalled, so the answer says nothing about that item either.
    */
   recordDayStepAttempt(attempt: DayStepAttempt): Promise<void>;
+  /**
+   * Appends one answered half of the method to the log and folds it into the
+   * lifetime totals. Nothing here schedules anything either: a year is not a
+   * fixed item set the way the 100 codes are, a (month, day) pair is not one,
+   * and a wrong year half cannot say whether the anchor or the code was the
+   * miss — which is the same reason a wrong full date never touches them.
+   */
+  recordMethodPartAttempt(attempt: MethodPartAttempt): Promise<void>;
   /**
    * Appends one answered calculation step to the log and folds it into the
    * per-step lifetime totals. Nothing here schedules anything: a derivation is

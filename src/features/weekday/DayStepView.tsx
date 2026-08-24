@@ -17,6 +17,7 @@ import { trueWeekdayName } from '@/domain/weekday';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
 import { DayStepTotalsView } from './DayStepTotalsView';
+import { WorkingLines } from './WorkingLines';
 import { sessionLine } from './dayStepStats';
 import { useDayStepSession } from './useDayStepSession';
 import { weekdayOptions } from './weekdayPad';
@@ -72,45 +73,7 @@ function Day({ value }: { value: number }) {
  * about where the terms came from.
  */
 function Working({ working }: { working: DayStepWorking }) {
-  const lines = working.lines;
-  return (
-    <Box
-      component="dl"
-      sx={{
-        m: 0,
-        width: '100%',
-        display: 'grid',
-        gridTemplateColumns: 'auto 1fr auto',
-        columnGap: { xs: 1.5, sm: 2.5 },
-        rowGap: 0.75,
-        alignItems: 'baseline',
-      }}
-    >
-      {lines.map((line, index) => (
-        <Box key={line.label} sx={{ display: 'contents' }}>
-          <Box component="dt" sx={{ m: 0 }}>
-            <Numeral size={12} color={palette.inkMuted}>
-              {line.label}
-            </Numeral>
-          </Box>
-          <Box component="dd" sx={{ m: 0, justifySelf: 'end' }}>
-            <Numeral size={12} color={palette.inkFaint}>
-              {line.expression}
-            </Numeral>
-          </Box>
-          <Box component="dd" sx={{ m: 0, justifySelf: 'end' }}>
-            <Numeral
-              size={13}
-              weight={index === lines.length - 1 ? 600 : 400}
-              color={index === lines.length - 1 ? palette.brandDeep : palette.ink}
-            >
-              {line.value}
-            </Numeral>
-          </Box>
-        </Box>
-      ))}
-    </Box>
-  );
+  return <WorkingLines lines={working.lines} />;
 }
 
 /**

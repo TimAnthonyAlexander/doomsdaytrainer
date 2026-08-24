@@ -206,6 +206,14 @@ numbers, and the numbers were wrong.
   across a common and a leap year, each asked from all seven weekdays the
   doomsday could fall on — against a day-by-day walk of the calendar, and
   against `weekdayFor` on real dates. `dayStepLifetime.ts` is its aggregate.
+- `methodParts.ts` is the method split down the middle. The year half is
+  `(century anchor + year code) mod 7`, which is the weekday that year's
+  doomsday falls on; the date half is `(day - month doomsday) mod 7`, which is
+  how far the date sits from it. Addition mod 7 is associative, so the two add
+  back to `weekdayFor` — and a test walks all 146,097 days of a full Gregorian
+  cycle proving they do, which is the one property that must never drift.
+  `dateStep` itself lives in `weekday.ts` beside `monthDoomsday`, because that
+  is what it is made of. `methodPartLifetime.ts` is the aggregate.
 - `calc.ts` is the calculation trainer's maths: `leapDays`, `rawSum`,
   `reduce28`, `cyclesRemoved`, `sevenStep`, and `stepsFor` / `reducedStepsFor`,
   which return the derivation as labelled steps, each carrying the question, the
@@ -256,6 +264,8 @@ v3  the weekday lifetime aggregate, built from existing attempts on upgrade
 v4  calculation-trainer attempts and per-step totals
 v5  per-item fluency, rebuilt from each item's stored attempts on upgrade
 v6  the day-step log and its aggregate, by step size and by direction
+v7  the two halves' log and aggregate, the year half by century and the date
+    half by month
 ```
 
 Migrations that introduce an aggregate rebuild it from whatever raw history the
@@ -340,6 +350,13 @@ violation, and several were bugs before they were rules.
     interval without resetting the repetitions, so redoing a decade wrote
     exactly that pair. Reported as "47 / 49, and it keeps alternating 00 and
     01"; the redo had also silently thrown away the whole decade's intervals.
+14. **A prompt whose answer depends on the year kind has to state it.** January
+    and February are the only two months whose doomsday moves, and it moves by a
+    day, so "January 1" without a year kind has two right answers and is not a
+    question. The date-half trainer says "January 1, leap year" for those two
+    and stays silent for the other ten, where saying it would imply it mattered.
+    The Tables drill obeys the same rule from the other side, by asking both
+    halves of those two months every time.
 
 ---
 
@@ -350,17 +367,76 @@ pick the weekday, seven buttons. Unassisted is the default. Assisted hands over
 the year code, which is the part ten decade blocks exist to teach, so a primary
 screen that opened in assisted mode would skip the thing it is for.
 
-Both the help toggle and the date range are remembered in `localStorage`, beside
-the theme preference. A picker that resets on every visit is a picker the user
-sets on every visit. They are device state rather than user data, so neither is
-in `AppData` and neither needed a schema bump, and an unrecognised stored value
-falls back to the default rather than reaching the screen. That last part is not
-defensive habit: `rangeById` resolves an unknown id to the full range, so a
-corrupt value would quietly widen the pool instead of failing.
+The trainer toggle, the help toggle and the date range are remembered in
+`localStorage`, beside the theme preference. A picker that resets on every visit
+is a picker the user sets on every visit. They are device state rather than user
+data, so none is in `AppData` and none needed a schema bump, and an unrecognised
+stored value falls back to the default rather than reaching the screen. That last
+part is not defensive habit: `rangeById` resolves an unknown id to the full
+range, so a corrupt value would quietly widen the pool instead of failing.
 
 Dates never enter spaced repetition, because they are not a fixed item set. Month
 doomsdays and century anchors do, because they are 12 and 4 fixed items. A wrong
 weekday answer does not punish either, since which step failed is unknowable.
+
+### The two halves, on the same screen
+
+The full-date trainer cannot say where six seconds went. A date is two lookups
+and two sums, and one tap at the end of it says only that the whole thing was
+slow. So the screen has three trainers behind one toggle: **Full date**, and the
+method's two halves timed alone.
+
+**Year** hands over a year and asks for `(century anchor + year code) mod 7`,
+which is the weekday that year's doomsday falls on. **Date** hands over a month
+and a day — no year at all — and asks for `(day - month doomsday) mod 7`, which
+is how far the date sits from that doomsday. Add the two and reduce and you are
+back at the weekday, which `methodParts.ts` documents and a full-cycle test
+holds them to. It is the same argument the day-step trainer already makes for
+the final count, one level up.
+
+Four decisions in there are worth keeping:
+
+**The date half is reduced, never counted from the taught date.** A month has
+three to five doomsdays and they are a whole number of weeks apart, so it cannot
+matter which one the reader anchors on: September's 6th is `6 - 5`, `6 - 12` and
+`6 - 26`, which are 1, -6 and -20, and all three are 1 mod 7. A trainer that only
+accepted the answer counted from the taught date would be marking a correct
+method wrong — the same mistake the twelve-value month pad made before it.
+
+**January and February state which kind of year they mean.** They are the only
+two months whose doomsday moves, and it moves by a day, so "January 1" has two
+different right answers and is not a question. The prompt reads "January 1, leap
+year" for those two and says nothing about year kind for the other ten, where
+raising it would imply it mattered. The pool draws the flag evenly for the two
+that move, so neither kind can go unmet for weeks.
+
+**Both answers are plain digits, Sunday-indexed.** The date half's answer is a
+count of days and was never a weekday. The year half's answer *is* a weekday
+index, but every intermediate number in the app is Sunday-indexed and
+`indexConvention` renames weekdays without touching a number (invariant 8) —
+the Tables drill asks for the century anchors as bare digits for exactly the
+same reason. The weekday name is on the worked answer instead, where it can be
+read as a check rather than tapped as a choice.
+
+**Neither half schedules anything, and neither offers help.** A year is not a
+fixed item set the way the 100 codes are, a (month, day) pair is not one either,
+and a wrong year half cannot say whether the anchor or the code was the miss —
+which is the same reason a wrong full date never touches them. Assisted hands
+over the year code, and the year half *is* the year code plus an anchor, so the
+help toggle is absent there rather than disabled. The range toggle stays for the
+year half, which draws from a span of years, and goes for the date half, which
+has no year in it.
+
+The pools are small enough to exhaust — a hundred years in the default range,
+425 distinct date prompts once both kinds of year are counted — so `partPool.ts`
+avoids a window of the last twenty rather than keeping the growing "already
+seen" set the full-date trainer can afford over 146,097 dates.
+
+The worked answer these show after a wrong tap is `WorkingLines`, which was
+written out twice before — once in `WeekdayWorking` and once in the day-step
+view — and a third copy was the alternative to extracting it. Three columns and
+a definition list: a term, its derivation, its value. The label is not optional
+and there is no version of a row without one.
 
 **Day step** is the last step of that method timed on its own, and it lives
 under Doomsdays. "In March, the 14th is a Tuesday. What is the 5th?" — one
@@ -844,6 +920,16 @@ Tests to know about, because they encode decisions rather than behaviour:
 - no step before the fourth naming a number the year code, which is the one way
   that screen could quietly stop teaching anything
 - the whole walk leaving the stored document byte for byte unchanged
+- the method's two halves adding back to `weekdayFor` on every one of the
+  146,097 days in a full Gregorian cycle, which is the only thing that makes
+  splitting the trainer in two legitimate
+- the date half giving the same answer counted from any of a month's doomsdays,
+  over every month, both kinds of year and every day
+- the leap flag moving the answer in January and February and nowhere else, and
+  the prompt naming the year kind for exactly those two
+- a stored "February 30" never reaching a screen that would compute its offset
+- the halves recording no scheduling at all: items, month items, century items
+  and session days byte for byte unchanged across an answer
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.
@@ -903,7 +989,7 @@ both `scripts/generate-tts.mjs` and `src/features/audio/speech.ts`. Reusing the
 path would strand anyone who had already cached the old set, for a year.
 
 The clips are runtime-cached by `sw.ts` and deliberately kept out of the
-precache manifest, which stays around 920 KiB and is code, fonts and the icons.
+precache manifest, which stays around 930 KiB and is code, fonts and the icons.
 Six megabytes of
 audio at first install, most of it for years the user has not reached, would be
 paid by everyone and used by few.

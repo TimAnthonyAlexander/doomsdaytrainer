@@ -8,9 +8,15 @@ import type {
   DayStepDirection,
   DayStepSize,
   DrillRecord,
+  MethodPartAttempt,
   WeekdayAttempt,
   WeekdayMode,
 } from '@/domain/types';
+import {
+  buildMethodPartTotals,
+  emptyMethodPartTotals,
+  overallMethodPartTotals,
+} from '@/domain/methodPartLifetime';
 import { CALC_STEP_IDS } from '@/domain/calc';
 import { DAY_STEP_SIZES } from '@/domain/dayStep';
 import {
@@ -219,7 +225,44 @@ function v5Document(overrides: Record<string, unknown> = {}): AppData {
   const stripped = { ...defaultAppData(1000), schemaVersion: 5 } as Record<string, unknown>;
   delete stripped.dayStepAttempts;
   delete stripped.dayStepTotals;
+  delete stripped.partAttempts;
+  delete stripped.partTotals;
   return { ...stripped, ...overrides } as unknown as AppData;
+}
+
+/**
+ * A document exactly as schema v6 wrote it: the day-step trainer and
+ * everything before it, and nothing from the method's two halves.
+ */
+function v6Document(overrides: Record<string, unknown> = {}): AppData {
+  const stripped = { ...defaultAppData(1000), schemaVersion: 6 } as Record<string, unknown>;
+  delete stripped.partAttempts;
+  delete stripped.partTotals;
+  return { ...stripped, ...overrides } as unknown as AppData;
+}
+
+/** One answered half, as the year trainer writes it. */
+function yearPartAttempt(fullYear: number, correct: boolean, latencyMs: number): MethodPartAttempt {
+  return { part: 'year', timestamp: 9000, fullYear, correct, latencyMs, answered: correct ? 3 : 1 };
+}
+
+/** One answered half, as the date trainer writes it. */
+function datePartAttempt(
+  month: number,
+  day: number,
+  correct: boolean,
+  latencyMs: number,
+): MethodPartAttempt {
+  return {
+    part: 'date',
+    timestamp: 9000,
+    month,
+    day,
+    leapYear: false,
+    correct,
+    latencyMs,
+    answered: correct ? 1 : 4,
+  };
 }
 
 /** One answered day step, as the trainer writes it. */
@@ -573,6 +616,90 @@ describe('migrateAppData', () => {
     );
     expect(migrated.dayStepAttempts).toHaveLength(1);
     expect(overallDayStepTotals(migrated.dayStepTotals).answered).toBe(1);
+  });
+
+  it('gives every older document the two halves, empty', () => {
+    for (const doc of [v1Document(), v2Document([]), v3Document(), v5Document(), v6Document()]) {
+      const migrated = migrateAppData(doc);
+      expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
+      expect(migrated.partAttempts).toEqual([]);
+      expect(migrated.partTotals).toEqual(emptyMethodPartTotals());
+      expect(overallMethodPartTotals(migrated.partTotals, 'year').answered).toBe(0);
+      expect(overallMethodPartTotals(migrated.partTotals, 'date').answered).toBe(0);
+    }
+  });
+
+  it('leaves everything a v6 user had exactly where it was', () => {
+    const before = v6Document({
+      settings: { ...DEFAULT_SETTINGS, newItemsPerDay: 3, onboardingComplete: true },
+      weekdayAttempts: [weekdayAttempt('unassisted', true, 1500)],
+      weekdayTotals: buildWeekdayTotals([weekdayAttempt('unassisted', true, 1500)]),
+      dayStepAttempts: [dayStepAttempt(2, 'forward', true, 900)],
+      dayStepTotals: buildDayStepTotals([dayStepAttempt(2, 'forward', true, 900)]),
+      days: { '2026-08-22': { date: '2026-08-22', reviewsCompleted: 4, newItemsIntroduced: 0 } },
+    });
+    const migrated = migrateAppData(before);
+
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(migrated.settings.newItemsPerDay).toBe(3);
+    expect(migrated.weekdayTotals.unassisted.answered).toBe(1);
+    // The day-step history a v6 document already had is carried, not rebuilt.
+    expect(migrated.dayStepTotals.bySize[2].answered).toBe(1);
+    expect(migrated.dayStepAttempts).toHaveLength(1);
+    expect(migrated.days['2026-08-22'].reviewsCompleted).toBe(4);
+    expect(migrated.createdAt).toBe(1000);
+    // And no new item map: neither a year nor a (month, day) pair is a fixed
+    // item set, so neither half is ever scheduled.
+    expect(Object.keys(migrated)).not.toContain('partItems');
+  });
+
+  it('builds the halves aggregate from a raw log rather than starting at zero', () => {
+    const attempts = [
+      yearPartAttempt(1973, true, 900),
+      yearPartAttempt(1850, false, 3000),
+      datePartAttempt(9, 6, true, 1100),
+    ];
+    const migrated = migrateAppData(v6Document({ partAttempts: attempts }));
+
+    expect(migrated.partTotals).toEqual(buildMethodPartTotals(attempts));
+    expect(migrated.partTotals.yearByCentury['19']).toMatchObject({ answered: 1, correct: 1 });
+    expect(migrated.partTotals.yearByCentury['18']).toMatchObject({ answered: 1, correct: 0 });
+    expect(migrated.partTotals.dateByMonth['9'].answered).toBe(1);
+    expect(overallMethodPartTotals(migrated.partTotals, 'year').answered).toBe(2);
+    expect(migrated.partAttempts).toHaveLength(3);
+  });
+
+  it('drops a half naming a date or a year it cannot place', () => {
+    const migrated = migrateAppData(
+      v6Document({
+        partAttempts: [
+          datePartAttempt(9, 6, true, 900),
+          // February 30 has no doomsday offset, because it is not a date.
+          { ...datePartAttempt(2, 1, true, 900), day: 30 },
+          // Outside the shipped century table, which starts at the 1800s.
+          yearPartAttempt(1700, true, 900),
+          { ...yearPartAttempt(1973, true, 900), part: 'weekday' },
+          null,
+        ],
+      }),
+    );
+    expect(migrated.partAttempts).toHaveLength(1);
+    expect(overallMethodPartTotals(migrated.partTotals, 'date').answered).toBe(1);
+    expect(overallMethodPartTotals(migrated.partTotals, 'year').answered).toBe(0);
+  });
+
+  it('loads a stored v6 document and comes back with a usable halves aggregate', async () => {
+    await putRaw(
+      v6Document({
+        partAttempts: [datePartAttempt(3, 22, true, 800), datePartAttempt(3, 22, false, 4000)],
+      }),
+    );
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(data.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(data.partTotals.dateByMonth['3']).toMatchObject({ answered: 2, correct: 1 });
+    expect(data.partAttempts).toHaveLength(2);
   });
 
   it('loads a stored v5 document and comes back with a usable day-step aggregate', async () => {
