@@ -2,10 +2,13 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { ChevronLeft } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
+import { SplitFlap, SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
 import { formatInterval, formatMs } from '@/domain/time';
 import { useAppState } from '@/state/useAppState';
 import { nextDueLabel } from '@/features/review/summary';
@@ -123,6 +126,19 @@ export function TableDrillView({ onBack }: TableDrillProps) {
   const session = useTableSession();
   const { phase, advance, entry } = session;
 
+  // The flap cells need a bare pixel number to derive an even cell height
+  // from (see SplitFlap.tsx); the `sx.fontSize` breakpoint object below
+  // can't give them one. Resolves to the same two numbers the heading's own
+  // `fontSize` already used, so the responsive sizing is unchanged.
+  const theme = useTheme();
+  const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 56 : 44;
+
+  // The pad's latency clock stays at zero until this settles, matching the
+  // window the entry above it is mid-flip and not yet readable — see
+  // useAnswerTimer.ts. Keyed on the same `promptKey` the pad restarts its
+  // clock on, so the two arm and rearm together.
+  const settled = useFlipSettled(session.promptKey);
+
   useEffect(() => {
     if (phase !== 'correct') return;
     const id = setTimeout(advance, Math.max(0, settings.autoAdvanceMs));
@@ -175,14 +191,19 @@ export function TableDrillView({ onBack }: TableDrillProps) {
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, py: 2 }}>
         <Typography
           component="h1"
+          aria-label={entryLabel(entry.kind, entry.key)}
           sx={{ m: 0, fontSize: { xs: 44, sm: 56 }, fontWeight: 600, lineHeight: 1.1, textAlign: 'center' }}
         >
           {entry.kind === 'century' ? (
-            <Numeral size="inherit" weight={600} lineHeight={1.1}>
-              {entryLabel(entry.kind, entry.key)}
-            </Numeral>
+            // A century as its digits, one cell per character, the same face
+            // every numeral in the app uses.
+            <SplitFlapText text={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} mono />
           ) : (
-            entryLabel(entry.kind, entry.key)
+            // A month as one word cell — it is a name, not a number, and
+            // flapping it letter by letter would animate every letter of
+            // "September" for a change that is really one word replacing
+            // another.
+            <SplitFlap value={entryLabel(entry.kind, entry.key)} size={promptSize} weight={600} />
           )}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
@@ -219,6 +240,7 @@ export function TableDrillView({ onBack }: TableDrillProps) {
                 }
           }
           disabled={phase !== 'prompt'}
+          armed={settled}
         />
       ) : (
         <AnswerPad
@@ -232,6 +254,7 @@ export function TableDrillView({ onBack }: TableDrillProps) {
           }
           disabled={phase !== 'prompt'}
           keyboard={settings.keyboardInput}
+          armed={settled}
         />
       )}
 

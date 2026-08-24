@@ -1,12 +1,13 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
 import { createItem, isLeech, masteryBucket } from '@/domain/scheduler';
 import { inScope } from '@/domain/scope';
 import type { ItemState, Scope, YearKey } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
+import { dur, stagger, transition, useReducedMotion } from '@/theme/motion';
 import { masteryBuckets, palette } from '@/theme/palette';
 import { bucketColor, bucketLabel, contrastRatio, readableInk } from './masteryColor';
 
@@ -40,6 +41,22 @@ export function MasteryGrid({ items, scope, selected, onSelect }: MasteryGridPro
     for (const item of items) map.set(item.yy, item);
     return map;
   }, [items]);
+
+  // The grid ramps in from the empty step on mount, per STYLEGUIDE.md §7 — the
+  // one place decorative motion is sanctioned. Two committed frames are needed
+  // to get a transition at all: the first paints every cell at the empty step,
+  // then this flips true and the real colours ramp in from there.
+  const reducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(reducedMotion);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setMounted(true);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(raf);
+  }, [reducedMotion]);
 
   return (
     <Box sx={{ containerType: 'inline-size' }}>
@@ -84,6 +101,9 @@ export function MasteryGrid({ items, scope, selected, onSelect }: MasteryGridPro
                   outOfScope={!inScope(yy, scope)}
                   selected={selected === yy}
                   onSelect={onSelect}
+                  rowIndex={decade}
+                  mounted={mounted}
+                  reducedMotion={reducedMotion}
                 />
               );
             })}
@@ -101,16 +121,30 @@ interface CellProps {
   outOfScope: boolean;
   selected: boolean;
   onSelect: (yy: YearKey) => void;
+  /** Decade row, 0–9. Cells in the same row start their ramp together. */
+  rowIndex: number;
+  mounted: boolean;
+  reducedMotion: boolean;
 }
 
-function Cell({ item, outOfScope, selected, onSelect }: CellProps) {
+function Cell({ item, outOfScope, selected, onSelect, rowIndex, mounted, reducedMotion }: CellProps) {
   const bucket = masteryBucket(item);
   const fill = bucketColor(bucket);
   const leech = isLeech(item);
 
+  // The aria-label always reads the true value, from the first frame. Only the
+  // fill is ever transitional.
   const parts = [formatYear(item.yy), bucketLabel(bucket)];
   if (leech) parts.push(`${item.lapses} lapses`);
   if (outOfScope) parts.push('outside scope');
+
+  // Out-of-scope cells are drawn as absence, not as progress, so they never
+  // ramp in — they are transparent on the first frame and every frame after.
+  // In-scope cells hold at the empty step until `mounted` flips, then ramp to
+  // their real colour, staggered by decade row.
+  const showFinal = reducedMotion || mounted;
+  const displayFill = showFinal ? fill : bucketColor(0);
+  const animate = !outOfScope && !reducedMotion;
 
   return (
     <ButtonBase
@@ -124,9 +158,11 @@ function Cell({ item, outOfScope, selected, onSelect }: CellProps) {
         overflow: 'hidden',
         // Out of scope is drawn as absence: the ground shows through and only a
         // dashed rule marks the cell, so the chosen scope reads as a shape.
-        bgcolor: outOfScope ? 'transparent' : fill,
+        bgcolor: outOfScope ? 'transparent' : displayFill,
         border: outOfScope ? `1px dashed ${palette.rule}` : 'none',
-        color: outOfScope ? palette.inkFaint : readableInk(fill),
+        color: outOfScope ? palette.inkFaint : readableInk(displayFill),
+        transition: animate ? transition(['background-color', 'color'], dur.ui) : 'none',
+        transitionDelay: animate ? stagger(rowIndex, 12) : undefined,
         outline: selected ? `2px solid ${palette.ink}` : 'none',
         outlineOffset: '1px',
         zIndex: selected ? 1 : 0,

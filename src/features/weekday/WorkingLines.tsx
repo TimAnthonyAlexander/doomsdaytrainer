@@ -1,5 +1,7 @@
 import Box from '@mui/material/Box';
+import { useEffect, useState } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
+import { dur, stagger, transition, useReducedMotion } from '@/theme/motion';
 import { palette } from '@/theme/palette';
 
 /** One row: what the number is, where it came from, and what it came out at. */
@@ -29,8 +31,28 @@ interface WorkingLinesProps {
  *
  * One copy, three callers. It was written out twice, in `WeekdayWorking` and in
  * the day-step view, and the third trainer would have made three.
+ *
+ * Rows fade in top to bottom rather than landing at once. The last row is the
+ * answer, and it is the one row that teaches nothing on its own — arriving with
+ * the rest invites reading it first. Every caller only mounts this component on
+ * a wrong-hold, where the screen is already stopped waiting for a tap, so the
+ * sequencing costs nobody any time. Each row still reserves its height from the
+ * first frame: only `opacity` moves, so nothing below the block shifts as the
+ * rows arrive.
  */
 export function WorkingLines({ lines }: WorkingLinesProps) {
+  const reducedMotion = useReducedMotion();
+  const [revealed, setRevealed] = useState(reducedMotion);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setRevealed(true);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setRevealed(true));
+    return () => cancelAnimationFrame(raf);
+  }, [reducedMotion]);
+
   return (
     <Box
       component="dl"
@@ -46,8 +68,19 @@ export function WorkingLines({ lines }: WorkingLinesProps) {
     >
       {lines.map((line, index) => {
         const last = index === lines.length - 1;
+        const animate = !reducedMotion;
         return (
-          <Box key={line.label} sx={{ display: 'contents' }}>
+          <Box
+            key={line.label}
+            sx={{
+              display: 'contents',
+              '& > *': {
+                opacity: revealed ? 1 : 0,
+                transition: animate ? transition(['opacity'], dur.flash) : 'none',
+                transitionDelay: animate ? stagger(index, 45) : undefined,
+              },
+            }}
+          >
             <Box component="dt" sx={{ m: 0 }}>
               <Numeral size={12} color={palette.inkMuted}>
                 {line.label}

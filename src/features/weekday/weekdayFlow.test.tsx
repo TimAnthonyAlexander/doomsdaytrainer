@@ -8,6 +8,7 @@ import { buildWeekdayTotals } from '@/domain/weekdayLifetime';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { MAX_WEEKDAY_ATTEMPTS, defaultAppData, monthItemKey } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
+import { FLIP_MS } from '@/components/ui/SplitFlap';
 import { WeekdayScreen } from '@/routes/WeekdayScreen';
 import { nextPaint } from '@/test/paint';
 import { theme } from '@/theme/theme';
@@ -49,8 +50,20 @@ function pad(label: string): HTMLElement {
   return screen.getByRole('button', { name: label });
 }
 
-/** Answers the prompt on screen, after the frame that starts its latency clock. */
+/**
+ * Answers the prompt on screen, after the frame that starts its latency clock.
+ *
+ * That frame is no longer the paint. The date flips into place, and for the
+ * length of the flip it is on screen without being readable, so the pad holds
+ * its clock and refuses taps until it settles — see `armed` in `AnswerPad`.
+ * Answering before then is what a real user's second tap on the previous prompt
+ * would be, and the pad is right to drop it.
+ */
 async function tap(label: string): Promise<void> {
+  // Order matters: the flip has to settle first, because arming the pad is what
+  // schedules the frame the clock starts on. Waiting for the frame and then for
+  // the flip would wait for a frame that had not been asked for yet.
+  await wait(FLIP_MS + 20);
   await nextPaint();
   fireEvent.click(pad(label));
 }

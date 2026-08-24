@@ -98,6 +98,40 @@ describe('AnswerPad', () => {
     expect(onAnswer.mock.calls[0][1]).toBeGreaterThanOrEqual(600);
   });
 
+  it('refuses a tap while the prompt is still arriving, and times from when it settles', () => {
+    const onAnswer = vi.fn();
+    const { rerender } = render(
+      <AnswerPad options={OPTIONS} onAnswer={onAnswer} promptKey="a" armed={false} />,
+    );
+
+    // Painted, but not readable. A prompt that flips into place spends the
+    // flip saying half of the old value, so paint is not the moment the user
+    // could first see it. Scoring here would add the flip's duration to the
+    // latency, which crosses the thresholds in Settings and quietly changes the
+    // grade, the fluency decision and every median on Stats.
+    paint();
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    fireEvent.click(button('3'));
+    fireEvent.keyDown(window, { key: '3', code: 'Digit3' });
+    expect(onAnswer).not.toHaveBeenCalled();
+
+    rerender(<AnswerPad options={OPTIONS} onAnswer={onAnswer} promptKey="a" armed />);
+    paint();
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.click(button('3'));
+
+    expect(onAnswer).toHaveBeenCalledTimes(1);
+    // 400, not 900: the 500ms spent unreadable is not time the user had the
+    // prompt in front of them, so it is not part of the answer.
+    const [, latency] = onAnswer.mock.calls[0];
+    expect(latency).toBeGreaterThanOrEqual(400);
+    expect(latency).toBeLessThan(900);
+  });
+
   it('never reports a zero latency, even across a prompt change', () => {
     const onAnswer = vi.fn();
     const view = render(<AnswerPad options={OPTIONS} onAnswer={onAnswer} promptKey="a" />);

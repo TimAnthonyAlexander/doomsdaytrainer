@@ -2,10 +2,14 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { ChevronLeft } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
+import { SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
+import { typeScale } from '@/theme/tokens';
 import {
   anchorMonthLabel,
   describeAnchor,
@@ -49,16 +53,16 @@ function BackRow({ onBack }: DayStepViewProps) {
 }
 
 /**
- * A day of the month: the digits in the mono face, the ordinal suffix in the
- * text face. The size is inherited from whatever it sits in, so the prompt and
- * the line above it keep their own scales.
+ * A day of the month: the digits as flap cells in the mono face, the ordinal
+ * suffix outside them in the text face. `size` is explicit rather than
+ * inherited — the flap needs a bare pixel number to derive an even cell
+ * height from (see SplitFlap.tsx) — so the prompt and the line above it each
+ * pass their own scale.
  */
-function Day({ value }: { value: number }) {
+function Day({ value, size }: { value: number; size: number }) {
   return (
     <>
-      <Numeral size="inherit" weight={600} lineHeight={1.1}>
-        {value}
-      </Numeral>
+      <SplitFlapText text={String(value)} size={size} weight={600} mono />
       {ordinalSuffix(value)}
     </>
   );
@@ -88,6 +92,18 @@ export function DayStepView({ onBack }: DayStepViewProps) {
   const { settings, dayStepTotals } = useAppState();
   const session = useDayStepSession();
   const { phase, advance, question, working } = session;
+
+  // See WeekdayPrompt.tsx: the flap needs a bare pixel number, which the
+  // responsive `fontSize` below cannot give it directly. The body line uses
+  // the same size `variant="body2"` already renders at.
+  const theme = useTheme();
+  const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 42 : 34;
+  const anchorSize = typeScale.label.size;
+
+  // The pad's latency clock stays at zero until this settles, matching the
+  // window the prompt below is actually mid-flip and not yet readable — see
+  // useAnswerTimer.ts.
+  const settled = useFlipSettled(session.promptKey);
 
   // Correct answers advance themselves. A wrong one never does: the working has
   // to be read, and reading it takes as long as it takes.
@@ -123,8 +139,20 @@ export function DayStepView({ onBack }: DayStepViewProps) {
           gap: 1.5,
         }}
       >
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-          In {anchorMonthLabel(question)}, the <Day value={question.anchorDay} /> is a{' '}
+        {/* Hidden from the accessibility tree, not from the screen. The h1
+            below carries `describeAnchor(question)` — this exact sentence —
+            followed by `describeTarget(question)`, so the whole prompt is
+            already announced there in one piece. Leaving this line visible to
+            a reader would have announced the anchor twice before the flap, and
+            since the flap the digits inside it are `aria-hidden`, so it would
+            now announce "In March, the th is a Tuesday." */}
+        <Typography
+          aria-hidden
+          variant="body2"
+          color="text.secondary"
+          sx={{ textAlign: 'center' }}
+        >
+          In {anchorMonthLabel(question)}, the <Day value={question.anchorDay} size={anchorSize} /> is a{' '}
           {weekdayName(question.anchorWeekday)}.
         </Typography>
 
@@ -141,7 +169,7 @@ export function DayStepView({ onBack }: DayStepViewProps) {
             textWrap: 'balance',
           }}
         >
-          What is the <Day value={question.targetDay} />?
+          What is the <Day value={question.targetDay} size={promptSize} />?
         </Typography>
 
         {phase === 'wrong' ? (
@@ -178,6 +206,7 @@ export function DayStepView({ onBack }: DayStepViewProps) {
         // miss and not a corrupted item.
         windowMs={settings.answerWindowMs}
         onExpire={() => session.expire(settings.answerWindowMs ?? 0)}
+        armed={settled}
       />
 
       {/* Named, because the two blocks under it are all-time and this one is

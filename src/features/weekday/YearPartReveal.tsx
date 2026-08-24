@@ -1,9 +1,12 @@
 import Box from '@mui/material/Box';
+import type { SxProps, Theme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
+import { useEffect, useState } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
 import type { Code } from '@/domain/types';
 import type { YearPartVerdict } from '@/domain/methodParts';
 import { palette } from '@/theme/palette';
+import { dur, transition, useReducedMotion } from '@/theme/motion';
 
 interface YearPartRevealProps {
   centuryAnchor: Code;
@@ -23,14 +26,22 @@ function Figure({
   label,
   colour,
   testId,
+  sx,
 }: {
   value: Code;
   label: string;
   colour: string;
   testId: string;
+  sx?: SxProps<Theme>;
 }) {
   return (
-    <Box data-testid={testId} sx={{ display: 'grid', justifyItems: 'center', rowGap: 0.25, color: colour }}>
+    <Box
+      data-testid={testId}
+      sx={[
+        { display: 'grid', justifyItems: 'center', rowGap: 0.25, color: colour },
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
+    >
       <Numeral size={52} weight={600}>
         {value}
       </Numeral>
@@ -65,8 +76,17 @@ function Figure({
  * They are never the only thing saying what happened — the pad flashes green or
  * red under this, a wrong answer holds the screen and draws a Continue button,
  * and the one verdict a colour could not carry on its own gets a sentence.
+ *
+ * On `century-forgotten` only, the anchor and the operator fade in `dur.advance`
+ * after the year code — the one figure the user actually produced lands first,
+ * and the one they skipped arrives a beat later, so the eye watches the
+ * omission rather than reading it off a caption. `century-forgotten` only ever
+ * comes from a wrong answer (`yearPartVerdict` checks `correct` first), so
+ * gating the delay on the verdict alone is enough: it can never land inside the
+ * 250ms-default correct-answer window, where a delay would read as a flicker.
  */
 export function YearPartReveal({ centuryAnchor, yearCode, verdict }: YearPartRevealProps) {
+  const reducedMotion = useReducedMotion();
   const anchorColour = verdict === 'correct' ? palette.gradeFast : palette.gradeWrong;
   const codeColour =
     verdict === 'correct'
@@ -74,6 +94,25 @@ export function YearPartReveal({ centuryAnchor, yearCode, verdict }: YearPartRev
       : verdict === 'century-forgotten'
         ? palette.gradeMedium
         : palette.gradeWrong;
+
+  // Every mount of this component is a fresh question (see MethodPartTrainer,
+  // which unmounts it between answers), so a plain mount-triggered fade needs
+  // no reset logic of its own.
+  const arriveLate = verdict === 'century-forgotten' && !reducedMotion;
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  // Opacity only, so the anchor and the operator never change the block's
+  // laid-out size — they are always mounted, just invisible for one beat.
+  const lateSx: SxProps<Theme> | undefined = arriveLate
+    ? {
+        opacity: ready ? 1 : 0,
+        transition: transition(['opacity'], dur.flash),
+        transitionDelay: dur.advance,
+      }
+    : undefined;
 
   return (
     <Box sx={{ display: 'grid', justifyItems: 'center', rowGap: 1 }}>
@@ -92,11 +131,12 @@ export function YearPartReveal({ centuryAnchor, yearCode, verdict }: YearPartRev
           value={centuryAnchor}
           label="Century anchor"
           colour={anchorColour}
+          sx={lateSx}
         />
         {/* The operator earns its place: the named mistake below is forgetting
             to perform it, so the pair has to read as a sum and not as two facts
             standing next to each other. */}
-        <Numeral size={26} color={palette.inkFaint}>
+        <Numeral size={26} color={palette.inkFaint} sx={lateSx}>
           +
         </Numeral>
         <Figure testId="year-part-code" value={yearCode} label="Year code" colour={codeColour} />

@@ -1,9 +1,12 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import type { WeekdayMode } from '@/domain/types';
 import { formatDate, monthName, weekdayName } from '@/domain/weekday';
 import { formatYear } from '@/domain/yearCodes';
 import { Numeral } from '@/components/ui/Numeral';
+import { SplitFlap, SplitFlapText } from '@/components/ui/SplitFlap';
 import { palette } from '@/theme/palette';
 import type { WeekdayPhase } from './useWeekdaySession';
 
@@ -35,6 +38,13 @@ export function WeekdayPrompt({
   phase,
   correctCode,
 }: WeekdayPromptProps) {
+  // The flap cells need a bare pixel number to derive an even cell height
+  // from (see SplitFlap.tsx); `sx.fontSize` breakpoint objects can't give
+  // them one. This resolves to the same two numbers the prompt's `fontSize`
+  // already used, so the responsive sizing is unchanged.
+  const theme = useTheme();
+  const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 52 : 40;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, width: '100%' }}>
       <Box sx={{ minHeight: 20 }}>
@@ -63,13 +73,9 @@ export function WeekdayPrompt({
           textWrap: 'balance',
         }}
       >
-        <Numeral size="inherit" weight={600} lineHeight={1.1}>
-          {day}
-        </Numeral>{' '}
-        {monthName(month)}{' '}
-        <Numeral size="inherit" weight={600} lineHeight={1.1}>
-          {fullYear}
-        </Numeral>
+        <SplitFlapText text={String(day)} size={promptSize} weight={600} mono />{' '}
+        <SplitFlap value={monthName(month)} size={promptSize} weight={600} />{' '}
+        <SplitFlapText text={String(fullYear)} size={promptSize} weight={600} mono />
       </Typography>
 
       {phase === 'wrong' ? (

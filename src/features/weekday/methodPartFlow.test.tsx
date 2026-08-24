@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
@@ -192,7 +192,14 @@ describe('the pad hints', () => {
     }
   });
 
-  /** The key that answers 1 must still be found and announced as "1". */
+  /**
+   * The key that answers 1 must still be found and announced as "1".
+   *
+   * The hint is looked up inside the key itself rather than page-wide: the
+   * year above the pad is not pinned here, and a flap cell is one digit per
+   * character now, so an unrelated "8" can legitimately land in the prompt
+   * on any given draw.
+   */
   it('keeps the hint out of the key name', async () => {
     await seed();
     mount();
@@ -200,7 +207,7 @@ describe('the pad hints', () => {
 
     const key = await screen.findByRole('button', { name: '1' });
     expect(key.getAttribute('aria-label')).toBe('1');
-    expect(screen.getByText('8').closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(within(key).getByText('8').closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   /**
@@ -208,6 +215,12 @@ describe('the pad hints', () => {
    * nothing. Asserted as the absence of the marks rather than as the button's
    * exact text: that pad does carry a corner hint already, the physical key
    * that selects it, and this is not about that one.
+   *
+   * Scoped to the pad's own buttons rather than the whole screen: the date
+   * above the pad is now a row of flap cells, one digit per cell, so a lone
+   * "8" legitimately sits in the DOM whenever the drawn date's day or year
+   * has one — that is the date, not a hint corner, and a page-wide text query
+   * cannot tell the two apart.
    */
   it('leaves the weekday pad unmarked', async () => {
     await seed();
@@ -215,8 +228,10 @@ describe('the pad hints', () => {
     await openTrainer('Full date');
 
     await screen.findByRole('button', { name: 'Sun' });
-    for (const marked of [7, 8, 9, 10, 11, 12, 13]) {
-      expect(screen.queryByText(String(marked))).toBeNull();
+    for (const button of screen.getAllByRole('button')) {
+      for (const marked of [7, 8, 9, 10, 11, 12, 13]) {
+        expect(within(button).queryByText(String(marked))).toBeNull();
+      }
     }
   });
 });

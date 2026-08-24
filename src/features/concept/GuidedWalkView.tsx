@@ -13,6 +13,7 @@ import {
 import type { CalendarDate } from '@/domain/types';
 import { NumberInput } from '@/features/calc/NumberInput';
 import { weekdayOptions } from '@/features/weekday/weekdayPad';
+import { dur, transition } from '@/theme/motion';
 import { radius, space, stroke } from '@/theme/tokens';
 import { ChoicePad } from './ChoicePad';
 import { DatePick } from './DatePick';
@@ -48,7 +49,21 @@ export interface GuidedWalkViewProps {
   intro?: ReactNode;
 }
 
-/** How far along, as a rule rather than a sentence. */
+/**
+ * How far along, as one segment per step rather than one continuous bar.
+ *
+ * `GoalLedger` already collapses each finished goal to one line, so a
+ * continuous bar reporting "72 percent" was saying less than the screen above
+ * it. One segment per step says "step seven of `GUIDED_STEP_COUNT`" instead,
+ * and every segment is the same width: STYLEGUIDE.md bans decoration that
+ * looks like data, and a wider gap at the goal boundaries would encode a
+ * structure the user has no key for.
+ *
+ * Only the segment for the step just finished ever changes state in a given
+ * render — the ones before it are already full and the ones after are still
+ * empty — so giving every segment the same width transition is enough to make
+ * just that one fill.
+ */
 function ProgressRule({ done }: { done: number }) {
   return (
     <Box
@@ -57,16 +72,23 @@ function ProgressRule({ done }: { done: number }) {
       aria-valuemax={GUIDED_STEP_COUNT}
       aria-valuenow={done}
       aria-label="Steps done"
-      sx={{ height: 3, borderRadius: 2, bgcolor: 'var(--surface-2)', overflow: 'hidden' }}
+      sx={{ display: 'flex', gap: '3px' }}
     >
-      <Box
-        sx={{
-          width: `${(done / GUIDED_STEP_COUNT) * 100}%`,
-          height: '100%',
-          bgcolor: 'var(--brand)',
-          transition: 'width 160ms ease-out',
-        }}
-      />
+      {Array.from({ length: GUIDED_STEP_COUNT }, (_unused, index) => (
+        <Box
+          key={index}
+          sx={{ flex: 1, height: 3, borderRadius: 2, bgcolor: 'var(--surface-2)', overflow: 'hidden' }}
+        >
+          <Box
+            sx={{
+              width: index < done ? '100%' : '0%',
+              height: '100%',
+              bgcolor: 'var(--brand)',
+              transition: transition(['width'], dur.ui),
+            }}
+          />
+        </Box>
+      ))}
     </Box>
   );
 }

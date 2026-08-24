@@ -1,8 +1,9 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useAnswerTimer } from '@/components/answer/useAnswerTimer';
 import { Numeral } from '@/components/ui/Numeral';
+import { dur, FEEDBACK_TRANSITION, stagger, transition, useReducedMotion } from '@/theme/motion';
 import { palette } from '@/theme/palette';
 import { monthPadDays } from './weekdayPad';
 
@@ -28,6 +29,15 @@ interface MonthPadProps {
   promptKey: string | number;
   feedback?: MonthPadFeedback | null;
   disabled?: boolean;
+  /**
+   * Whether the prompt this pad answers is readable yet. Defaults to true.
+   *
+   * Only a caller that animates its prompt into place has any reason to pass
+   * this. It holds the latency clock at zero until the prompt has settled, and
+   * the pad refuses taps for the same window, so an answer is never timed
+   * against a prompt that was still resolving. See `useAnswerTimer`.
+   */
+  armed?: boolean;
 }
 
 type Tone = 'idle' | 'pressed' | 'right' | 'wrong' | 'answer' | 'alsoRight';
@@ -72,6 +82,69 @@ function toneFor(value: number, feedback: MonthPadFeedback | null, pressed: numb
   return feedback.accepted.includes(value) ? 'alsoRight' : 'idle';
 }
 
+/** Which of the pad's seven columns a date sits in. Day is 1-based. */
+function columnOf(day: number): number {
+  return (day - 1) % 7;
+}
+
+/**
+ * The vertical line a shared column draws behind the pad, growing from the
+ * top over the reveal.
+ *
+ * A plain sibling of the day cells rather than something a cell paints itself:
+ * it spans every row in its column via `gridRow: '1 / -1'`, which no single
+ * cell's box can do without changing that cell's own size. Absolutely
+ * positioned so it takes no space in the grid's own sizing and moves no cell's
+ * hit target, and negative `zIndex` so it paints behind the (unpositioned,
+ * in-flow) day buttons rather than over their faces — only the row gaps show
+ * it, which is what reads as a line connecting the rings rather than a bar
+ * drawn across them.
+ *
+ * Mounted only while the reveal is showing (see `MonthPad`), so its own mount
+ * is the trigger: the first frame commits at `scaleY(0)`, then this flips a
+ * frame later, which is what a CSS transition needs to have something to
+ * animate from.
+ */
+function ColumnRule({ column, reducedMotion }: { column: number; reducedMotion: boolean }) {
+  const [grown, setGrown] = useState(reducedMotion);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setGrown(true);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(raf);
+  }, [reducedMotion]);
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'absolute',
+        inset: 0,
+        gridColumn: `${column + 1} / ${column + 2}`,
+        gridRow: '1 / -1',
+        display: 'flex',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        zIndex: -1,
+      }}
+    >
+      <Box
+        sx={{
+          width: '2px',
+          height: '100%',
+          backgroundColor: palette.gradeFast,
+          transformOrigin: 'top',
+          transform: grown ? 'scaleY(1)' : 'scaleY(0)',
+          transition: reducedMotion ? 'none' : transition(['transform'], dur.ui),
+        }}
+      />
+    </Box>
+  );
+}
+
 /**
  * The month-doomsday pad: every day the month has, seven to a row.
  *
@@ -90,10 +163,12 @@ export function MonthPad({
   promptKey,
   feedback = null,
   disabled = false,
+  armed = true,
 }: MonthPadProps) {
   const [pressed, setPressed] = useState<number | null>(null);
   const answered = useRef(false);
-  const timer = useAnswerTimer(promptKey);
+  const timer = useAnswerTimer(promptKey, armed);
+  const reducedMotion = useReducedMotion();
 
   useLayoutEffect(() => {
     answered.current = false;
@@ -113,16 +188,44 @@ export function MonthPad({
     [disabled, onAnswer, timer],
   );
 
+  // The dates that draw the quieter ring, ascending, so the reveal can stagger
+  // down the column in the order the eye reads it. Excludes the taught date
+  // (which gets `answer`, not `alsoRight`) and the tapped one (which is `wrong`
+  // on this path — `reveal` only ever shows alongside a held wrong answer).
+  const alsoRightDates = useMemo(() => {
+    if (!feedback || !feedback.reveal) return [];
+    return feedback.accepted
+      .filter((date) => date !== feedback.canonical && date !== feedback.chosen)
+      .slice()
+      .sort((a, b) => a - b);
+  }, [feedback]);
+
+  // The rule draws only when every accepted date genuinely shares the taught
+  // date's column. `doomsdayDates` always produces dates exactly seven apart,
+  // so this holds by construction — but this pad takes `accepted` as a prop
+  // rather than computing it, so the check is real rather than assumed. Drawing
+  // a line through dates that are not actually a week apart would be worse than
+  // drawing no line.
+  const ruleColumn = useMemo(() => {
+    if (!feedback || !feedback.reveal) return null;
+    const column = columnOf(feedback.canonical);
+    return feedback.accepted.every((date) => columnOf(date) === column) ? column : null;
+  }, [feedback]);
+
   return (
     <Box
       sx={{
+        position: 'relative',
         display: 'grid',
         gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
         gap: { xs: '5px', sm: '8px' },
       }}
     >
+      {ruleColumn === null ? null : <ColumnRule column={ruleColumn} reducedMotion={reducedMotion} />}
+
       {monthPadDays(month, leapYear).map((value) => {
         const tone = toneFor(value, feedback, pressed);
+        const staggered = tone === 'alsoRight' && !reducedMotion;
         return (
           <ButtonBase
             key={value}
@@ -133,8 +236,16 @@ export function MonthPad({
             sx={{
               minHeight: { xs: 44, sm: 52 },
               borderRadius: 1.25,
-              transition:
-                'background-color 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out',
+              // Shared with `AnswerPad` rather than written out again: the two
+              // pads had drifted onto the same hand-written 140ms, which is not
+              // a token, and fixing one of them would have left the other. The
+              // `alsoRight` ring is the one exception, and it stays feedback —
+              // it only ever shows alongside a held wrong answer, so drawing it
+              // over `dur.flash` costs nobody an answer window.
+              transition: staggered
+                ? transition(['background-color', 'color', 'box-shadow'], dur.flash)
+                : FEEDBACK_TRANSITION,
+              transitionDelay: staggered ? stagger(alsoRightDates.indexOf(value), 40) : undefined,
               ...TONE_SX[tone],
               '&.Mui-disabled': { opacity: 1 },
               '&:focus-visible': { outline: `2px solid ${palette.brand}`, outlineOffset: 2 },

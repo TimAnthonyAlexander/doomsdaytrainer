@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppData, Settings } from '@/domain/types';
@@ -7,6 +7,7 @@ import { monthDoomsday } from '@/domain/weekday';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { defaultAppData, monthItemKey } from '@/storage/defaults';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
+import { FLIP_MS } from '@/components/ui/SplitFlap';
 import { DoomsdaysScreen } from '@/routes/DoomsdaysScreen';
 import { TablesScreen } from '@/routes/TablesScreen';
 import { nextPaint } from '@/test/paint';
@@ -66,10 +67,25 @@ async function openTables(): Promise<void> {
 
 beforeEach(deleteDb);
 
-/** One tap, after the prompt has painted so the timer is running. */
+/**
+ * One tap, after the prompt has painted so the timer is running.
+ *
+ * The month name above the pad flips into place, and for the length of the
+ * flip it is on screen without being readable — the pad holds its clock and
+ * refuses taps until it settles (see `armed` in `MonthPad`/`AnswerPad`).
+ * Order matters: the flip has to settle first, because arming the pad is what
+ * schedules the frame the clock starts on.
+ */
 async function tapDay(day: number): Promise<void> {
+  await wait(FLIP_MS + 20);
   await nextPaint();
   fireEvent.click(screen.getByRole('button', { name: `Day ${day}` }));
+}
+
+async function wait(ms: number): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  });
 }
 
 describe('Tables', () => {

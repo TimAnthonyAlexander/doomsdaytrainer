@@ -3,6 +3,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
+import { FEEDBACK_TRANSITION } from '@/theme/motion';
 import { palette } from '@/theme/palette';
 import { useAnswerTimer } from './useAnswerTimer';
 
@@ -54,6 +55,15 @@ export interface AnswerPadProps {
    */
   windowMs?: number | null;
   onExpire?: () => void;
+  /**
+   * Whether the prompt this pad answers is readable yet. Defaults to true.
+   *
+   * Only a surface that animates its prompt into place has any reason to pass
+   * this. It holds the latency clock at zero until the prompt has settled, and
+   * the pad refuses taps for the same window, so an answer is never timed
+   * against a prompt that was still resolving. See `useAnswerTimer`.
+   */
+  armed?: boolean;
 }
 
 const DEFAULT_KEYS = ['0', '1', '2', '3', '4', '5', '6'];
@@ -147,6 +157,7 @@ export function AnswerPad({
   keys = DEFAULT_KEYS,
   windowMs = null,
   onExpire,
+  armed = true,
 }: AnswerPadProps) {
   if (import.meta.env.DEV && options.length !== 7) {
     throw new Error(`AnswerPad needs exactly 7 options, got ${options.length}.`);
@@ -155,7 +166,7 @@ export function AnswerPad({
   const [pressed, setPressed] = useState<number | null>(null);
   const [expired, setExpired] = useState(false);
   const answered = useRef(false);
-  const timer = useAnswerTimer(promptKey);
+  const timer = useAnswerTimer(promptKey, armed);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
@@ -259,8 +270,11 @@ export function AnswerPad({
                 position: 'relative',
                 minHeight: { xs: 72, sm: 76 },
                 borderRadius: 1.5,
-                transition:
-                  'background-color 140ms ease-out, color 140ms ease-out, box-shadow 140ms ease-out',
+                // §7: the fill is there on the same frame as the tap. This used
+                // to ramp over a hand-written 140ms, which is not one of the
+                // five durations and not the app's easing curve, so a grading
+                // colour arrived after the eye had already moved.
+                transition: FEEDBACK_TRANSITION,
                 ...TONE_SX[tone],
                 '&.Mui-disabled': { opacity: 1 },
                 // The focus ring is the one brand mark allowed here: it marks

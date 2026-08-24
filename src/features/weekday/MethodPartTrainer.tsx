@@ -1,10 +1,13 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { useEffect, useMemo } from 'react';
 import { AnswerPad, type AnswerOption } from '@/components/answer/AnswerPad';
 import { Numeral } from '@/components/ui/Numeral';
 import { Screen } from '@/components/ui/Screen';
+import { SplitFlapText, useFlipSettled } from '@/components/ui/SplitFlap';
 import {
   datePartPrompt,
   methodPartQuestion,
@@ -81,6 +84,16 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
   const { phase, advance, prompt } = session;
   const answered = phase !== 'prompt';
 
+  // See WeekdayPrompt.tsx: the flap needs a bare pixel number, which the
+  // responsive `fontSize` below cannot give it directly.
+  const theme = useTheme();
+  const promptSize = useMediaQuery(theme.breakpoints.up('sm')) ? 48 : 40;
+
+  // The pad's latency clock stays at zero until this settles, matching the
+  // window the prompt below is actually mid-flip and not yet readable — see
+  // useAnswerTimer.ts.
+  const settled = useFlipSettled(session.promptKey);
+
   // Correct answers advance themselves. Errors never do: the working has to be
   // read, and reading it takes as long as it takes.
   useEffect(() => {
@@ -122,6 +135,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
 
         <Typography
           component="h1"
+          aria-label={promptText}
           sx={{
             m: 0,
             textAlign: 'center',
@@ -132,7 +146,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
             textWrap: 'balance',
           }}
         >
-          {promptText}
+          <SplitFlapText text={promptText} size={promptSize} weight={600} />
         </Typography>
 
         {phase === 'wrong' ? (
@@ -196,6 +210,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
         }
         disabled={phase !== 'prompt'}
         keyboard={settings.keyboardInput}
+        armed={settled}
       />
 
       {/* Both lines keep their place whether or not there is anything in them,
