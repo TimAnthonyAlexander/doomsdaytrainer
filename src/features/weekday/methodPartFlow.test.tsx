@@ -66,6 +66,24 @@ async function tapDigit(value: number): Promise<void> {
   fireEvent.click(screen.getByRole('button', { name: String(value) }));
 }
 
+/**
+ * Reads the document back once the write an answer started has landed.
+ *
+ * Recording an attempt is asynchronous: it goes through `patchAppData`, and
+ * when that resolves the provider sets state. Reading storage with a bare
+ * `loadAppData` awaits a different promise, so that update lands outside
+ * anything `act` knows about and React warns. `waitFor` is act-aware and
+ * retries, so it both silences that and removes the assumption that one tick
+ * is enough for an IndexedDB round trip.
+ */
+async function storedAfterWrite(attempts: number): Promise<AppData> {
+  await waitFor(async () => {
+    const data = await loadAppData();
+    expect(data.partAttempts).toHaveLength(attempts);
+  });
+  return loadAppData();
+}
+
 beforeEach(deleteDb);
 afterEach(() => {
   vi.restoreAllMocks();
@@ -402,7 +420,7 @@ describe('the date half', () => {
     expect(screen.getByText('Days from the doomsday')).toBeInTheDocument();
     expect(screen.getByText('Step, mod 7')).toBeInTheDocument();
 
-    const stored = await loadAppData();
+    const stored = await storedAfterWrite(1);
     expect(stored.partAttempts[0].correct).toBe(false);
   });
 });
