@@ -1,11 +1,36 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Numeral } from '@/components/ui/Numeral';
 import { PageTitle } from '@/components/ui/PageTitle';
+import { dur, transition, useReducedMotion } from '@/theme/motion';
 import { radius, space, stroke } from '@/theme/tokens';
 import { introCenturies, introExample, introGroups, type IntroMonth } from './introContent';
+
+/**
+ * Starts drawn (or, under reduced motion, starts already drawn) and reveals on
+ * the next frame.
+ *
+ * This was going to be a scroll-linked reveal via `animation-timeline: view()`
+ * — `main` is the app's only scroller, so the timeline would have resolved
+ * against it — but `Part` is exactly the element that reasoning has to check
+ * and reject: a section here is allowed to fragment across the two-column
+ * layout ("A section may split across the two columns" below), and a view()
+ * timeline on a box CSS can fragment is undefined — the second fragment can
+ * land at a smaller scroll offset than the first, since both columns start at
+ * the same top edge. So this animates on mount instead, once, rather than on
+ * scroll.
+ */
+function useHairlineReveal(reducedMotion: boolean): boolean {
+  const [drawn, setDrawn] = useState(reducedMotion);
+  useEffect(() => {
+    if (reducedMotion || drawn) return;
+    const raf = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(raf);
+  }, [reducedMotion, drawn]);
+  return drawn;
+}
 
 /**
  * A section of the explainer: a quiet heading, then one idea under it.
@@ -14,13 +39,32 @@ import { introCenturies, introExample, introGroups, type IntroMonth } from './in
  * right column carries on where the left ran out. What may not split is any
  * single row, mnemonic or verdict, and a heading may not be left alone at the
  * foot of a column with its section in the next one.
+ *
+ * The rule above the heading draws itself in left to right on mount rather
+ * than simply being there — see `useHairlineReveal` for why it is mount-timed
+ * rather than scroll-timed. It is a background-coloured line rather than the
+ * section's own `border-top`, since a border cannot carry a `scaleX`.
  */
 function Part({ title, children }: { title: string; children: ReactNode }) {
+  const reducedMotion = useReducedMotion();
+  const drawn = useHairlineReveal(reducedMotion);
   return (
-    <Box
-      component="section"
-      sx={{ pt: `${space[4]}px`, mb: `${space[4]}px`, borderTop: stroke.hairline }}
-    >
+    <Box component="section" sx={{ position: 'relative', pt: `${space[4]}px`, mb: `${space[4]}px` }}>
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '1px',
+          bgcolor: 'var(--border)',
+          transformOrigin: 'left center',
+          opacity: drawn ? 1 : 0,
+          transform: drawn ? 'scaleX(1)' : 'scaleX(0)',
+          transition: reducedMotion ? 'none' : transition(['transform', 'opacity'], dur.ui),
+        }}
+      />
       <Typography
         variant="caption"
         component="h2"

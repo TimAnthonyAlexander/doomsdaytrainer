@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Typography from '@mui/material/Typography';
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import {
   BottomNav,
@@ -17,6 +17,7 @@ import { dueItems } from '@/domain/scheduler';
 import { resolveScope } from '@/domain/scope';
 import { AppChrome } from '@/features/pwa';
 import { useAppState } from '@/state/useAppState';
+import { dur, transition, useReducedMotion } from '@/theme/motion';
 import { SCREEN_PADDING_X, radius, space, stroke } from '@/theme/tokens';
 
 /** The answer pad as a mark: three, three, one. Same shape as the favicon. */
@@ -71,6 +72,7 @@ export function AppShell() {
   const { settings } = useAppState();
   const dueCount = useDueCount();
   const mainRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
 
   const title = screenTitle(pathname);
 
@@ -80,6 +82,68 @@ export function AppShell() {
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [pathname]);
+
+  // The rail's active-item tint, as one block that travels rather than a
+  // colour repainted on a different element each route change. Measured
+  // rather than computed from `index * height`, because the due count changes
+  // an item's contents and nothing here can assume every row is the same
+  // height without checking.
+  const railRef = useRef<HTMLElement>(null);
+  const railItemRefs = useRef<Map<string, HTMLElement>>(new Map());
+  // The block's own (unscaled) box size, fixed at the first real measurement
+  // and reused for every scale factor after that. Recomputing it on every
+  // measurement would let rounding drift compound; anchoring it once does not.
+  const railBaseSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const [railHighlight, setRailHighlight] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const measureRailHighlight = useCallback(() => {
+    const railEl = railRef.current;
+    const activeItem = NAV_ITEMS.find((item) => isNavActive(pathname, item.path));
+    const node = activeItem ? railItemRefs.current.get(activeItem.path) : undefined;
+    if (!railEl || !node) {
+      setRailHighlight(null);
+      return;
+    }
+    const itemRect = node.getBoundingClientRect();
+    const railRect = railEl.getBoundingClientRect();
+    // jsdom has no layout and returns an all-zero rect for everything; drawing
+    // a block at that size would be a visible 0x0 artifact rather than none.
+    if (itemRect.width <= 0 || itemRect.height <= 0) {
+      setRailHighlight(null);
+      return;
+    }
+    if (!railBaseSizeRef.current) {
+      railBaseSizeRef.current = { width: itemRect.width, height: itemRect.height };
+    }
+    setRailHighlight({
+      // Relative to the rail's own content box, scroll offset included: `top`
+      // on an absolutely positioned descendant of a scrolling container is a
+      // content-space coordinate, not a viewport one, so the visible-position
+      // delta above has to be corrected back by the rail's own scroll.
+      top: itemRect.top - railRect.top + railEl.scrollTop,
+      left: itemRect.left - railRect.left + railEl.scrollLeft,
+      width: itemRect.width,
+      height: itemRect.height,
+    });
+  }, [pathname]);
+
+  // Re-measure on the route change itself, and whenever the due count could
+  // have changed an item's width (the badge beside "Year codes"). Layout
+  // effect so the block's new position is what the browser paints first,
+  // rather than one stale frame animating out of place.
+  useLayoutEffect(() => {
+    measureRailHighlight();
+  }, [measureRailHighlight, dueCount]);
+
+  useEffect(() => {
+    window.addEventListener('resize', measureRailHighlight);
+    return () => window.removeEventListener('resize', measureRailHighlight);
+  }, [measureRailHighlight]);
 
   if (!settings.onboardingComplete) {
     return <Navigate to="/welcome" replace />;
@@ -102,6 +166,7 @@ export function AppShell() {
       <Box
         component="nav"
         aria-label="Main"
+        ref={railRef}
         sx={{
           display: { xs: 'none', md: 'flex' },
           flexDirection: 'column',
@@ -111,11 +176,36 @@ export function AppShell() {
           // Full height by being a flex item of a frame that is exactly one
           // viewport tall, so it needs neither `sticky` nor a height of its own.
           overflowY: 'auto',
+          // The traveling tint block below is positioned relative to this box,
+          // so it scrolls with the items it sits behind rather than floating
+          // over the viewport.
+          position: 'relative',
           px: `${space[2]}px`,
           py: `${space[5]}px`,
           borderRight: stroke.hairline,
         }}
       >
+        {railHighlight && railBaseSizeRef.current ? (
+          <Box
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: railBaseSizeRef.current.width,
+              height: railBaseSizeRef.current.height,
+              borderRadius: `${radius.md}px`,
+              bgcolor: 'var(--brand-tint)',
+              pointerEvents: 'none',
+              transformOrigin: '0 0',
+              transform: `translate(${railHighlight.left}px, ${railHighlight.top}px) scale(${
+                railHighlight.width / railBaseSizeRef.current.width
+              }, ${railHighlight.height / railBaseSizeRef.current.height})`,
+              transition: reducedMotion ? 'none' : transition(['transform'], dur.ui),
+            }}
+          />
+        ) : null}
+
         <Box
           sx={{
             display: 'flex',
@@ -140,8 +230,13 @@ export function AppShell() {
               key={item.path}
               component={RouterLink}
               to={item.path}
+              ref={(node: HTMLElement | null) => {
+                if (node) railItemRefs.current.set(item.path, node);
+                else railItemRefs.current.delete(item.path);
+              }}
               aria-current={active ? 'page' : undefined}
               sx={{
+                position: 'relative',
                 minHeight: 44,
                 px: `${space[3]}px`,
                 borderRadius: `${radius.md}px`,
@@ -150,8 +245,8 @@ export function AppShell() {
                 justifyContent: 'flex-start',
                 gap: `${space[3]}px`,
                 color: active ? 'var(--brand-on-tint)' : 'var(--text-secondary)',
-                bgcolor: active ? 'var(--brand-tint)' : 'transparent',
-                '&:hover': { bgcolor: active ? 'var(--brand-tint)' : 'var(--surface-1)' },
+                transition: transition(['color'], dur.ui),
+                '&:hover': { bgcolor: active ? 'transparent' : 'var(--surface-1)' },
               }}
             >
               <Icon size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />

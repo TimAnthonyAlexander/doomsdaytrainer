@@ -5,6 +5,7 @@ import { Anchor, BarChart3, CalendarDays, Hash, Route, Settings } from 'lucide-r
 import type { LucideIcon } from 'lucide-react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { Numeral } from '@/components/ui/Numeral';
+import { dur, transition } from '@/theme/motion';
 import { space, stroke, typeScale } from '@/theme/tokens';
 
 export interface NavItem {
@@ -138,6 +139,7 @@ export function BottomNav({ dueCount }: BottomNavProps) {
                 // clear 4.5:1 on the page ground, and --brand does not in light
                 // mode.
                 color: active ? 'var(--brand-deep)' : 'var(--text-secondary)',
+                transition: transition(['color'], dur.ui),
               }}
             >
               <Icon size={ICON_SIZE} strokeWidth={ICON_STROKE} aria-hidden />
