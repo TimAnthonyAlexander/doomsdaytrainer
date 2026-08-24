@@ -84,8 +84,11 @@ Read as a person wrote it. Plain words, specific claims, varied sentence length.
    scheduling state (`interval`, `easeFactor`, `dueAt`, `repetitions`, `lapses`).
 6. The 100 year codes are fixed content. They are never user-editable and never
    regenerated at runtime from a config.
-7. Index convention (Sunday/Monday) changes **only** the weekday names shown as
-   optional context. It never changes a year code.
+7. Sunday is 0. In the shipped tables, in every century anchor, in every year
+   code, in every intermediate sum and on every pad. There was a setting
+   offering Monday at 0 and it renamed the seven buttons while moving no
+   number, so the pad and the rest of the app disagreed about what 0 meant.
+   Do not reintroduce a second convention that reaches only the labels.
 8. Everything is local. No network calls, no analytics, no accounts, no server.
 
 ## What "done" means for your task

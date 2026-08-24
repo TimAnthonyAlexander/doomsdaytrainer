@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import type { WeekdayMode } from '@/domain/types';
-import { formatDate, monthName, trueWeekdayName } from '@/domain/weekday';
+import { formatDate, monthName, weekdayName } from '@/domain/weekday';
 import { formatYear } from '@/domain/yearCodes';
 import { Numeral } from '@/components/ui/Numeral';
 import { palette } from '@/theme/palette';
@@ -74,7 +74,7 @@ export function WeekdayPrompt({
 
       {phase === 'wrong' ? (
         <Typography variant="h3" component="p" sx={{ color: palette.brandDeep }}>
-          {trueWeekdayName(correctCode as 0)}
+          {weekdayName(correctCode as 0)}
         </Typography>
       ) : null}
     </Box>

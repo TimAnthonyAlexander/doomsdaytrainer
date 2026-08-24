@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppData, Code, DayStepAttempt, Settings } from '@/domain/types';
 import { dayStepAnswer } from '@/domain/dayStep';
-import { trueWeekdayName } from '@/domain/weekday';
+import { weekdayName } from '@/domain/weekday';
 import { buildDayStepTotals } from '@/domain/dayStepLifetime';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { MAX_DAY_STEP_ATTEMPTS, defaultAppData, monthItemKey } from '@/storage/defaults';
@@ -70,7 +70,7 @@ async function wait(ms: number): Promise<void> {
 
 function weekdayCode(name: string): Code {
   for (let code = 0; code < 7; code += 1) {
-    if (trueWeekdayName(code as Code) === name) return code as Code;
+    if (weekdayName(code as Code) === name) return code as Code;
   }
   throw new Error(`Not a weekday: ${name}`);
 }
@@ -110,7 +110,7 @@ function prompt(): Prompt {
 /** Answers the prompt on screen, after the frame that starts its latency clock. */
 async function tap(code: Code): Promise<void> {
   await nextPaint();
-  fireEvent.click(screen.getByRole('button', { name: trueWeekdayName(code).slice(0, 3) }));
+  fireEvent.click(screen.getByRole('button', { name: weekdayName(code).slice(0, 3) }));
 }
 
 function dayStepAttempt(overrides: Partial<DayStepAttempt> = {}): DayStepAttempt {
@@ -168,7 +168,7 @@ describe('Day step trainer', () => {
     await tap(wrong);
 
     expect(screen.getByRole('status')).toHaveTextContent(
-      `Incorrect. The answer is ${trueWeekdayName(current.answer).slice(0, 3)}.`,
+      `Incorrect. The answer is ${weekdayName(current.answer).slice(0, 3)}.`,
     );
 
     // Every number behind the answer, each with the label that names it.

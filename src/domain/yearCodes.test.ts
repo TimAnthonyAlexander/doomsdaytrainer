@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  WEEKDAYS_MONDAY,
-  WEEKDAYS_SUNDAY,
   YEAR_CODES,
   allYears,
   anchorFor,
@@ -10,9 +8,7 @@ import {
   decadeOf,
   deriveCode,
   formatYear,
-  weekdayName,
 } from './yearCodes';
-import type { Code } from './types';
 
 describe('YEAR_CODES table', () => {
   it('has exactly 100 entries', () => {
@@ -150,31 +146,7 @@ describe('anchorFor', () => {
   });
 });
 
-describe('weekday names', () => {
-  it('lists seven days starting at the convention day', () => {
-    expect(WEEKDAYS_SUNDAY).toHaveLength(7);
-    expect(WEEKDAYS_MONDAY).toHaveLength(7);
-    expect(WEEKDAYS_SUNDAY[0]).toBe('Sunday');
-    expect(WEEKDAYS_MONDAY[0]).toBe('Monday');
-    expect(WEEKDAYS_SUNDAY[6]).toBe('Saturday');
-    expect(WEEKDAYS_MONDAY[6]).toBe('Sunday');
-  });
-
-  it('resolves a code under both conventions', () => {
-    expect(weekdayName(0, 'sunday')).toBe('Sunday');
-    expect(weekdayName(0, 'monday')).toBe('Monday');
-    expect(weekdayName(3, 'sunday')).toBe('Wednesday');
-    expect(weekdayName(3, 'monday')).toBe('Thursday');
-  });
-
-  it('rejects codes outside 0..6', () => {
-    expect(() => weekdayName(7 as unknown as Code, 'sunday')).toThrow(RangeError);
-    expect(() => weekdayName(-1 as unknown as Code, 'monday')).toThrow(RangeError);
-  });
-
-  it('does not change any year code', () => {
-    const before = [...YEAR_CODES];
-    weekdayName(codeFor(73), 'monday');
-    expect([...YEAR_CODES]).toEqual(before);
-  });
-});
+/*
+ * The weekday names moved to src/domain/weekday.ts along with the one
+ * convention that survived; their tests moved with them.
+ */

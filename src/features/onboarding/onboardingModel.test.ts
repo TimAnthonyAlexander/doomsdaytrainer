@@ -23,7 +23,6 @@ import {
 } from './onboardingModel';
 
 const draft = (overrides: Partial<OnboardingDraft> = {}): OnboardingDraft => ({
-  indexConvention: 'sunday',
   scopeId: 'full',
   customFrom: '00',
   customTo: '99',
@@ -31,31 +30,35 @@ const draft = (overrides: Partial<OnboardingDraft> = {}): OnboardingDraft => ({
 });
 
 describe('steps', () => {
-  it('has the five steps, in order, the explainer last', () => {
-    expect(ONBOARDING_STEPS).toEqual(['intro', 'why', 'index', 'scope', 'method']);
-    expect(STEP_COUNT).toBe(5);
+  /**
+   * There was an `index` step between `why` and `scope`, asking whether 0 meant
+   * Sunday or Monday. It renamed the seven buttons and moved no number, so it
+   * is gone along with the setting behind it.
+   */
+  it('has the four steps, in order, the explainer last', () => {
+    expect(ONBOARDING_STEPS).toEqual(['intro', 'why', 'scope', 'method']);
+    expect(STEP_COUNT).toBe(4);
   });
 
   it('numbers steps from one', () => {
     expect(stepNumber('intro')).toBe(1);
-    expect(stepNumber('method')).toBe(5);
+    expect(stepNumber('method')).toBe(4);
   });
 
   it('steps forward and back', () => {
     expect(nextStep('intro')).toBe('why');
-    expect(nextStep('why')).toBe('index');
-    expect(nextStep('index')).toBe('scope');
+    expect(nextStep('why')).toBe('scope');
     expect(nextStep('scope')).toBe('method');
     expect(nextStep('method')).toBeNull();
 
     expect(previousStep('method')).toBe('scope');
-    expect(previousStep('scope')).toBe('index');
+    expect(previousStep('scope')).toBe('why');
     expect(previousStep('intro')).toBeNull();
   });
 
-  it('lands on the index step whether step two is read or skipped', () => {
+  it('lands on the scope step whether step two is read or skipped', () => {
     // Skipping is the same jump as continuing; the difference is only the label.
-    expect(nextStep('why')).toBe('index');
+    expect(nextStep('why')).toBe('scope');
   });
 });
 
@@ -108,12 +111,10 @@ describe('initialDraft', () => {
   it('starts from the stored settings so a rerun is not a reset', () => {
     const result = initialDraft({
       ...DEFAULT_SETTINGS,
-      indexConvention: 'monday',
       scopeId: 'custom',
       customScope: { from: 60, to: 12 },
     });
     expect(result).toEqual({
-      indexConvention: 'monday',
       scopeId: 'custom',
       customFrom: '12',
       customTo: '60',
@@ -129,8 +130,7 @@ describe('initialDraft', () => {
 
 describe('settingsFromDraft', () => {
   it('carries every choice and completes onboarding', () => {
-    expect(settingsFromDraft(draft({ indexConvention: 'monday', scopeId: 'living' }))).toEqual({
-      indexConvention: 'monday',
+    expect(settingsFromDraft(draft({ scopeId: 'living' }))).toEqual({
       scopeId: 'living',
       customScope: { from: 0, to: 99 },
       onboardingComplete: true,
@@ -191,7 +191,7 @@ describe('derivation', () => {
     }
   });
 
-  it('demonstrates the index convention on years whose code is not zero', () => {
+  it('demonstrates the table on years whose code is not zero', () => {
     for (const yy of INDEX_EXAMPLE_YEARS) {
       expect(codeFor(yy)).not.toBe(0);
     }

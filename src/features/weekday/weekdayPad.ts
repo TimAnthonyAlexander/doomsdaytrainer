@@ -1,15 +1,19 @@
-import type { Code, IndexConvention } from '@/domain/types';
-import { weekdayName } from '@/domain/yearCodes';
-import { monthLength, weekdayAbbr } from '@/domain/weekday';
+import type { Code } from '@/domain/types';
+import { monthLength, weekdayAbbr, weekdayName } from '@/domain/weekday';
 
 /**
  * What the two answer pads offer, and in what order.
  *
  * The seven weekday buttons keep the pad's contract: exactly seven, fixed
- * positions, one tap per answer. `settings.indexConvention` decides which day
- * sits in position 0 — Sunday-indexed puts Sunday first, Monday-indexed puts
- * Monday first — and that is the only thing it changes. The *value* behind a
- * button is always the Sunday-indexed code, because the shipped tables are.
+ * positions, one tap per answer. Sunday sits in position 0 and always has,
+ * because the shipped tables are Sunday-indexed and the value behind a button
+ * is the code itself.
+ *
+ * There was a setting that moved Monday into position 0. It renamed the seven
+ * buttons and changed no number anywhere else, so a user who picked it read
+ * "0 = Monday" on the pad while every century anchor, every worked line and
+ * every explanation in the app still counted from Sunday. The positions are
+ * fixed now in the one sense that matters: they are the same for everybody.
  */
 
 export interface WeekdayOption {
@@ -21,15 +25,10 @@ export interface WeekdayOption {
   short: string;
 }
 
-export function weekdayOptions(convention: IndexConvention): WeekdayOption[] {
+export function weekdayOptions(): WeekdayOption[] {
   return Array.from({ length: 7 }, (_unused, position) => {
-    // Position 0 is Sunday (code 0) or Monday (code 1) depending on convention.
-    const value = ((convention === 'monday' ? position + 1 : position) % 7) as Code;
-    return {
-      value,
-      name: weekdayName(value, 'sunday'),
-      short: weekdayAbbr(value, 'sunday'),
-    };
+    const value = position as Code;
+    return { value, name: weekdayName(value), short: weekdayAbbr(value) };
   });
 }
 

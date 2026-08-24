@@ -57,7 +57,7 @@ import {
   isLeapYear,
   monthDoomsday,
   monthName,
-  trueWeekdayName,
+  weekdayName,
   weekdayFor,
   yearKeyOf,
 } from './weekday';
@@ -286,7 +286,7 @@ export interface GuidedWalk {
   leapYear: boolean;
   /** Sunday-indexed, like every code in the app. */
   weekday: Code;
-  /** "Friday". The convention never changes this — see `trueWeekdayName`. */
+  /** "Friday". The convention never changes this — see `weekdayName`. */
   weekdayName: string;
   /** "20 March 1987". */
   dateLabel: string;
@@ -607,7 +607,7 @@ function stepsFor(date: CalendarDate, n: WalkNumbers): GuidedStep[] {
       max: 6,
       choices: [],
       answerLabel: `Doomsday in ${fullYear}`,
-      working: `${n.doomsday} is ${trueWeekdayName(n.doomsday)}.`,
+      working: `${n.doomsday} is ${weekdayName(n.doomsday)}.`,
       why: NAMING_WHY,
     }),
     asked({
@@ -664,7 +664,7 @@ function stepsFor(date: CalendarDate, n: WalkNumbers): GuidedStep[] {
       max: 6,
       choices: [],
       answerLabel: 'The day',
-      working: `${n.weekday} is ${trueWeekdayName(n.weekday)}.`,
+      working: `${n.weekday} is ${weekdayName(n.weekday)}.`,
       why: NAMING_WHY,
     }),
   ];
@@ -769,11 +769,11 @@ function goalsFor(fullYear: number, month: number, day: number, n: WalkNumbers):
         {
           label: 'Doomsday',
           expression: `${n.doomsday} as a weekday`,
-          value: trueWeekdayName(n.doomsday),
+          value: weekdayName(n.doomsday),
           from: 'doomsdayName',
         },
       ],
-      summary: `Doomsday ${n.doomsday}, ${trueWeekdayName(n.doomsday)}`,
+      summary: `Doomsday ${n.doomsday}, ${weekdayName(n.doomsday)}`,
     },
     {
       id: 'daysOn',
@@ -802,7 +802,7 @@ function goalsFor(fullYear: number, month: number, day: number, n: WalkNumbers):
         {
           label: 'The day',
           expression: `${n.weekday} as a weekday`,
-          value: trueWeekdayName(n.weekday),
+          value: weekdayName(n.weekday),
           from: 'weekdayName',
         },
       ],
@@ -831,7 +831,7 @@ export function guidedWalk(date: CalendarDate): GuidedWalk {
     date,
     leapYear: n.leapYear,
     weekday,
-    weekdayName: trueWeekdayName(weekday),
+    weekdayName: weekdayName(weekday),
     dateLabel: formatDate(fullYear, month, day),
     steps: stepsFor(date, n),
     goals: goalsFor(fullYear, month, day, n),

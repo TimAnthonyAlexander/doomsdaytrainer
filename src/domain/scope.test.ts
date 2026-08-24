@@ -3,7 +3,6 @@ import type { ScopeId, Settings } from './types';
 import { SCOPES, inScope, resolveScope, scopeYears } from './scope';
 
 const settings: Settings = {
-  indexConvention: 'sunday',
   scopeId: 'full',
   customScope: { from: 0, to: 99 },
   newItemsPerDay: 20,

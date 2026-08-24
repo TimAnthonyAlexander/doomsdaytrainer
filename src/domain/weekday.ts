@@ -11,8 +11,8 @@
  * memorising, the same way it comes out of their head.
  */
 
-import type { Code, IndexConvention, YearKey } from './types';
-import { codeFor, weekdayName } from './yearCodes';
+import type { Code, YearKey } from './types';
+import { codeFor } from './yearCodes';
 
 /** Julian dates are out of scope. 1800 is the floor precisely so they never come up. */
 export const MIN_YEAR = 1800;
@@ -246,21 +246,41 @@ export function formatDate(fullYear: number, month: number, day: number): string
   return `${day} ${monthName(month)} ${fullYear}`;
 }
 
-/** "Sun", "Mon", ... Three letters is unambiguous for all seven. */
-export function weekdayAbbr(code: Code, convention: IndexConvention): string {
-  return weekdayName(code, convention).slice(0, 3);
+/**
+ * The seven days, in the one order the app has.
+ *
+ * Sunday sits at 0 because the shipped tables put it there: every century
+ * anchor, every year code and every intermediate sum in the method is
+ * Sunday-indexed, so a code names the same day everywhere and always.
+ *
+ * There was a Monday-indexed set beside this one and a setting to choose
+ * between them. It renamed the seven buttons and changed no number anywhere,
+ * which meant a user who picked it read "0 = Monday" on the pad while every
+ * anchor, every worked line and every one of the app's own explanations still
+ * counted from Sunday. A convention that only reaches the labels is not a
+ * convention, it is a mislabelling, and the two never met in the middle.
+ */
+export const WEEKDAY_NAMES: readonly string[] = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+/** The day a code stands for. */
+export function weekdayName(code: Code): string {
+  if (!Number.isInteger(code) || code < 0 || code > 6) {
+    throw new RangeError(`Code out of range: ${code}`);
+  }
+  return WEEKDAY_NAMES[code];
 }
 
-/**
- * The real name of the day a code stands for.
- *
- * The shipped tables are Sunday-indexed, so a code always names the same day
- * whatever the user's index convention. The convention reorders the seven
- * buttons and nothing else, which is why the worked answer reads its name from
- * here rather than through `weekdayName`.
- */
-export function trueWeekdayName(code: Code): string {
-  return weekdayName(code, 'sunday');
+/** "Sun", "Mon", ... Three letters is unambiguous for all seven. */
+export function weekdayAbbr(code: Code): string {
+  return weekdayName(code).slice(0, 3);
 }
 
 /* ------------------------------------------------------------------ */

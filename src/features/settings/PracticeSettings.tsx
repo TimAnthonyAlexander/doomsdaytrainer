@@ -5,7 +5,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import { Numeral } from '@/components/ui/Numeral';
 import { SCOPES } from '@/domain/scope';
-import type { IndexConvention, ScopeId, Settings } from '@/domain/types';
+import type { ScopeId, Settings } from '@/domain/types';
 import { formatYear } from '@/domain/yearCodes';
 import {
   normaliseRange,
@@ -25,15 +25,17 @@ interface PracticeSettingsProps {
 }
 
 /**
- * These settings do not all reach the same distance, and the labels now say so.
+ * Both of these govern the 100 year codes and nothing else — not the tables,
+ * not the day step, not the weekday trainer, not the Concept walk — and while
+ * they were labelled "Scope" and "New codes per day" they read as the app's
+ * practice settings, which made the whole app look like a year-code trainer
+ * with some extra screens attached. Each names its subject now, and each note
+ * names what it leaves alone.
  *
- * The index convention renames weekdays wherever the app prints one, so it
- * belongs to the method. Scope and the daily cap govern the 100 year codes and
- * nothing else — not the tables, not the day step, not the weekday trainer, not
- * the Concept walk — and while they were labelled "Scope" and "New codes per
- * day" they read as the app's practice settings, which made the whole app look
- * like a year-code trainer with some extra screens attached. Each names its
- * subject now, and each note names what it leaves alone.
+ * The section also held an index-convention toggle, Sunday against Monday. It
+ * renamed the seven buttons and changed no number anywhere else, so picking
+ * Monday left every century anchor, every worked line and every explanation in
+ * the app still counting from Sunday. Sunday is the only convention now.
  */
 export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) {
   const range = normaliseRange(settings.customScope);
@@ -49,34 +51,6 @@ export function PracticeSettings({ settings, onChange }: PracticeSettingsProps) 
 
   return (
     <SettingsSection title="Practice">
-      <Field
-        label="Index convention"
-        note="This renames the weekdays the app shows you, on every screen. It never changes a year code."
-      >
-        <ToggleButtonGroup
-          exclusive
-          fullWidth
-          color="primary"
-          value={settings.indexConvention}
-          onChange={(_event, next: IndexConvention | null) => {
-            if (next) onChange({ indexConvention: next });
-          }}
-        >
-          <ToggleButton value="sunday">
-            <Numeral weight={600}>0</Numeral>
-            <Box component="span" sx={{ ml: 0.75 }}>
-              = Sunday
-            </Box>
-          </ToggleButton>
-          <ToggleButton value="monday">
-            <Numeral weight={600}>0</Numeral>
-            <Box component="span" sx={{ ml: 0.75 }}>
-              = Monday
-            </Box>
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Field>
-
       <Field
         label="Year-code scope"
         note="Which of the 100 codes are scheduled. The rest stay stored and stop coming up; nothing is deleted, and widening the scope brings their progress back. It scopes the codes only — the month doomsdays, the century anchors, the day step, the weekday trainer and the Concept walk are always there in full."

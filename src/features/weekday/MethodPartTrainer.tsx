@@ -10,7 +10,7 @@ import {
   methodPartQuestion,
   type MethodPart,
 } from '@/domain/methodParts';
-import { trueWeekdayName } from '@/domain/weekday';
+import { weekdayName } from '@/domain/weekday';
 import type { WeekdayRangeId } from '@/domain/types';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
@@ -24,11 +24,10 @@ import { useMethodPartSession } from './useMethodPartSession';
  *
  * Both halves produce a number rather than a day. The date half's answer is a
  * count of days and was never a weekday at all; the year half's answer *is* a
- * weekday index, but it is Sunday-indexed like every other intermediate number
- * in the app, and `settings.indexConvention` renames weekdays without touching
- * a single number (invariant 8). The Tables drill asks for the century anchors
- * as bare digits for exactly the same reason. The name is on the worked answer
- * instead, where it can be read as a check rather than tapped as a choice.
+ * weekday index, but it is Sunday-indexed like every other number in the app
+ * (invariant 8), and the Tables drill asks for the century anchors as bare
+ * digits for exactly the same reason. The name is on the worked answer instead,
+ * where it can be read as a check rather than tapped as a choice.
  */
 const DIGIT_OPTIONS: AnswerOption[] = Array.from({ length: 7 }, (_unused, value) => ({
   value,
@@ -123,7 +122,7 @@ export function MethodPartTrainer({ part, rangeId, header }: MethodPartTrainerPr
                   can check the 3 against something they already hold. The date
                   half's answer is a count of days and has no name. */}
               {prompt.part === 'year'
-                ? `${session.correctCode}  ${trueWeekdayName(session.correctCode)}`
+                ? `${session.correctCode}  ${weekdayName(session.correctCode)}`
                 : String(session.correctCode)}
             </Typography>
             <Box sx={{ width: '100%', maxWidth: 360 }}>

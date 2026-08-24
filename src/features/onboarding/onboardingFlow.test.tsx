@@ -74,8 +74,6 @@ describe('onboarding flow', () => {
     expect(heading('Where the year codes come from')).not.toBeNull();
 
     await user.click(button('Next'));
-    await user.click(button('0 = Monday'));
-    await user.click(button('Next'));
 
     await user.click(button(/Custom range/));
     const from = screen.getByLabelText('From');
@@ -95,7 +93,6 @@ describe('onboarding flow', () => {
 
     const settings = persistedSettings();
     expect(settings.onboardingComplete).toBe(true);
-    expect(settings.indexConvention).toBe('monday');
     expect(settings.scopeId).toBe('custom');
     // Typed high-to-low, stored low-to-high.
     expect(settings.customScope).toEqual({ from: 12, to: 25 });
@@ -109,53 +106,32 @@ describe('onboarding flow', () => {
     await user.click(button('Skip'));
     await user.click(button('Next'));
     await user.click(button('Next'));
-    await user.click(button('Next'));
 
     await screen.findByText('learn screen');
     const settings = persistedSettings();
-    expect(settings.indexConvention).toBe('sunday');
     expect(settings.scopeId).toBe('full');
     expect(settings.onboardingComplete).toBe(true);
   });
 
-  it('skips the arithmetic screen straight to the index choice', async () => {
+  it('skips the arithmetic screen straight to the scope choice', async () => {
     const { user } = await mount();
     await user.click(button('Next'));
     await user.click(button('Skip'));
 
-    expect(heading('Which day is code 0?')).not.toBeNull();
+    expect(heading('How many year codes')).not.toBeNull();
     expect(heading('Where the year codes come from')).toBeNull();
-    expect(screen.getByRole('group', { name: 'Step 3 of 5' })).toBeInTheDocument();
-  });
-
-  it('holds the year codes still while the weekday names change', async () => {
-    const { user } = await mount();
-    await user.click(button('Next'));
-    await user.click(button('Skip'));
-
-    // 20 → 4 and 44 → 6, whichever convention is selected.
-    expect(screen.getByText('Thursday')).toBeInTheDocument();
-    await user.click(button('0 = Monday'));
-    expect(screen.getByText('Friday')).toBeInTheDocument();
-    expect(screen.queryByText('Thursday')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Step 3 of 4' })).toBeInTheDocument();
   });
 
   it('preserves choices when the user goes back', async () => {
     const { user } = await mount();
     await user.click(button('Next'));
     await user.click(button('Next'));
-    await user.click(button('0 = Monday'));
-    await user.click(button('Next'));
     await user.click(button(/Living memory/));
-
-    await user.click(button('Back'));
-    expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(button('Back'));
     expect(heading('Where the year codes come from')).not.toBeNull();
 
-    await user.click(button('Next'));
-    expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');
     await user.click(button('Next'));
     expect(button(/Living memory/)).toHaveAttribute('aria-pressed', 'true');
 
@@ -163,14 +139,12 @@ describe('onboarding flow', () => {
     await user.click(button('Next'));
     await screen.findByText('learn screen');
     expect(persistedSettings().scopeId).toBe('living');
-    expect(persistedSettings().indexConvention).toBe('monday');
   });
 
   it('shows each scope its own code count', async () => {
     const { user } = await mount();
     await user.click(button('Next'));
     await user.click(button('Skip'));
-    await user.click(button('Next'));
 
     expect(button(/Full/).textContent).toContain('100 codes');
     expect(button(/Living memory/).textContent).toContain('75 codes');
@@ -187,12 +161,12 @@ describe('onboarding flow', () => {
     const { user } = await mount();
     await user.click(button('Next'));
     await user.click(button('Next'));
-    await user.click(button('0 = Monday'));
+    await user.click(button(/Living memory/));
 
     // Nothing is committed mid-run: an abandoned flow starts clean next time.
     const settings = persistedSettings();
     expect(settings.onboardingComplete).toBe(false);
-    expect(settings.indexConvention).toBe('sunday');
+    expect(settings.scopeId).toBe('full');
   });
 
   it('redirects away when onboarding is already complete', async () => {
@@ -206,7 +180,6 @@ describe('onboarding flow', () => {
   it('runs again on request and starts from the stored settings', async () => {
     await seedSettings({
       onboardingComplete: true,
-      indexConvention: 'monday',
       scopeId: 'custom',
       customScope: { from: 30, to: 40 },
     });
@@ -215,9 +188,6 @@ describe('onboarding flow', () => {
     expect(heading('Any date, in your head')).not.toBeNull();
     await user.click(button('Next'));
     await user.click(button('Skip'));
-    expect(button('0 = Monday')).toHaveAttribute('aria-pressed', 'true');
-
-    await user.click(button('Next'));
     expect(button(/Custom range/)).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('From')).toHaveValue('30');
     expect(screen.getByLabelText('To')).toHaveValue('40');
@@ -226,12 +196,10 @@ describe('onboarding flow', () => {
 
 type User = ReturnType<typeof userEvent.setup>;
 
-/** The four choice steps, tapped through, leaving the explainer on screen. */
-async function reachMethod(user: User, convention: 'sunday' | 'monday' = 'sunday'): Promise<void> {
+/** The three choice steps, tapped through, leaving the explainer on screen. */
+async function reachMethod(user: User): Promise<void> {
   await user.click(button('Next'));
   await user.click(button('Skip'));
-  if (convention === 'monday') await user.click(button('0 = Monday'));
-  await user.click(button('Next'));
   await user.click(button('Next'));
 }
 
@@ -241,7 +209,7 @@ describe('the explainer at the end of onboarding', () => {
     await reachMethod(user);
 
     expect(heading('How it works')).not.toBeNull();
-    expect(screen.getByRole('group', { name: 'Step 5 of 5' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Step 4 of 4' })).toBeInTheDocument();
 
     // The guided walk lives on `/concept` and no longer stands between the
     // reader and the app: neither the button that starts it nor anything it
@@ -254,7 +222,7 @@ describe('the explainer at the end of onboarding', () => {
 
   it('writes nothing until its button, then commits the whole run', async () => {
     const { user } = await mount();
-    await reachMethod(user, 'monday');
+    await reachMethod(user);
 
     const before = JSON.stringify(await loadAppData());
     expect(persistedSettings().onboardingComplete).toBe(false);
@@ -263,8 +231,6 @@ describe('the explainer at the end of onboarding', () => {
     await user.click(button('Next'));
     await screen.findByText('learn screen');
 
-    const settings = persistedSettings();
-    expect(settings.indexConvention).toBe('monday');
-    expect(settings.onboardingComplete).toBe(true);
+    expect(persistedSettings().onboardingComplete).toBe(true);
   });
 });

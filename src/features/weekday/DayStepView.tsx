@@ -13,7 +13,7 @@ import {
   ordinalSuffix,
   type DayStepWorking,
 } from '@/domain/dayStep';
-import { trueWeekdayName } from '@/domain/weekday';
+import { weekdayName } from '@/domain/weekday';
 import { useAppState } from '@/state/useAppState';
 import { palette } from '@/theme/palette';
 import { DayStepTotalsView } from './DayStepTotalsView';
@@ -99,11 +99,11 @@ export function DayStepView({ onBack }: DayStepViewProps) {
 
   const options = useMemo<AnswerOption[]>(
     () =>
-      weekdayOptions(settings.indexConvention).map((option) => ({
+      weekdayOptions().map((option) => ({
         value: option.value,
         label: option.short,
       })),
-    [settings.indexConvention],
+    [],
   );
 
   const line = sessionLine(session.summary);
@@ -125,7 +125,7 @@ export function DayStepView({ onBack }: DayStepViewProps) {
       >
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
           In {anchorMonthLabel(question)}, the <Day value={question.anchorDay} /> is a{' '}
-          {trueWeekdayName(question.anchorWeekday)}.
+          {weekdayName(question.anchorWeekday)}.
         </Typography>
 
         <Typography
@@ -147,7 +147,7 @@ export function DayStepView({ onBack }: DayStepViewProps) {
         {phase === 'wrong' ? (
           <>
             <Typography variant="h3" component="p" sx={{ color: palette.brandDeep }}>
-              {trueWeekdayName(session.correctCode)}
+              {weekdayName(session.correctCode)}
             </Typography>
             <Box sx={{ width: '100%', maxWidth: 360 }}>
               <Working working={working} />

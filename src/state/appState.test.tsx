@@ -90,7 +90,7 @@ describe('AppStateProvider', () => {
   it('persists settings across a reload', async () => {
     const first = await mount();
     await act(async () => {
-      await first.result.current.updateSettings({ newItemsPerDay: 10, indexConvention: 'monday' });
+      await first.result.current.updateSettings({ newItemsPerDay: 10, hintType: 'anchor' });
     });
     expect(first.result.current.settings.newItemsPerDay).toBe(10);
 
@@ -99,7 +99,7 @@ describe('AppStateProvider', () => {
 
     const second = await mount();
     expect(second.result.current.settings.newItemsPerDay).toBe(10);
-    expect(second.result.current.settings.indexConvention).toBe('monday');
+    expect(second.result.current.settings.hintType).toBe('anchor');
   });
 
   it('advances the schedule on a review and persists it', async () => {

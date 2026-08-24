@@ -37,11 +37,19 @@ import { emptyCalcTotals, emptyVerifyTotals } from '@/domain/calcStats';
  * half cut by month. No new item map, for the same reason as v6 — a year is
  * not a fixed item set the way the 100 codes are, and neither is a (month,
  * day) pair.
+ *
+ * v8 removed `settings.indexConvention`, the only migration here that takes
+ * something away. It chose whether 0 meant Sunday or Monday, and all it did was
+ * rename the seven buttons: every century anchor, every year code, every
+ * intermediate sum and every worked line in the app is Sunday-indexed and none
+ * of them moved. So a user who picked Monday read "0 = Monday" on the pad and
+ * "the 1900s anchor is 3" everywhere else, which are two different claims about
+ * the same number. `mergeSettings` spreads whatever the document holds, so the
+ * dead field would otherwise have ridden along in every export for good.
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const DEFAULT_SETTINGS: Settings = {
-  indexConvention: 'sunday',
   scopeId: 'full',
   customScope: { from: 0, to: 99 },
   newItemsPerDay: 20,

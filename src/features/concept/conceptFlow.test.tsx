@@ -2,7 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { AppData, IndexConvention } from '@/domain/types';
+import type { AppData } from '@/domain/types';
 import { ConceptScreen } from '@/routes/ConceptScreen';
 import { AppStateGate, AppStateProvider } from '@/state/AppStateProvider';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
@@ -34,9 +34,9 @@ async function deleteDb(): Promise<void> {
   });
 }
 
-async function seed(indexConvention: IndexConvention = 'sunday'): Promise<void> {
+async function seed(): Promise<void> {
   const data: AppData = defaultAppData(Date.now());
-  data.settings = { ...data.settings, onboardingComplete: true, indexConvention };
+  data.settings = { ...data.settings, onboardingComplete: true };
   await saveAppData(data);
   await closeDb();
 }
@@ -554,35 +554,16 @@ describe('a day below every doomsday date in the month', () => {
   });
 });
 
-describe('the index convention', () => {
-  /** Everything the screen says, minus the buttons, for all twelve steps. */
-  async function collect(convention: IndexConvention): Promise<string[]> {
-    await deleteDb();
-    await seed(convention);
-    const view = mount();
-    await open();
-
-    const steps: string[] = [];
-    for (const value of ANSWERS) {
-      steps.push(screen.getByTestId('concept-ledger').textContent ?? '');
-      await answer(value);
-      next();
-    }
-    view.unmount();
-    return steps;
-  }
-
-  it('changes not one number or word in the twelve steps', async () => {
-    // Invariant 8. Every number in the walk is Sunday-indexed whatever the user
-    // picked; the convention only decides which day sits in position 0 of the
-    // weekday pad.
-    const sunday = await collect('sunday');
-    const monday = await collect('monday');
-    expect(monday).toEqual(sunday);
-  });
-
-  it('reorders the weekday pad and nothing else', async () => {
-    await seed('monday');
+/**
+ * There was a Sunday/Monday setting, and the tests here proved it changed the
+ * pad's order and not one number in the walk. It is gone: renaming the seven
+ * buttons while every anchor, code and worked line stayed Sunday-indexed meant
+ * the pad and the rest of the app disagreed about what 0 meant. What is left to
+ * assert is that the one order really is the one order.
+ */
+describe('the weekday pad', () => {
+  it('puts Sunday first', async () => {
+    await seed();
     mount();
     await open();
 
@@ -592,36 +573,17 @@ describe('the index convention', () => {
     }
 
     expect(expression()).toBe('6 as a weekday');
-    const pad = screen.getByRole('button', { name: 'Mon' }).parentElement as HTMLElement;
-    expect(
-      within(pad)
-        .getAllByRole('button')
-        .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-
-    // Same day, same closing line. Only the buttons moved.
-    for (const value of ['Sat', 14, 6, 12, 5, 'Fri'] as const) {
-      await answer(value);
-      next();
-    }
-    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
-  });
-
-  it('puts Sunday first when that is what is set', async () => {
-    await seed('sunday');
-    mount();
-    await open();
-
-    for (const value of [3, 0, 3, 3, 6, 6] as const) {
-      await answer(value);
-      next();
-    }
-
     const pad = screen.getByRole('button', { name: 'Sun' }).parentElement as HTMLElement;
     expect(
       within(pad)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
     ).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+
+    for (const value of ['Sat', 14, 6, 12, 5, 'Fri'] as const) {
+      await answer(value);
+      next();
+    }
+    expect(screen.getByText('20 March 1987 was a Friday.')).toBeInTheDocument();
   });
 });

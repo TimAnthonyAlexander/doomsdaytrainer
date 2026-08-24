@@ -225,6 +225,27 @@ const MIGRATIONS: Record<number, Migration> = {
       partTotals: buildMethodPartTotals(partAttempts),
     };
   },
+
+  /**
+   * v7 → v8: `settings.indexConvention` goes.
+   *
+   * The only migration here that removes something rather than adding it. The
+   * setting chose whether 0 meant Sunday or Monday, and renaming the seven
+   * buttons was all it ever did — the shipped tables are Sunday-indexed, so
+   * every anchor, every code, every intermediate sum and every worked line
+   * stayed where it was. A user who picked Monday was told "0 = Monday" by the
+   * pad and "the 1900s anchor is 3" by everything else.
+   *
+   * Deleted rather than left in place because `mergeSettings` spreads whatever
+   * the stored document holds over the defaults, so an unread field survives
+   * every load and rides along in every export indefinitely. Nothing else in
+   * settings moves, and no progress is touched.
+   */
+  8: (data) => {
+    const settings = { ...(data.settings ?? {}) } as Record<string, unknown>;
+    delete settings.indexConvention;
+    return { ...data, schemaVersion: 8, settings: settings as unknown as Settings };
+  },
 };
 
 export function migrateAppData(data: AppData): AppData {

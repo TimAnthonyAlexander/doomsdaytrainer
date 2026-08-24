@@ -1,5 +1,5 @@
 import { resolveScope, scopeYears } from '@/domain/scope';
-import type { Code, IndexConvention, Scope, ScopeId, Settings, YearKey } from '@/domain/types';
+import type { Code, Scope, ScopeId, Settings, YearKey } from '@/domain/types';
 import { deriveCode, formatYear } from '@/domain/yearCodes';
 import { DEFAULT_SETTINGS } from '@/storage/defaults';
 
@@ -11,7 +11,14 @@ import { DEFAULT_SETTINGS } from '@/storage/defaults';
  * only interesting thing to test, and it lives here.
  */
 
-export const ONBOARDING_STEPS = ['intro', 'why', 'index', 'scope', 'method'] as const;
+/**
+ * There was an `index` step between `why` and `scope`, asking whether 0 meant
+ * Sunday or Monday. It renamed the seven buttons and changed no number
+ * anywhere else, so picking Monday left every century anchor, every worked line
+ * and every explanation in the app still counting from Sunday. Both the setting
+ * and the screen are gone; Sunday is the only convention.
+ */
+export const ONBOARDING_STEPS = ['intro', 'why', 'scope', 'method'] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -23,7 +30,6 @@ export interface CustomRange {
 }
 
 export interface OnboardingDraft {
-  indexConvention: IndexConvention;
   scopeId: ScopeId;
   /**
    * Raw input text, not numbers: a field cleared to "" must stay empty while the
@@ -62,7 +68,6 @@ export function draftRange(draft: OnboardingDraft): CustomRange {
 export function initialDraft(settings: Settings): OnboardingDraft {
   const range = normaliseRange(settings.customScope ?? { from: 0, to: 99 });
   return {
-    indexConvention: settings.indexConvention,
     scopeId: settings.scopeId,
     customFrom: formatYear(range.from),
     customTo: formatYear(range.to),
@@ -71,13 +76,12 @@ export function initialDraft(settings: Settings): OnboardingDraft {
 
 export type OnboardingResult = Pick<
   Settings,
-  'indexConvention' | 'scopeId' | 'customScope' | 'onboardingComplete'
+  'scopeId' | 'customScope' | 'onboardingComplete'
 >;
 
 /** The single patch handed to `updateSettings` when the last step is confirmed. */
 export function settingsFromDraft(draft: OnboardingDraft): OnboardingResult {
   return {
-    indexConvention: draft.indexConvention,
     scopeId: draft.scopeId,
     customScope: draftRange(draft),
     onboardingComplete: true,

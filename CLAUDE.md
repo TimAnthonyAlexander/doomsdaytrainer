@@ -266,6 +266,10 @@ v5  per-item fluency, rebuilt from each item's stored attempts on upgrade
 v6  the day-step log and its aggregate, by step size and by direction
 v7  the two halves' log and aggregate, the year half by century and the date
     half by month
+v8  `settings.indexConvention` removed. The only migration that takes something
+    away rather than adding it: `mergeSettings` spreads whatever the document
+    holds over the defaults, so a field nothing reads any more would otherwise
+    survive every load and ride along in every export
 ```
 
 Migrations that introduce an aggregate rebuild it from whatever raw history the
@@ -321,8 +325,15 @@ violation, and several were bugs before they were rules.
    stacked with nothing naming them cannot teach a pairing, and hints that print
    bare arithmetic teach nothing about where the values came from. This is the
    single most common regression in this codebase. If you add a number, label it.
-8. **The index convention changes weekday names only.** It never changes a year
-   code. Onboarding demonstrates that rather than asserting it.
+8. **There is one weekday convention and it is Sunday-indexed.** Sunday is 0,
+   in the shipped tables, in every century anchor, in every year code, in every
+   intermediate sum and on every pad. There was a setting offering Monday at 0.
+   All it did was rename the seven buttons: no anchor moved, no code moved, no
+   worked line moved, so a user who chose it was told "0 = Monday" by the pad
+   and "the 1900s anchor is 3" by everything else, which are two claims about
+   the same number. A convention that reaches only the labels is a
+   mislabelling. It is gone, along with its onboarding step, its settings row
+   and `settings.indexConvention` (schema v8).
 9. **No network calls.** Fonts are self-hosted, there is no analytics, no
    accounts, no server. A build with a third-party reference in `dist/` is a bug.
 10. **Nothing may ask the 100 codes in ascending order twice.** Ordered
@@ -412,11 +423,10 @@ that move, so neither kind can go unmet for weeks.
 
 **Both answers are plain digits, Sunday-indexed.** The date half's answer is a
 count of days and was never a weekday. The year half's answer *is* a weekday
-index, but every intermediate number in the app is Sunday-indexed and
-`indexConvention` renames weekdays without touching a number (invariant 8) —
-the Tables drill asks for the century anchors as bare digits for exactly the
-same reason. The weekday name is on the worked answer instead, where it can be
-read as a check rather than tapped as a choice.
+index, and it is Sunday-indexed like every other number in the app (invariant
+8) — the Tables drill asks for the century anchors as bare digits for exactly
+the same reason. The weekday name is on the worked answer instead, where it can
+be read as a check rather than tapped as a choice.
 
 **Neither half schedules anything, and neither offers help.** A year is not a
 fixed item set the way the 100 codes are, a (month, day) pair is not one either,
@@ -562,8 +572,9 @@ it the component draws no button of its own, and onboarding's own footer is the
 single way forward.
 
 This screen is also where invariant 8 is easiest to see. Every number in the
-first eight steps is Sunday-indexed whatever the user picked; the convention
-only decides which weekday sits in position 0 of the last pad.
+first eight steps is Sunday-indexed, and so is the pad on the last one. There
+used to be a setting that reordered that pad and left the eight steps alone,
+which is exactly the disagreement the invariant now forbids.
 
 ### Year codes
 
@@ -730,9 +741,8 @@ app is closed. So the capability layer reports what the browser can actually do,
 in a sentence meant to be rendered as-is, and the settings screen shows that
 rather than a switch that quietly does nothing.
 
-In Practice, every setting names how far it reaches. The index convention
-renames weekdays wherever the app prints one, so it belongs to the method.
-"Scope" and "New codes per day" govern the 100 codes and nothing else — not the
+In Practice, every setting names how far it reaches. "Scope" and "New codes per
+day" govern the 100 codes and nothing else — not the
 tables, not the day step, not the weekday trainer, not the Concept walk — and
 under those names they read as the app's practice settings. They are
 "Year-code scope" and "New year codes per day" now, and each note says what it

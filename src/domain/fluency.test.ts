@@ -12,7 +12,6 @@ import {
 import { addDays } from './time';
 
 const settings: Settings = {
-  indexConvention: 'sunday',
   scopeId: 'full',
   customScope: { from: 0, to: 99 },
   newItemsPerDay: 20,

@@ -7,6 +7,7 @@ import {
   MAX_YEAR,
   MIN_YEAR,
   MONTH_DOOMSDAYS,
+  WEEKDAY_NAMES,
   centuryAnchor,
   centuryLabel,
   centuryOf,
@@ -23,8 +24,10 @@ import {
   ordinalDay,
   weekdayAbbr,
   weekdayFor,
+  weekdayName,
   yearDoomsday,
 } from './weekday';
+import type { Code } from './types';
 
 /** The reference calendar. UTC only, so no timezone or DST can shift a day. */
 function realWeekday(fullYear: number, month: number, day: number): number {
@@ -325,9 +328,40 @@ describe('formatting', () => {
   });
 
   it('abbreviates weekdays to three unambiguous letters', () => {
-    const sunday = [0, 1, 2, 3, 4, 5, 6].map((c) => weekdayAbbr(c as 0, 'sunday'));
-    expect(sunday).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-    expect(new Set(sunday).size).toBe(7);
-    expect(weekdayAbbr(0, 'monday')).toBe('Mon');
+    const days = [0, 1, 2, 3, 4, 5, 6].map((c) => weekdayAbbr(c as 0));
+    expect(days).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    expect(new Set(days).size).toBe(7);
+  });
+});
+
+/**
+ * There were two of these, Sunday-indexed and Monday-indexed, and a setting to
+ * choose. The setting renamed the seven buttons and moved no number: every
+ * century anchor, every year code and every intermediate sum in the method is
+ * Sunday-indexed, so a user who picked Monday read "0 = Monday" on the pad and
+ * "the 1900s anchor is 3" everywhere else. One convention now, and it is the
+ * one the shipped tables are written in.
+ */
+describe('weekday names', () => {
+  it('lists the seven days from Sunday', () => {
+    expect(WEEKDAY_NAMES).toHaveLength(7);
+    expect(WEEKDAY_NAMES[0]).toBe('Sunday');
+    expect(WEEKDAY_NAMES[6]).toBe('Saturday');
+  });
+
+  it('resolves a code to the day the tables give it', () => {
+    expect(weekdayName(0)).toBe('Sunday');
+    expect(weekdayName(3)).toBe('Wednesday');
+    expect(weekdayName(6)).toBe('Saturday');
+  });
+
+  it('agrees with the method on a date whose weekday is known', () => {
+    // 14 March 1987 was a Saturday.
+    expect(weekdayName(weekdayFor(1987, 3, 14))).toBe('Saturday');
+  });
+
+  it('rejects codes outside 0..6', () => {
+    expect(() => weekdayName(7 as unknown as Code)).toThrow(RangeError);
+    expect(() => weekdayName(-1 as unknown as Code)).toThrow(RangeError);
   });
 });

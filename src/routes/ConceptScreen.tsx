@@ -53,7 +53,6 @@ export function ConceptScreen() {
       <GuidedWalkView
         date={date}
         onDate={setDate}
-        convention={settings.indexConvention}
         keyboard={settings.keyboardInput}
         intro={
           <PageTitle subtitle="Pick a date and work out which day of the week it falls on. The app looks everything up; you do the sums.">

@@ -10,7 +10,7 @@ import {
   guidedClosingLine,
   guidedWalk,
 } from '@/domain/guidedDate';
-import type { CalendarDate, IndexConvention } from '@/domain/types';
+import type { CalendarDate } from '@/domain/types';
 import { NumberInput } from '@/features/calc/NumberInput';
 import { weekdayOptions } from '@/features/weekday/weekdayPad';
 import { radius, space, stroke } from '@/theme/tokens';
@@ -38,12 +38,6 @@ const START: Progress = { index: 0, attempts: 0, chosen: null };
 export interface GuidedWalkViewProps {
   date: CalendarDate;
   onDate: (date: CalendarDate) => void;
-  /**
-   * Which day the seven weekday buttons start on. A prop rather than a read of
-   * `useAppState`, so the walk can be rendered and asserted under either
-   * convention without a settings document behind it.
-   */
-  convention: IndexConvention;
   keyboard?: boolean;
   /**
    * The screen's own heading and blurb. Shown while the walk has not started
@@ -103,7 +97,6 @@ function ProgressRule({ done }: { done: number }) {
 export function GuidedWalkView({
   date,
   onDate,
-  convention,
   keyboard = true,
   intro,
 }: GuidedWalkViewProps) {
@@ -125,8 +118,8 @@ export function GuidedWalkView({
 
   const weekdayPad = useMemo<AnswerOption[]>(
     () =>
-      weekdayOptions(convention).map((option) => ({ value: option.value, label: option.short })),
-    [convention],
+      weekdayOptions().map((option) => ({ value: option.value, label: option.short })),
+    [],
   );
 
   const finished = progress.index >= GUIDED_STEP_COUNT;

@@ -27,10 +27,9 @@
  * weekday, these two isolate each half of the arithmetic that produces one.
  *
  * Both answers are Sunday-indexed numbers 0 to 6, like every intermediate
- * number in the app. `settings.indexConvention` renames weekdays and changes
- * no number anywhere (invariant 8), and the century anchors are shipped
- * Sunday-indexed, which is why the Tables drill asks for them as plain digits
- * too. Nothing here is a weekday name, so nothing here reads the convention.
+ * number in the app: the shipped tables are Sunday-indexed, which is why the
+ * Tables drill asks for the century anchors as plain digits too. That is the
+ * only convention there is (invariant 8).
  *
  * Nothing in this file is timed, stored or scheduled. It is arithmetic and the
  * labels that say what each number is.
@@ -47,7 +46,7 @@ import {
   monthDoomsday,
   monthLength,
   monthName,
-  trueWeekdayName,
+  weekdayName,
   yearDoomsday,
   yearKeyOf,
 } from './weekday';
@@ -165,7 +164,7 @@ export function explainYearPart(question: YearPartQuestion): YearPartWorking {
       {
         label: "The year's doomsday",
         expression: `${anchor} + ${code} mod 7`,
-        value: `${answer}  ${trueWeekdayName(answer)}`,
+        value: `${answer}  ${weekdayName(answer)}`,
       },
     ],
   };

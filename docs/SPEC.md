@@ -77,9 +77,10 @@ Screen sequence:
 
 1. **What this is.** One paragraph: a full date in, a weekday out, and the four pieces the method gets there with. It said "you're memorizing 100 number pairs — year → code, that's it" for a while, which named one step as the whole product and was flatly contradicted by four of the six destinations.
 2. **Why the codes exist.** Optional, skippable, one screen. Shows the formula `(YY + floor(YY/4)) mod 7` and one worked example so the user knows the table isn't arbitrary.
-3. **Index choice.** User picks Sunday-indexed (`0=Sun`) or Monday-indexed (`0=Mon`). This does not change the year codes at all. It only changes the weekday names shown in optional context. Default: Sunday-indexed. Changeable in settings.
-4. **Scope choice.** Full 100, or a subset (see Scopes below). Default: full 100.
-5. **One date, all the way through.** The Concept walk, on a date the user picks. Not skippable. The settings chosen above are committed at the end of it, and the app opens on Learn.
+3. **Scope choice.** Full 100, or a subset (see Scopes below). Default: full 100.
+4. **The method.** The explainer, read rather than done. The settings chosen above are committed by the button under it, and the app opens on Learn.
+
+There was an **index choice** at step 3, offering Sunday-indexed (`0=Sun`) against Monday-indexed (`0=Mon`). It renamed the seven buttons and moved no number — every century anchor, every year code and every worked line stayed Sunday-indexed — so a user who chose Monday was told "0 = Monday" by the pad and "the 1900s anchor is 3" by everything else. The step, the settings row and `settings.indexConvention` are all gone; see invariant 8 in `CLAUDE.md`. Sunday is 0 for everybody.
 
 ### 2. Learn mode
 
@@ -203,7 +204,6 @@ Per-user dashboard:
 ## Settings
 
 ```
-Index convention      Sunday-indexed / Monday-indexed
 Scope                 (see Scopes)
 New items per day     0-40, default 20
 Latency thresholds    fast/medium cutoffs, default 2000/5000ms
@@ -331,7 +331,7 @@ If a second device is a requirement later, sync is the only thing that would nee
 - Speed drills, scopes, hints, stats detail, notifications.
 
 **V3**
-- Export/import, leech handling, custom latency thresholds, index convention toggle.
+- Export/import, leech handling, custom latency thresholds.
 
 **V4**
 - Weekday trainer, assisted and unassisted. Month doomsdays and century anchors

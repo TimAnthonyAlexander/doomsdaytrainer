@@ -170,14 +170,14 @@ function Trainer({ mode, rangeId, header }: TrainerProps) {
 
   const options = useMemo<AnswerOption[]>(
     () =>
-      weekdayOptions(settings.indexConvention).map((option) => ({
+      weekdayOptions().map((option) => ({
         // Three letters, not "Wednesday": the pad's figures are wide, and a pad
         // whose buttons change width between prompts is a pad that moves under
         // the thumb.
         value: option.value,
         label: option.short,
       })),
-    [settings.indexConvention],
+    [],
   );
 
   return (

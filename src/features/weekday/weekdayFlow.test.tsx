@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Settings, WeekdayAttempt, WeekdayMode } from '@/domain/types';
-import { formatDate, monthDoomsday, trueWeekdayName, weekdayFor } from '@/domain/weekday';
+import { formatDate, monthDoomsday, weekdayName, weekdayFor } from '@/domain/weekday';
 import { buildWeekdayTotals } from '@/domain/weekdayLifetime';
 import { closeDb, loadAppData, saveAppData } from '@/storage/db';
 import { MAX_WEEKDAY_ATTEMPTS, defaultAppData, monthItemKey } from '@/storage/defaults';
@@ -143,7 +143,7 @@ describe('Weekday trainer', () => {
     mount();
 
     await screen.findByLabelText(formatDate(2000, 1, 1));
-    const correct = trueWeekdayName(weekdayFor(2000, 1, 1)).slice(0, 3);
+    const correct = weekdayName(weekdayFor(2000, 1, 1)).slice(0, 3);
     await tap(correct);
     expect(screen.getByRole('status')).toHaveTextContent('Correct.');
 
@@ -160,10 +160,10 @@ describe('Weekday trainer', () => {
 
     await screen.findByLabelText(formatDate(2000, 1, 1));
     const answer = weekdayFor(2000, 1, 1);
-    const wrong = trueWeekdayName(((answer + 1) % 7) as 0).slice(0, 3);
+    const wrong = weekdayName(((answer + 1) % 7) as 0).slice(0, 3);
     await tap(wrong);
 
-    expect(screen.getByRole('status')).toHaveTextContent(`Incorrect. The answer is ${trueWeekdayName(answer).slice(0, 3)}.`);
+    expect(screen.getByRole('status')).toHaveTextContent(`Incorrect. The answer is ${weekdayName(answer).slice(0, 3)}.`);
 
     // Five lines of working, with this date's real numbers.
     expect(screen.getByText('Century anchor')).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe('Weekday trainer', () => {
     expect(
       screen.getByText(
         (_text, node) =>
-          node?.tagName === 'SPAN' && node.textContent === `${answer}  ${trueWeekdayName(answer)}`,
+          node?.tagName === 'SPAN' && node.textContent === `${answer}  ${weekdayName(answer)}`,
       ),
     ).toBeInTheDocument();
 
@@ -199,7 +199,7 @@ describe('Weekday trainer', () => {
     const { unmount } = mount();
 
     await screen.findByLabelText(formatDate(2000, 1, 1));
-    await tap(trueWeekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
+    await tap(weekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
 
     await waitFor(async () => {
       const stored = await loadAppData();
@@ -256,8 +256,14 @@ describe('Weekday trainer', () => {
     expect(seen.size).toBe(12);
   });
 
-  it('orders the pad by the index convention without renaming a day', async () => {
-    await seed({ indexConvention: 'monday' });
+  /**
+   * A setting used to move Monday into position 0. It renamed the seven buttons
+   * and moved no number - every anchor, every code and every worked line stayed
+   * Sunday-indexed - so the pad and the rest of the app disagreed about what 0
+   * meant. One order now, and the value under a button is the code itself.
+   */
+  it('puts Sunday first, for everybody', async () => {
+    await seed();
     mount();
 
     await screen.findByRole('heading', { level: 1 });
@@ -265,9 +271,8 @@ describe('Weekday trainer', () => {
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label') ?? '')
       .filter((label) => /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/.test(label));
-    expect(labels).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-    // Reordered, never renamed: Sunday is still Sunday.
-    expect(weekdayAbbr(0, 'sunday')).toBe('Sun');
+    expect(labels).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    expect(weekdayAbbr(0)).toBe('Sun');
   });
 
   it('changes the range and draws from the new one', async () => {
@@ -335,7 +340,7 @@ describe('Lifetime totals under the pad', () => {
     mount();
 
     await screen.findByLabelText(formatDate(2000, 1, 1));
-    await tap(trueWeekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
+    await tap(weekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
 
     await waitFor(async () => {
       const stored = await loadAppData();
@@ -369,7 +374,7 @@ describe('Lifetime totals under the pad', () => {
     pinDate();
     mount();
     await screen.findByLabelText(formatDate(2000, 1, 1));
-    await tap(trueWeekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
+    await tap(weekdayName(weekdayFor(2000, 1, 1)).slice(0, 3));
 
     await waitFor(async () => {
       const stored = await loadAppData();

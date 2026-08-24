@@ -1,4 +1,4 @@
-import { centuryLabel, monthName, trueWeekdayName, type WeekdayWorking as Working } from '@/domain/weekday';
+import { centuryLabel, monthName, weekdayName, type WeekdayWorking as Working } from '@/domain/weekday';
 import { formatYear } from '@/domain/yearCodes';
 import { WorkingLines, type WorkingLine } from './WorkingLines';
 
@@ -44,7 +44,7 @@ export function WeekdayWorking({ working }: WeekdayWorkingProps) {
     {
       label: 'Weekday',
       expression: `${working.centuryAnchor} + ${working.yearCode} ${signed(working.offset)} mod 7`,
-      value: `${working.weekday}  ${trueWeekdayName(working.weekday)}`,
+      value: `${working.weekday}  ${weekdayName(working.weekday)}`,
     },
   ];
 

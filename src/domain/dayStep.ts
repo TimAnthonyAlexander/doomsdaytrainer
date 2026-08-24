@@ -25,7 +25,7 @@
  */
 
 import type { Code, DayStepDirection, DayStepSize } from './types';
-import { daysInMonth, monthName, trueWeekdayName } from './weekday';
+import { daysInMonth, monthName, weekdayName } from './weekday';
 
 /** Every step size a question can have, ascending. Persisted as keys. */
 export const DAY_STEP_SIZES: readonly DayStepSize[] = [0, 1, 2, 3, 4, 5, 6];
@@ -161,7 +161,7 @@ export function anchorMonthLabel(question: DayStepQuestion): string {
  * ordinal, so neither number on the prompt can be read as the other one.
  */
 export function describeAnchor(question: DayStepQuestion): string {
-  const weekday = trueWeekdayName(question.anchorWeekday);
+  const weekday = weekdayName(question.anchorWeekday);
   return `In ${anchorMonthLabel(question)}, the ${ordinal(question.anchorDay)} is a ${weekday}.`;
 }
 
@@ -223,7 +223,7 @@ export function explainDayStep(question: DayStepQuestion): DayStepWorking {
       {
         label: 'Month doomsday',
         expression: monthLabel,
-        value: `${anchorDay}  ${trueWeekdayName(anchorWeekday)}`,
+        value: `${anchorDay}  ${weekdayName(anchorWeekday)}`,
       },
       { label: 'Day asked for', expression: monthLabel, value: String(targetDay) },
       {
@@ -234,8 +234,8 @@ export function explainDayStep(question: DayStepQuestion): DayStepWorking {
       { label: 'Step, mod 7', expression: `${offset} mod 7`, value: String(size) },
       {
         label: 'Weekday',
-        expression: `${trueWeekdayName(anchorWeekday)} + ${size}`,
-        value: `${weekday}  ${trueWeekdayName(weekday)}`,
+        expression: `${weekdayName(anchorWeekday)} + ${size}`,
+        value: `${weekday}  ${weekdayName(weekday)}`,
       },
     ],
   };

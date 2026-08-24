@@ -25,7 +25,7 @@ import {
   isLeapYear,
   monthDoomsday,
   monthName,
-  trueWeekdayName,
+  weekdayName,
   weekdayFor,
   yearKeyOf,
 } from '@/domain/weekday';
@@ -112,7 +112,7 @@ export function introExample(): IntroExample {
     anchor,
     doomsdaySum,
     doomsday,
-    doomsdayName: trueWeekdayName(doomsday),
+    doomsdayName: weekdayName(doomsday),
     month: monthName(month),
     monthDoomsday: anchorDay,
     monthDoomsdayOrdinal: ordinal(anchorDay),
@@ -122,7 +122,7 @@ export function introExample(): IntroExample {
     finalSum,
     finalSevensOff: finalStep.multiple,
     weekday,
-    weekdayName: trueWeekdayName(weekday),
+    weekdayName: weekdayName(weekday),
   };
 }
 

@@ -25,7 +25,7 @@ import {
   daysInMonth,
   isLeapYear,
   monthDoomsday,
-  trueWeekdayName,
+  weekdayName,
   weekdayFor,
   yearKeyOf,
 } from './weekday';
@@ -106,7 +106,7 @@ describe('guidedWalk', () => {
       expect(walk.weekday, walk.dateLabel).toBe(real);
       expect(answerOf(walk.steps, 'weekdayName'), walk.dateLabel).toBe(real);
       expect(answerOf(walk.steps, 'weekdayCode'), walk.dateLabel).toBe(real);
-      expect(walk.weekdayName).toBe(trueWeekdayName(real));
+      expect(walk.weekdayName).toBe(weekdayName(real));
     }
   });
 
@@ -172,7 +172,7 @@ describe('every question is answerable from what is on screen', () => {
     for (const date of SAMPLE) {
       for (const step of guidedWalk(date).steps) {
         const wanted =
-          step.input === 'weekday' ? trueWeekdayName(step.answer as Code) : String(step.answer);
+          step.input === 'weekday' ? weekdayName(step.answer as Code) : String(step.answer);
         expect(step.working, `${step.id}`).toContain(wanted);
       }
     }
@@ -267,7 +267,7 @@ describe('the four goals', () => {
         if (row.from === null) continue;
         const step = stepOf(walk.steps, row.from);
         const wanted =
-          step.input === 'weekday' ? trueWeekdayName(step.answer as Code) : String(step.answer);
+          step.input === 'weekday' ? weekdayName(step.answer as Code) : String(step.answer);
         expect(row.value, `${walk.dateLabel} · ${row.label}`).toBe(wanted);
       }
     }

@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { Screen } from '@/components/ui/Screen';
 import { MethodIntro } from '@/features/concept/MethodIntro';
 import { useAppState } from '@/state/useAppState';
-import { IndexStep } from './IndexStep';
 import { IntroStep } from './IntroStep';
 import { ScopeStep, type RangeField } from './ScopeStep';
 import { StepIndicator } from './StepIndicator';
@@ -23,8 +22,14 @@ import {
 } from './onboardingModel';
 
 /**
- * Five steps, one commit. Choices live in local state until the last button, so
+ * Four steps, one commit. Choices live in local state until the last button, so
  * a run that is abandoned halfway leaves nothing behind and starts clean.
+ *
+ * It was five. The one that went asked whether 0 meant Sunday or Monday, and
+ * the answer renamed the seven buttons and changed no number anywhere else — so
+ * a user who picked Monday read "0 = Monday" on the pad while every century
+ * anchor, every worked line and every explanation in the app still counted from
+ * Sunday. There is one convention now, and no screen has to ask about it.
  *
  * Every step is read, including the last: it is the method explainer, the same
  * component the Concept screen opens on, and the button under it leaves for the
@@ -86,12 +91,6 @@ export function OnboardingFlow() {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
         {step === 'intro' ? <IntroStep /> : null}
         {step === 'why' ? <WhyStep /> : null}
-        {step === 'index' ? (
-          <IndexStep
-            value={draft.indexConvention}
-            onChange={(indexConvention) => setDraft((current) => ({ ...current, indexConvention }))}
-          />
-        ) : null}
         {step === 'scope' ? (
           <ScopeStep
             scopeId={draft.scopeId}

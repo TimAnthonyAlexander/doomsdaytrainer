@@ -1,4 +1,4 @@
-import type { Code, IndexConvention, YearKey } from './types';
+import type { Code, YearKey } from './types';
 
 /**
  * The 100 year codes, index === yy. Fixed shipped content: never generated at
@@ -74,30 +74,9 @@ export function anchorFor(yy: YearKey, known: (yy: YearKey) => boolean): YearKey
   return null;
 }
 
-export const WEEKDAYS_SUNDAY: readonly string[] = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
-
-export const WEEKDAYS_MONDAY: readonly string[] = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-
-/** Optional context only. The convention never changes a year code. */
-export function weekdayName(code: Code, convention: IndexConvention): string {
-  if (!Number.isInteger(code) || code < 0 || code > 6) {
-    throw new RangeError(`Code out of range: ${code}`);
-  }
-  return convention === 'monday' ? WEEKDAYS_MONDAY[code] : WEEKDAYS_SUNDAY[code];
-}
+/*
+ * The weekday names moved to src/domain/weekday.ts, which is where naming a
+ * weekday belongs and where every caller already imports from. They lived here
+ * while a code could be read under two conventions and the pairing mattered to
+ * the table; there is one convention now, so they are just the seven names.
+ */

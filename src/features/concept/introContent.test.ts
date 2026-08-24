@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { guidedWalk, type GuidedStepId } from '@/domain/guidedDate';
-import { ALL_MONTHS, MONTH_DOOMSDAYS, monthDoomsday, trueWeekdayName } from '@/domain/weekday';
+import { ALL_MONTHS, MONTH_DOOMSDAYS, monthDoomsday, weekdayName } from '@/domain/weekday';
 import {
   INTRO_DATE,
   introCenturies,
@@ -33,7 +33,7 @@ describe('the worked example', () => {
 
   it('lands on the weekday the calendar actually has', () => {
     expect(example.weekday).toBe(introTrueWeekday());
-    expect(example.weekdayName).toBe(trueWeekdayName(introTrueWeekday()));
+    expect(example.weekdayName).toBe(weekdayName(introTrueWeekday()));
     expect(example.weekdayName).toBe('Friday');
   });
 

@@ -688,6 +688,42 @@ describe('migrateAppData', () => {
     expect(overallMethodPartTotals(migrated.partTotals, 'year').answered).toBe(0);
   });
 
+  /**
+   * The only migration here that removes something. `mergeSettings` spreads
+   * whatever the stored document holds over the defaults, so a field nothing
+   * reads any more survives every load and rides along in every export unless
+   * it is actually deleted.
+   */
+  it('drops the index convention and leaves every other setting alone', () => {
+    const before = v6Document({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        indexConvention: 'monday',
+        newItemsPerDay: 7,
+        hintType: 'anchor',
+        onboardingComplete: true,
+      },
+    });
+    const migrated = migrateAppData(before);
+
+    expect(migrated.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(Object.keys(migrated.settings)).not.toContain('indexConvention');
+    expect(migrated.settings.newItemsPerDay).toBe(7);
+    expect(migrated.settings.hintType).toBe('anchor');
+    expect(migrated.settings.onboardingComplete).toBe(true);
+  });
+
+  it('keeps it dropped through a real load, not only through the migration', async () => {
+    await putRaw(
+      v6Document({ settings: { ...DEFAULT_SETTINGS, indexConvention: 'monday', newItemsPerDay: 9 } }),
+    );
+    await closeDb();
+
+    const data = await loadAppData();
+    expect(Object.keys(data.settings)).not.toContain('indexConvention');
+    expect(data.settings.newItemsPerDay).toBe(9);
+  });
+
   it('loads a stored v6 document and comes back with a usable halves aggregate', async () => {
     await putRaw(
       v6Document({

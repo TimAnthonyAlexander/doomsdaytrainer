@@ -105,8 +105,6 @@ export interface ItemState {
   attemptHistory: Attempt[];
 }
 
-export type IndexConvention = 'sunday' | 'monday';
-
 export type ScopeId = 'full' | 'living' | 'modern' | 'current' | 'custom';
 
 export interface Scope {
@@ -120,7 +118,6 @@ export interface Scope {
 export type HintType = 'structural' | 'arithmetic' | 'anchor';
 
 export interface Settings {
-  indexConvention: IndexConvention;
   scopeId: ScopeId;
   /** Only meaningful when scopeId === 'custom'. */
   customScope: { from: YearKey; to: YearKey };

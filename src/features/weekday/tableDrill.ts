@@ -10,7 +10,7 @@ import {
   monthDoomsday,
   monthName,
   ordinalDay,
-  trueWeekdayName,
+  weekdayName,
 } from '@/domain/weekday';
 
 /**
@@ -110,7 +110,7 @@ function joinDays(days: readonly number[]): string {
 /** The fact the question was asking for, once it is on screen. */
 export function entryAnswerNote(kind: TableKind, key: number, leapYear = false): string {
   if (kind !== 'month') {
-    return `${centuryLabel(key)} start on a ${trueWeekdayName(entryAnswer('century', key) as Code)}.`;
+    return `${centuryLabel(key)} start on a ${weekdayName(entryAnswer('century', key) as Code)}.`;
   }
   const day = monthDoomsday(key, leapYear);
   if (doomsdayShifts(key)) {

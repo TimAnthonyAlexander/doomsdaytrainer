@@ -4,16 +4,21 @@ import { monthPadDays, weekdayOptions } from './weekdayPad';
 
 describe('weekdayOptions', () => {
   it('is always seven, and always the seven days', () => {
-    for (const convention of ['sunday', 'monday'] as const) {
-      const options = weekdayOptions(convention);
-      expect(options).toHaveLength(7);
-      expect(new Set(options.map((o) => o.value)).size).toBe(7);
-      expect(new Set(options.map((o) => o.name)).size).toBe(7);
-    }
+    const options = weekdayOptions();
+    expect(options).toHaveLength(7);
+    expect(new Set(options.map((o) => o.value)).size).toBe(7);
+    expect(new Set(options.map((o) => o.name)).size).toBe(7);
   });
 
-  it('starts on Sunday when the user is Sunday-indexed', () => {
-    const options = weekdayOptions('sunday');
+  /**
+   * Sunday sits at 0 for everybody. A setting used to move Monday there, and
+   * all it moved was the labels: every anchor, every code and every worked line
+   * stayed Sunday-indexed, so the pad and the rest of the app disagreed about
+   * what 0 meant. There is one order now and the pad's positions are fixed in
+   * the sense that matters, which is that they are the same for every user.
+   */
+  it('starts on Sunday, and the value under a button is the code itself', () => {
+    const options = weekdayOptions();
     expect(options.map((o) => o.name)).toEqual([
       'Sunday',
       'Monday',
@@ -26,32 +31,14 @@ describe('weekdayOptions', () => {
     expect(options.map((o) => o.value)).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
-  it('starts on Monday when the user is Monday-indexed, without renaming a day', () => {
-    const options = weekdayOptions('monday');
-    expect(options.map((o) => o.name)).toEqual([
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ]);
-    // Reordered, not relabelled: Saturday still carries the code the tables give it.
-    expect(options.map((o) => o.value)).toEqual([1, 2, 3, 4, 5, 6, 0]);
-  });
-
-  it('keeps the value that matches the method under either convention', () => {
+  it('keeps the value that matches the method', () => {
     // 14 March 1987 was a Saturday.
-    const code = weekdayFor(1987, 3, 14);
-    for (const convention of ['sunday', 'monday'] as const) {
-      const saturday = weekdayOptions(convention).find((o) => o.name === 'Saturday');
-      expect(saturday?.value).toBe(code);
-    }
+    const saturday = weekdayOptions().find((o) => o.name === 'Saturday');
+    expect(saturday?.value).toBe(weekdayFor(1987, 3, 14));
   });
 
   it('abbreviates to three letters, all distinct', () => {
-    const shorts = weekdayOptions('sunday').map((o) => o.short);
+    const shorts = weekdayOptions().map((o) => o.short);
     expect(shorts).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
     expect(new Set(shorts).size).toBe(7);
   });
