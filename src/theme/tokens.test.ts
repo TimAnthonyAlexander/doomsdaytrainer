@@ -99,7 +99,27 @@ describe('token values', () => {
   });
 
   it('carries the §7 durations', () => {
-    expect(duration).toEqual({ instant: 0, advance: 120, flash: 160, ui: 180, hold: 200 });
+    expect(duration).toEqual({
+      instant: 0,
+      advance: 120,
+      flash: 160,
+      ui: 180,
+      hold: 200,
+      flip: 320,
+    });
+  });
+
+  /**
+   * The flap is drawn as two half-rotations, so what matters is what one half
+   * gets rather than the total. Under about 150ms a half is worth fewer than
+   * ten frames at 60Hz, and a rotation in fewer than ten frames stops reading
+   * as a rotation — it reads as a few discrete positions, which is a rendering
+   * fault to look at. This is the guard on that, and it is why `flip` is a
+   * duration of its own rather than `advance`, which is 120ms and was the
+   * value it was first given.
+   */
+  it('gives the flap a duration a rotation can actually be drawn in', () => {
+    expect(duration.flip / 2).toBeGreaterThanOrEqual(150);
   });
 
   it('has a mastery ramp of seven steps with a matching ink per step', () => {

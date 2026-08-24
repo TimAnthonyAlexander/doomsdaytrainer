@@ -7,9 +7,11 @@ import { fontFamily } from '@/theme/tokens';
 import { palette } from '@/theme/palette';
 import { dur, ease, useReducedMotion } from '@/theme/motion';
 
-/** Matches `--dur-advance`. JS timers cannot read a CSS var, so this is the
- * one place the number is duplicated rather than resolved from `dur.advance`. */
-export const FLIP_MS = 120;
+/** Matches `--dur-flip`. JS timers cannot read a CSS var, so this is the one
+ * place the number is duplicated rather than resolved from `dur.flip`. A test
+ * pins the two together, because a flap that outlives its arming window would
+ * put a live pad in front of a prompt that was still resolving. */
+export const FLIP_MS = 320;
 
 const flipTopOut = keyframes({
   from: { transform: 'rotateX(0deg)' },
@@ -226,7 +228,11 @@ export function SplitFlap({ value, size, weight = 500, mono = false, color = 'in
           clipPath: 'inset(0 0 50% 0)',
           transformOrigin: 'bottom',
           backfaceVisibility: 'hidden',
-          animation: `${flipTopOut} calc(${dur.advance} / 2) ${ease.out} forwards`,
+          // Accelerating out of rest, not `ease.out`. The app's general curve
+          // front-loads its movement, which over half a flip put most of the
+          // rotation into the first frame and left the rest bunched against
+          // the end — the whole arc collapsed to two positions and a stop.
+          animation: `${flipTopOut} calc(${dur.flip} / 2) ${ease.flapAway} forwards`,
         }}
       >
         <Glyph mono={mono} size={size} weight={weight} color={color}>
@@ -242,7 +248,11 @@ export function SplitFlap({ value, size, weight = 500, mono = false, color = 'in
           clipPath: 'inset(50% 0 0 0)',
           transformOrigin: 'top',
           backfaceVisibility: 'hidden',
-          animation: `${flipBotIn} calc(${dur.advance} / 2) ${ease.out} calc(${dur.advance} / 2) forwards`,
+          // Starts already carrying the speed the top half ended with, because
+          // this is the same card still falling rather than a second one
+          // easing up from rest. Easing in from zero here stalls the motion
+          // exactly at the seam, which is the most visible frame of the flip.
+          animation: `${flipBotIn} calc(${dur.flip} / 2) ${ease.flapIn} calc(${dur.flip} / 2) forwards`,
         }}
       >
         <Glyph mono={mono} size={size} weight={weight} color={color}>

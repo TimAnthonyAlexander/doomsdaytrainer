@@ -267,7 +267,12 @@ describe('Weekday trainer', () => {
       );
     }
     expect(seen.size).toBe(12);
-  });
+    // Twelve prompts, each of which has to sit through the flap's arming
+    // window before it will take a tap, so this one walks past the 5s default
+    // on real timers alone. The iteration count is the assertion — twelve
+    // distinct dates is the property — so the budget moves rather than the
+    // loop.
+  }, 20_000);
 
   /**
    * A setting used to move Monday into position 0. It renamed the seven buttons

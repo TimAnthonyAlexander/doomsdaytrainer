@@ -156,6 +156,19 @@ describe('useFlipSettled', () => {
  * and the arming window would not, so a pad would go live partway through its
  * own flip and start timing a prompt that was still resolving.
  */
-it('keeps the arming window and the advance token in step', () => {
-  expect(FLIP_MS).toBe(duration.advance);
+it('keeps the arming window and the flip token in step', () => {
+  expect(FLIP_MS).toBe(duration.flip);
+});
+
+/**
+ * The flip is drawn in two halves, so its own duration is what each half
+ * actually gets, and that is what decides whether the arc reads as motion or
+ * as a handful of positions. At 60Hz a half needs to be worth about ten
+ * frames; `advance`, which this was first tied to, is 120ms and gives it
+ * under four.
+ */
+it('gives each half of the flip enough frames to read as motion', () => {
+  const halfMs = duration.flip / 2;
+  const framesPerHalf = halfMs / (1000 / 60);
+  expect(framesPerHalf).toBeGreaterThanOrEqual(9);
 });

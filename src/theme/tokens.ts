@@ -252,9 +252,47 @@ export const shadow = { keypad: `0 -1px 0 0 ${cssVar('border')}` } as const;
 /* §7 Motion                                                           */
 /* ------------------------------------------------------------------ */
 
-export const duration = { instant: 0, advance: 120, flash: 160, ui: 180, hold: 200 } as const;
+/**
+ * `flip` is the split-flap, and it is deliberately the longest of these.
+ *
+ * It was first tied to `advance` on the reading that both are "the prompt
+ * changing". They are not the same kind of event. `advance` describes a
+ * crossfade, where 120ms is right because opacity has no intermediate shape
+ * worth seeing. A flap is a mechanism, and it is drawn in two halves, so 120ms
+ * gives each half 60ms — under four frames at 60Hz. Four frames of a rotation
+ * is not a fast animation, it is three discrete positions, and it reads as a
+ * rendering fault rather than as motion. At 320ms each half gets about ten
+ * frames, which is the point where the arc stops looking stepped.
+ */
+export const duration = {
+  instant: 0,
+  advance: 120,
+  flash: 160,
+  ui: 180,
+  hold: 200,
+  flip: 320,
+} as const;
 
-export const easing = { out: 'cubic-bezier(0.2, 0, 0, 1)' } as const;
+/**
+ * `out` is the app's curve for anything that arrives and settles.
+ *
+ * The two flap curves exist because a falling flap is not that shape. It is
+ * one card falling through 180 degrees under gravity and stopping dead against
+ * the next, so it accelerates the whole way and then simply ends. Drawn with
+ * `out`, which front-loads its movement, a 60ms half put roughly 65% of the
+ * rotation into the first frame and bunched the rest at the end — which is why
+ * the flap looked broken at more than one duration.
+ *
+ * `flapAway` is the old card starting from rest and accelerating out of view.
+ * `flapIn` is the same fall continuing, so it starts already carrying the
+ * speed the first half ended with rather than easing up from nothing, which
+ * would stall the motion at the halfway seam.
+ */
+export const easing = {
+  out: 'cubic-bezier(0.2, 0, 0, 1)',
+  flapAway: 'cubic-bezier(0.4, 0, 1, 1)',
+  flapIn: 'cubic-bezier(0.3, 0.6, 0.4, 1)',
+} as const;
 
 /**
  * `--dur-hold` is how long a correct fill stays on screen before the prompt
@@ -270,6 +308,11 @@ export const REDUCED_MOTION_KEEPS: readonly (keyof typeof duration)[] = ['hold']
 /** The colour declarations for one mode, as they appear in `src/index.css`. */
 export function colorDeclarations(mode: ThemeMode): string[] {
   return Object.entries(colorTokens[mode]).map(([name, value]) => `--${name}: ${value};`);
+}
+
+/** `flapAway` -> `flap-away`. The token names are kebab, the keys are not. */
+function kebab(name: string): string {
+  return name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
 /** The mode-independent declarations: type, spacing, radius, stroke, motion. */
@@ -293,6 +336,12 @@ export function staticDeclarations(): string[] {
   for (const [name, ms] of Object.entries(duration)) {
     lines.push(`--dur-${name}: ${ms}ms;`);
   }
-  lines.push(`--ease-out: ${easing.out};`);
+  // Iterated rather than written out one by one, the way the durations above
+  // are. A hardcoded `--ease-out` line meant adding a curve here left the
+  // stylesheet without it, and the component reaching for `var(--ease-flap-in)`
+  // would have silently fallen back to the browser's default easing.
+  for (const [name, curve] of Object.entries(easing)) {
+    lines.push(`--ease-${kebab(name)}: ${curve};`);
+  }
   return lines;
 }

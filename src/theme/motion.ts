@@ -29,9 +29,19 @@ export const dur = {
   flash: 'var(--dur-flash)',
   ui: 'var(--dur-ui)',
   hold: 'var(--dur-hold)',
+  flip: 'var(--dur-flip)',
 } as const;
 
-export const ease = { out: 'var(--ease-out)' } as const;
+/**
+ * `out` is the app's one general curve. The two flap curves belong to the
+ * split-flap alone and should not be borrowed: they describe something falling
+ * and hitting a stop, which is wrong for anything that arrives and settles.
+ */
+export const ease = {
+  out: 'var(--ease-out)',
+  flapAway: 'var(--ease-flap-away)',
+  flapIn: 'var(--ease-flap-in)',
+} as const;
 
 /** `transition` shorthand for one or more properties on one duration. */
 export function transition(properties: readonly string[], duration: string): string {

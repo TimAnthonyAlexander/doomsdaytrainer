@@ -234,10 +234,31 @@ is a defect.
 ```
 --dur-instant   0ms      --dur-advance  120ms
 --dur-flash     160ms    --dur-ui       180ms
---dur-hold      200ms
+--dur-hold      200ms    --dur-flip     320ms
 
---ease-out      cubic-bezier(0.2, 0, 0, 1)
+--ease-out        cubic-bezier(0.2, 0, 0, 1)
+--ease-flap-away  cubic-bezier(0.4, 0, 1, 1)
+--ease-flap-in    cubic-bezier(0.3, 0.6, 0.4, 1)
 ```
+
+`--dur-flip` is the split-flap, and it is the longest duration here for a
+reason worth keeping written down. It was first tied to `--dur-advance` on the
+reading that both describe the prompt changing. A crossfade and a mechanism are
+not the same event: opacity has no intermediate shape worth seeing, so 120ms is
+plenty for one, while a flap is drawn as two half-rotations and 120ms leaves
+each half 60ms, which is under four frames at 60Hz. A rotation in four frames
+is not a fast animation. It is three discrete positions, and it reads as a
+rendering fault. Below roughly 150ms per half there is no duration at which
+this looks like anything but broken.
+
+The two flap curves exist for the same reason. `--ease-out` front-loads its
+movement, which is right for something arriving and settling and wrong for a
+falling card: over a 60ms half it put about 65% of the rotation into the first
+frame and bunched the remainder against the end. A flap is one card falling
+through 180 degrees and stopping dead, so it accelerates throughout —
+`--ease-flap-away` starts it from rest, and `--ease-flap-in` continues the same
+fall, entering already carrying the speed the first half ended with rather than
+easing up from nothing and stalling at the seam.
 
 - The keypad has **no** press animation, no scale, no ripple.
 - Feedback fill applies at `--dur-instant`. The colour is there on the same
@@ -249,8 +270,15 @@ is a defect.
 - Screen transitions use `--dur-ui` opacity only. No slide, no push.
 - The mastery grid animates cell colour changes over `--dur-ui` when the stats
   screen mounts. This is the only decorative motion in the app.
+- A prompt that flips is painted before it is readable, because for the length
+  of the flip one half of the cell carries the new glyph and the other still
+  carries the old. The answer pad therefore holds its latency clock, and
+  refuses taps, until the flip settles. Paint is the zero point only for a
+  prompt that arrives whole.
 - `prefers-reduced-motion: reduce` sets every duration above to `0ms` except
-  `--dur-hold`, which is timing, not motion.
+  `--dur-hold`, which is timing, not motion. The flap goes further and drops
+  its rotating halves entirely: a zeroed keyframe still runs, and the structure
+  has to change rather than only the speed.
 
 ---
 
