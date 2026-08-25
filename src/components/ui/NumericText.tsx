@@ -63,16 +63,43 @@ const exitDown = keyframes({
 });
 
 /**
- * An even integer cell height, derived from the font size.
+ * The mask, applied only while a cell is moving.
  *
- * Even because the cell clips its content, and a half-pixel bound leaves a
- * glyph edge softened along the crop. Taller for the sans face than the mono
- * one because the mono cells only ever hold digits, which have no descender,
- * while a word cell has to hold "September" without shaving the p.
+ * `clip-path` rather than `overflow: hidden`, and the difference is the whole
+ * reason this prompt lines up. An inline-block whose `overflow` is anything but
+ * `visible` takes its baseline from its bottom margin edge instead of from the
+ * text inside it (CSS 2.1 §10.8.1), so clipping that way would drop a cell off
+ * the line its neighbours sit on. `clip-path` affects painting and nothing
+ * else, so the cell keeps a real baseline while it clips.
+ *
+ * The vertical inset is slightly negative so an ascender or a descender is not
+ * shaved during the move; the horizontal edges stay flush, because sideways is
+ * not where anything travels.
  */
-function cellHeightPx(fontSizePx: number, mono: boolean): number {
-  return Math.ceil((fontSizePx * (mono ? 1.3 : 1.5)) / 2) * 2;
-}
+const MOVING_CLIP = 'inset(-0.12em 0)';
+
+/**
+ * The cell, in both states, and it is deliberately almost nothing.
+ *
+ * No height, no centring, and `vertical-align: baseline` rather than `middle`.
+ * A prompt like "8 February 1927" mixes the two faces — the digits are Plex
+ * Mono through `Numeral`, the month is Plex Sans — and those two put their
+ * baseline at different offsets inside a `line-height: 1` box. Aligning the
+ * cells by their centres therefore aligned the boxes and left the text sitting
+ * at two different heights, with the month visibly low.
+ *
+ * Before any of this the day, month and year were plain inline content in one
+ * heading, sharing a single line box and so a single baseline for free. This
+ * gives that back: an inline-block with visible overflow takes its baseline
+ * from the text inside it, so the cells line up on the text rather than on
+ * their own edges.
+ */
+const CELL_SX = {
+  position: 'relative',
+  display: 'inline-block',
+  verticalAlign: 'baseline',
+  fontVariantNumeric: 'tabular-nums',
+} as const;
 
 /** Numeric where it can be, so 89 -> 90 travels the same way 9 -> 10 does. */
 function directionBetween(from: string, to: string): NumericDirection {
@@ -122,9 +149,11 @@ function Glyph({
 export interface NumericValueProps {
   /** What the cell shows. Any length — a digit, a word, a whole prompt. */
   value: string;
-  /** CSS font-size. A bare number is read as the pixel size the cell's height
-   * is derived from; a string falls back to a 16px assumption for that
-   * derivation, so real call sites should prefer a number. */
+  /** CSS font-size, passed straight through. A responsive value is fine: the
+   * cell no longer derives a pixel height from this, so nothing here needs a
+   * bare number any more. Several call sites still resolve a `{ xs, sm }` pair
+   * with `useMediaQuery` because an earlier version did; that is now redundant
+   * rather than wrong. */
   size?: number | string;
   weight?: NumeralWeight;
   /** Routes the glyph through `Numeral` (IBM Plex Mono, tabular) rather than
@@ -180,24 +209,11 @@ export function NumericValue({
   const settled = useNumericSettled(value, NUMERIC_MS);
   const animating = !reduced && !settled && oldValue !== null && oldValue !== value;
 
-  const fontSizePx = typeof size === 'number' ? size : 16;
-  const height = cellHeightPx(fontSizePx, mono);
   const travel = direction ?? directionBetween(oldValue ?? value, value);
 
   if (reduced || !animating) {
     return (
-      <Box
-        component="span"
-        aria-hidden
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: `${height}px`,
-          verticalAlign: 'middle',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
+      <Box component="span" aria-hidden sx={CELL_SX}>
         <Glyph mono={mono} size={size} weight={weight} color={color}>
           {value}
         </Glyph>
@@ -210,24 +226,19 @@ export function NumericValue({
       component="span"
       aria-hidden
       sx={{
-        position: 'relative',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: `${height}px`,
-        // The mask. Both glyphs are cut off at the cell edge rather than
-        // sliding out over whatever sits above and below the prompt.
-        overflow: 'hidden',
-        verticalAlign: 'middle',
-        fontVariantNumeric: 'tabular-nums',
+        ...CELL_SX,
+        // The mask, so both glyphs are cut off at the cell rather than sliding
+        // over whatever sits above and below the prompt. `clip-path` and not
+        // `overflow: hidden`: see MOVING_CLIP.
+        clipPath: MOVING_CLIP,
       }}
     >
-      {/* The incoming value, in normal flow, so it is what sizes the cell. */}
+      {/* The incoming value, in normal flow, so it is what sizes the cell and
+          what the cell takes its baseline from. */}
       <Box
         component="span"
         sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
+          display: 'inline-block',
           animation: `${travel === 'up' ? enterUp : enterDown} ${dur.numeric} ${ease.numeric} forwards`,
         }}
       >
@@ -236,15 +247,18 @@ export function NumericValue({
         </Glyph>
       </Box>
       {/* The outgoing value, taken out of flow so it cannot hold the cell at
-          its old width on the way out. */}
+          its old width on the way out. Pinned to the same origin the in-flow
+          glyph starts from rather than stretched and centred: the cell has no
+          height of its own any more, so centring inside it would put the two
+          glyphs on different lines for the length of the move. */}
       <Box
         component="span"
         sx={{
           position: 'absolute',
-          inset: 0,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          top: 0,
+          left: 0,
+          display: 'inline-block',
+          whiteSpace: 'nowrap',
           animation: `${travel === 'up' ? exitUp : exitDown} ${dur.numeric} ${ease.numeric} forwards`,
         }}
       >
