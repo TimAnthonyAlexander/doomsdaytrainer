@@ -47,6 +47,13 @@ export type AttemptSource =
   | 'sprint'
   | 'gauntlet'
   | 'decade'
+  /**
+   * The endless pass over the introduced codes: no run length, no clock, no
+   * schedule. Its own source rather than 'learn' or a drill's, because the
+   * item sheet prints the source next to every attempt and a surface that
+   * borrowed another's name would be a mislabelled number on screen.
+   */
+  | 'endless'
   | 'trouble'
   /** A direct month-doomsday review on the weekday trainer. */
   | 'month'

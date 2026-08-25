@@ -80,12 +80,13 @@ describe('YearCodesScreen', () => {
     expect(screen.getByText(/turns a century anchor into that year's doomsday/)).toBeInTheDocument();
   });
 
-  it('offers Learn, Revise and Calc, each pointing under /year-codes', async () => {
+  it('offers Learn, Revise, Endless and Calc, each pointing under /year-codes', async () => {
     await mount();
     expect(tile(/^Learn/)).toHaveAttribute('href', '/year-codes/learn');
     expect(tile(/^Revise/)).toHaveAttribute('href', '/year-codes/revise');
+    expect(tile(/^Endless/)).toHaveAttribute('href', '/year-codes/endless');
     expect(tile(/^Calc/)).toHaveAttribute('href', '/year-codes/calc');
-    expect(screen.getAllByRole('link')).toHaveLength(3);
+    expect(screen.getAllByRole('link')).toHaveLength(4);
   });
 
   it('gives each tile one line of what is actually left', async () => {
@@ -93,6 +94,7 @@ describe('YearCodesScreen', () => {
     await mount();
     expect(tile(/^Learn/)).toHaveTextContent('9 blocks of ten still to learn.');
     expect(tile(/^Revise/)).toHaveTextContent('10 codes due now, oldest first.');
+    expect(tile(/^Endless/)).toHaveTextContent('10 codes learned, asked over and over.');
     expect(tile(/^Calc/)).toHaveTextContent('Work any code out from the year, one step at a time.');
   });
 
@@ -107,14 +109,14 @@ describe('YearCodesScreen', () => {
     expect(screen.queryByRole('link', { name: /^Trouble spots/ })).not.toBeInTheDocument();
   });
 
-  it('adds Trouble spots as a fourth tile once codes are flagged', async () => {
+  it('adds Trouble spots as a fifth tile once codes are flagged', async () => {
     await seed((data) => withLeeches(withIntroduced(data, [40, 41, 42]), [73, 88]));
     await mount();
 
     const trouble = tile(/^Trouble spots/);
     expect(trouble).toHaveAttribute('href', '/year-codes/trouble');
     expect(trouble).toHaveTextContent('2 codes flagged after six lapses.');
-    expect(screen.getAllByRole('link')).toHaveLength(4);
+    expect(screen.getAllByRole('link')).toHaveLength(5);
   });
 
   it('uses the drill pool rule, so a recovered code does not bring the tile back', async () => {

@@ -121,10 +121,13 @@ describe('gradeFor', () => {
 });
 
 describe('applyReview source guard', () => {
-  it.each(['sprint', 'gauntlet', 'decade'] as AttemptSource[])('throws for %s attempts', (source) => {
-    const item = reviewing();
-    expect(() => applyReview(item, attempt({ source }), settings, NOW)).toThrow(/drill/i);
-  });
+  it.each(['sprint', 'gauntlet', 'decade', 'endless'] as AttemptSource[])(
+    'throws for %s attempts',
+    (source) => {
+      const item = reviewing();
+      expect(() => applyReview(item, attempt({ source }), settings, NOW)).toThrow(/schedule-free/i);
+    },
+  );
 
   it.each(['review', 'learn', 'trouble'] as AttemptSource[])('accepts %s attempts', (source) => {
     const item = reviewing();

@@ -65,20 +65,43 @@ describe('learnStatus', () => {
 });
 
 describe('yearCodeTiles', () => {
-  it('is Learn, Revise and Calc while nothing is flagged', () => {
+  it('is Learn, Revise, Endless and Calc while nothing is flagged', () => {
     const tiles = tilesFor(introduced([40, 41, 42]));
-    expect(tiles.map((tile) => tile.id)).toEqual(['learn', 'revise', 'calc']);
+    // The order is what the codes are for: get them, keep them, practise them
+    // with nothing to finish, work one out.
+    expect(tiles.map((tile) => tile.id)).toEqual(['learn', 'revise', 'endless', 'calc']);
   });
 
-  it('adds Trouble spots once codes are flagged, making a 2x2', () => {
+  it('adds Trouble spots once codes are flagged', () => {
     const map = introduced([40, 41, 42]);
     for (const yy of [73, 88]) {
       map[itemKey(yy)] = { ...introduce(createItem(yy), NOW), lapses: 7, leech: true, interval: 1 };
     }
     const tiles = tilesFor(map);
-    expect(tiles).toHaveLength(4);
-    expect(tiles[3].label).toBe('Trouble spots');
-    expect(tiles[3].status).toBe('2 codes flagged after six lapses.');
+    expect(tiles).toHaveLength(5);
+    expect(tiles[4].label).toBe('Trouble spots');
+    expect(tiles[4].status).toBe('2 codes flagged after six lapses.');
+  });
+
+  it('counts the introduced codes on the Endless line, not the due ones', () => {
+    // Nothing about this surface is scheduled, so a due count there would name
+    // a number it does not act on.
+    const map = introduced([40, 41, 42], { dueAt: NOW + 5 * 86_400_000, interval: 5 });
+    const endless = tilesFor(map).find((tile) => tile.id === 'endless');
+    expect(endless?.status).toBe('3 codes learned, asked over and over.');
+  });
+
+  it('sends the Endless line to Learn while there is nothing to ask', () => {
+    const endless = tilesFor(introduced([])).find((tile) => tile.id === 'endless');
+    expect(endless?.status).toBe('Learn a block and its ten codes join the pass.');
+  });
+
+  it('keeps the Endless pool inside the active scope', () => {
+    // Modern is 50–99, so the 40 is introduced and still out of the pass.
+    const endless = tilesFor(introduced([60, 61, 62, 40]), MODERN).find(
+      (tile) => tile.id === 'endless',
+    );
+    expect(endless?.status).toBe('3 codes learned, asked over and over.');
   });
 
   it('uses the drill pool rule, so a recovered code does not put the tile back', () => {

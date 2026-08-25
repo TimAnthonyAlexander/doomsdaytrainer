@@ -42,7 +42,7 @@ describe('isNavActive', () => {
   });
 
   it('lights Year codes on every one of its children, with no extra rule', () => {
-    for (const child of ['learn', 'revise', 'calc', 'trouble']) {
+    for (const child of ['learn', 'revise', 'endless', 'calc', 'trouble']) {
       expect(isNavActive(`/year-codes/${child}`, '/year-codes')).toBe(true);
     }
   });
@@ -66,6 +66,7 @@ describe('screenTitle', () => {
     // put "Year codes" in the top bar while the user is on Learn.
     expect(screenTitle('/year-codes/learn')).toBe('Learn');
     expect(screenTitle('/year-codes/revise')).toBe('Revise');
+    expect(screenTitle('/year-codes/endless')).toBe('Endless');
     expect(screenTitle('/year-codes/calc')).toBe('Calc');
     expect(screenTitle('/year-codes/trouble')).toBe('Trouble spots');
   });

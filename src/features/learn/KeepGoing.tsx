@@ -2,6 +2,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState } from 'react';
 import { AnswerPad, type AnswerFeedback, type AnswerOption } from '@/components/answer/AnswerPad';
+import { CodeCorrection } from '@/components/answer/CodeCorrection';
 import { Numeral } from '@/components/ui/Numeral';
 import { NumericText, useNumericSettled } from '@/components/ui/NumericText';
 import type { Attempt, Code, YearKey } from '@/domain/types';
@@ -139,14 +140,7 @@ export function KeepGoing({ decade, pool, seed = 0, onStop }: KeepGoingProps) {
               </Numeral>
             </>
           ) : state.lastWrong !== null && state.lastWrongYear !== null ? (
-            <Typography variant="body2" color="error.main">
-              <Numeral color="inherit">{formatYear(state.lastWrongYear)}</Numeral>
-              {' is '}
-              <Numeral color="inherit">{codeFor(state.lastWrongYear)}</Numeral>
-              {', not '}
-              <Numeral color="inherit">{state.lastWrong}</Numeral>
-              {'. Tap the right one to go on.'}
-            </Typography>
+            <CodeCorrection yy={state.lastWrongYear} chosen={state.lastWrong} />
           ) : null}
         </Box>
       </Box>

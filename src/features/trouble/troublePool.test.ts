@@ -100,11 +100,11 @@ describe('trouble attempts and scheduling', () => {
     expect(graded.next.interval).toBe(0);
   });
 
-  it('refuses drill sources, which is why drills cannot reschedule', () => {
+  it('refuses the schedule-free sources, which is why drills cannot reschedule', () => {
     const before = item(50, { lapses: 6, leech: true });
-    for (const source of ['sprint', 'gauntlet', 'decade'] as const) {
+    for (const source of ['sprint', 'gauntlet', 'decade', 'endless'] as const) {
       expect(() => applyReview(before, attempt({ source }), DEFAULT_SETTINGS, 0)).toThrow(
-        /drill attempt source/,
+        /schedule-free attempt source/,
       );
     }
   });

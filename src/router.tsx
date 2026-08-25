@@ -4,6 +4,7 @@ import { CalcScreen } from '@/routes/CalcScreen';
 import { ConceptScreen } from '@/routes/ConceptScreen';
 import { DayStepScreen } from '@/routes/DayStepScreen';
 import { DoomsdaysScreen } from '@/routes/DoomsdaysScreen';
+import { EndlessScreen } from '@/routes/EndlessScreen';
 import { LearnScreen } from '@/routes/LearnScreen';
 import { NotFoundScreen } from '@/routes/NotFoundScreen';
 import { ReviseScreen } from '@/routes/ReviseScreen';
@@ -37,6 +38,7 @@ export const routes: RouteObject[] = [
       { path: 'year-codes', element: <YearCodesScreen /> },
       { path: 'year-codes/learn', element: <LearnScreen /> },
       { path: 'year-codes/revise', element: <ReviseScreen /> },
+      { path: 'year-codes/endless', element: <EndlessScreen /> },
       { path: 'year-codes/calc', element: <CalcScreen /> },
       // Off the grid until something is flagged, and off the nav always. It is
       // reached from the Year codes grid, from Revise, and from the mastery

@@ -47,6 +47,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
 const SCREEN_TITLES: Readonly<Record<string, string>> = {
   '/year-codes/learn': 'Learn',
   '/year-codes/revise': 'Revise',
+  '/year-codes/endless': 'Endless',
   '/year-codes/calc': 'Calc',
   '/year-codes/trouble': 'Trouble spots',
   '/doomsdays/tables': 'Tables',

@@ -1,6 +1,7 @@
-import { BookOpen, Calculator, Flag, Repeat } from 'lucide-react';
+import { BookOpen, Calculator, Flag, Infinity as InfinityIcon, Repeat } from 'lucide-react';
 import type { Tile } from '@/components/ui/TileGrid';
 import type { ItemState, Scope } from '@/domain/types';
+import { endlessPool, endlessStatus } from '@/features/endless/endlessPlan';
 import { decadeBlocks, type DailyAllowance, type DecadeBlock } from '@/features/learn/blocks';
 import { reviseStatus } from '@/features/revise/revisePlan';
 import { troubleItems } from '@/features/trouble/troublePool';
@@ -13,7 +14,7 @@ import { troubleItems } from '@/features/trouble/troublePool';
  * or a block the daily cap will refuse, would be worse than no line at all.
  */
 
-export type YearCodeTileId = 'learn' | 'revise' | 'calc' | 'trouble';
+export type YearCodeTileId = 'learn' | 'revise' | 'endless' | 'calc' | 'trouble';
 
 export interface YearCodeTile extends Tile {
   id: YearCodeTileId;
@@ -47,8 +48,12 @@ export function troubleStatus(count: number): string {
 }
 
 /**
- * The tiles, in the order they are laid out. Trouble spots is absent while
- * nothing is flagged, which also leaves the grid at a clean 2x2 once it is not.
+ * The tiles, in the order they are laid out.
+ *
+ * The order is what the codes are for rather than what they are called: get
+ * them (Learn), keep them (Revise), practise them with nothing to finish
+ * (Endless), work one out from scratch (Calc). Trouble spots is absent while
+ * nothing is flagged.
  */
 export function yearCodeTiles({ items, itemList, scope, allowance, now }: TileInput): YearCodeTile[] {
   const blocks = decadeBlocks(items, scope);
@@ -68,6 +73,13 @@ export function yearCodeTiles({ items, itemList, scope, allowance, now }: TileIn
       label: 'Revise',
       icon: Repeat,
       status: reviseStatus(itemList, scope, now).detail,
+    },
+    {
+      id: 'endless',
+      path: '/year-codes/endless',
+      label: 'Endless',
+      icon: InfinityIcon,
+      status: endlessStatus(endlessPool(itemList, scope).length),
     },
     {
       id: 'calc',

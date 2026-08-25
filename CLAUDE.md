@@ -86,9 +86,10 @@ Six destinations, and the whole table is in `src/router.tsx`:
 ```
 /                       Weekday          the index route, and the point of the app
 /concept                Concept          one date walked to its weekday, every step asked
-/year-codes             the grid         Learn, Revise, Calc, Trouble when flagged
+/year-codes             the grid         Learn, Revise, Endless, Calc, Trouble when flagged
 /year-codes/learn       Learn
 /year-codes/revise      Revise           the due queue and the three drills
+/year-codes/endless     Endless          every learned code, asked until you leave
 /year-codes/calc        Calc
 /year-codes/trouble     Trouble spots    off the nav, and off the grid until flagged
 /doomsdays              the grid         Tables and Day step
@@ -327,10 +328,11 @@ violation, and several were bugs before they were rules.
    crosses the thresholds in Settings, and moves the grade, the fluency
    decision, the mastery bucket and every median on Stats without anything
    failing.
-4. **Drills never touch scheduling.** Sprint, gauntlet and decade record
-   attempts through `recordDrillAttempt`, which appends history and leaves
-   `interval`, `easeFactor`, `dueAt`, `repetitions` and `lapses` untouched.
-   `applyReview` throws if handed a drill source. Drill attempts are also
+4. **Drills never touch scheduling.** Sprint, gauntlet, decade and the endless
+   pass record attempts through `recordDrillAttempt`, which appends history and
+   leaves `interval`, `easeFactor`, `dueAt`, `repetitions` and `lapses`
+   untouched. `applyReview` throws for every source in
+   `SCHEDULE_FREE_SOURCES`. Drill attempts are also
    buffered in memory and flushed only when a run completes, so an aborted run
    writes nothing and IndexedDB writes stay out of the latency being measured.
 5. **Trouble spots do schedule**, always with `hintUsed: true` and therefore
@@ -660,9 +662,11 @@ which is exactly the disagreement the invariant now forbids.
 
 The 100 codes are one step of the method, not the subject of the app, so
 everything that teaches or keeps them sits behind a single destination presented
-as a grid: Learn, Revise and Calc, with Trouble spots joining them when
+as a grid: Learn, Revise, Endless and Calc, with Trouble spots joining them when
 something is flagged. Each tile carries one line of real status, so the grid
-answers "what is there to do" without being entered.
+answers "what is there to do" without being entered. The order is what the codes
+are for rather than what the screens are called: get them, keep them, practise
+them with nothing to finish, work one out.
 
 They used to be three top-level entries called Review, Learn and Drills. All
 three names meant roughly "practise", they sat above the thing being practised
@@ -786,6 +790,38 @@ queue, and Trouble spots. Trouble spots is not a mode and is not in the list. It
 has no best to beat, it always runs with the block on screen and therefore
 always at a grade-3 ceiling, and for a user with nothing flagged it is not on
 the screen at all.
+
+**Endless** is a two-digit year, the code it has, and nothing else, for as long
+as the user stays. 33, 6. 04, 5. On and on. It is the weekday screen's year half
+with the century taken off: `(anchor + code) mod 7` is two things to recall and
+this is the one of them with a hundred values.
+
+It exists because the other three tiles all stop somewhere. Learn stops at the
+block's criterion, Revise when the queue empties, Calc at the end of a
+derivation, and there was no way to simply keep going over everything already
+learned. A route rather than a fifth mode on Revise, for the same reason:
+everything behind that Start button is a run with an end, and this has no length
+to choose, so the row it would take there would be a row with nothing to
+configure.
+
+The state machine is `src/features/learn/endless.ts`, unchanged and now shared.
+It was written for the pass at the end of a learn block, and this is the same
+machine over every introduced year in scope rather than over the ten a block
+just taught. Cycles rather than a draw at random, so every year comes up once
+before any comes up twice, and the seam between two cycles is checked so the
+join cannot hand back a neighbour.
+
+Nothing here schedules. Attempts carry the source `'endless'`, which is its own
+value rather than a borrowed `'learn'` because the item sheet prints the source
+beside every attempt. `applyReview` refuses it along with the three drills. The
+screen says so as well, in one sentence: it sits one tile from Revise and is
+identical in the hand, so an hour spent here would otherwise read as work the
+queue will credit.
+
+There is no answer window, whatever Settings says. A drill can treat an expiry
+as a miss because a drill has a length to move through; this has none, so an
+expiry could only advance past a year the user did not answer, or reveal the
+code and wait, and waiting is already what a wrong tap does.
 
 **Progress** centres on the mastery grid, a 10x10 heatmap on a single-hue ramp so
 mastery reads as one thing getting stronger. Cell text colour is chosen by
@@ -1043,6 +1079,9 @@ Tests to know about, because they encode decisions rather than behaviour:
 - `screenTitle('/year-codes/learn')` being `Learn` rather than `Year codes`, and
   the same for both children of `/doomsdays`, which is the one way the prefix
   matching goes wrong and the one way it goes wrong silently
+- the endless pass walked in through the `/year-codes` grid, leaving every
+  scheduling field of the year it just answered byte for byte unchanged, and
+  holding a wrong tap on the same year until the right code is given
 - the day step and the tables walked in through the `/doomsdays` grid rather
   than by rendering their views directly, because the way in is the part that
   broke

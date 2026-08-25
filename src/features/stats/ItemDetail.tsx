@@ -28,6 +28,7 @@ const SOURCE_LABEL: Record<Attempt['source'], string> = {
   sprint: 'Sprint',
   gauntlet: 'Gauntlet',
   decade: 'Decade drill',
+  endless: 'Endless',
   trouble: 'Trouble spots',
   // Month and century items live in their own maps, so these two never label a
   // year's history. The map is total because the type is.

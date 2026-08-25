@@ -60,9 +60,27 @@ function nextEase(ease: number, grade: Grade): number {
 }
 
 /**
+ * The surfaces that record history and must never move a schedule: the three
+ * drills and the endless pass. They are named rather than inferred, because
+ * the property is a promise the surface makes and not something a source
+ * string can be read for.
+ *
+ * 'learn' is absent on purpose. It writes no scheduling either, but it does it
+ * by never calling this — the block's own `introduceItems` is what moves those
+ * ten items, and a guard here would only make that harder to see.
+ */
+const SCHEDULE_FREE_SOURCES: ReadonlySet<Attempt['source']> = new Set([
+  'sprint',
+  'gauntlet',
+  'decade',
+  'endless',
+]);
+
+/**
  * Apply one review answer to an item. Returns a new item; the input is never
- * mutated. Throws for drill-sourced attempts: drills record history but must
- * never touch scheduling state, and silent corruption there is unrecoverable.
+ * mutated. Throws for drill- and endless-sourced attempts: both record history
+ * but must never touch scheduling state, and silent corruption there is
+ * unrecoverable.
  */
 export function applyReview(
   item: ItemState,
@@ -70,8 +88,8 @@ export function applyReview(
   settings: Settings,
   now: number,
 ): GradeResult {
-  if (attempt.source === 'sprint' || attempt.source === 'gauntlet' || attempt.source === 'decade') {
-    throw new Error(`applyReview called with drill attempt source: ${attempt.source}`);
+  if (SCHEDULE_FREE_SOURCES.has(attempt.source)) {
+    throw new Error(`applyReview called with a schedule-free attempt source: ${attempt.source}`);
   }
 
   const grade = gradeFor(attempt.correct, attempt.latencyMs, attempt.hintUsed, settings);

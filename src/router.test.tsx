@@ -30,6 +30,7 @@ const LINKED_PATHS = [
   '/year-codes',
   '/year-codes/learn',
   '/year-codes/revise',
+  '/year-codes/endless',
   '/year-codes/calc',
   '/year-codes/trouble',
   '/doomsdays',
@@ -53,8 +54,8 @@ describe('the route table', () => {
   });
 
   it('nests the year-code screens under the nav entry that lights up for them', () => {
-    // Nesting is what makes one nav entry cover four screens, so it is worth
-    // asserting rather than leaving to the shape of a literal.
+    // Nesting is what makes one nav entry cover all five screens, so it is
+    // worth asserting rather than leaving to the shape of a literal.
     const nested = routes
       .flatMap((route) => route.children ?? [])
       .map((route) => route.path)
@@ -64,6 +65,7 @@ describe('the route table', () => {
       'year-codes',
       'year-codes/learn',
       'year-codes/revise',
+      'year-codes/endless',
       'year-codes/calc',
       'year-codes/trouble',
     ]);

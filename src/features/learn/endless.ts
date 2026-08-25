@@ -3,7 +3,13 @@ import { isCousin, orderVaried } from '@/domain/rotation';
 import { codeFor } from '@/domain/yearCodes';
 
 /**
- * The pass that comes after the block is taught and does not end.
+ * A pass over a pool of years that does not end.
+ *
+ * Two surfaces run on it. It was written for the one at the end of a learn
+ * block, and `/year-codes/endless` is the same machine over every introduced
+ * year in scope rather than over the ten a block just taught. It lives here
+ * because the block's pass is where the argument for it was made; nothing in
+ * it knows about a block.
  *
  * A block stops the moment every year has its clean run, which is the right
  * place to stop *teaching* — the criterion is what makes "introduced" mean
