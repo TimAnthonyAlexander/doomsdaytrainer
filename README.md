@@ -15,7 +15,7 @@ calls at all. Progress moves between devices through a JSON export.
 ```
 bun install
 bun run dev        # 127.0.0.1:47318, strictPort, loopback only
-bun run test       # vitest, 1469 tests
+bun run test       # vitest
 bun run build      # vite build. The typecheck is separate, on purpose
 bun run preview    # 127.0.0.1:47319, the only way to exercise the service worker
 ```
@@ -78,11 +78,10 @@ arrives before that frame — such a tap is the tail end of the previous answer,
 not a response to a prompt nobody has looked at yet.
 
 Since prompts animate their value, paint is no longer quite that moment: a
-changed number is on screen for a moment before it is readable. Pads take an
-`armed` prop that holds the clock until it settles, which is 140ms, well short
-of the 280ms the motion itself takes. Anything adding animation to a prompt has
-to arm it, or the animation ends up inside every recorded latency and the
-grades move with it.
+changed number is on screen briefly before it is readable. Pads take an `armed`
+prop that holds the clock until it settles, which is deliberately shorter than
+the motion itself. Anything adding animation to a prompt has to arm it, or the
+animation ends up inside every recorded latency and the grades move with it.
 
 **Drills sit outside SM-2 on purpose.** Sprint, gauntlet and decade runs record
 attempt history and personal bests and never touch `interval`, `easeFactor`,

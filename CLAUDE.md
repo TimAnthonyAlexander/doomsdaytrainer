@@ -245,6 +245,12 @@ roughly 3.6 MB — 200 attempts on each of the 116 items, which is most of it,
 plus the full weekday, day-step, calculation and verify logs. Per-record stores
 would buy nothing.
 
+That bound is a calculation, not a measurement, and **adding a log invalidates
+it**. Schema v6 and v7 each added one. What has to stay true is the shape of the
+argument rather than the figure: every log is capped, so the document has a
+ceiling. If you add an uncapped array, the ceiling is gone and this paragraph is
+a lie rather than merely out of date.
+
 Every write goes through one promise chain, so concurrent `patchAppData` callers
 cannot interleave a read-modify-write. There is a test that fires 50 concurrent
 patches and asserts the counter lands on exactly 50.
@@ -312,10 +318,11 @@ violation, and several were bugs before they were rules.
    Prompts now animate their value, so paint is no longer quite the moment the
    prompt can be read: the incoming glyph starts transparent and off-position.
    `AnswerPad` and `MonthPad` take an `armed` prop, defaulting to true, which
-   holds the clock and refuses taps until the value has settled — 140ms
-   (`--dur-numeric-settle`), against the 280ms the motion takes in full. The
-   difference is deliberate and is the cost of the whole animation pass: 140ms
-   against a 2000ms fast threshold. **Any surface that animates a prompt must
+   holds the clock and refuses taps until the value has settled
+   (`--dur-numeric-settle`), which is deliberately shorter than the whole
+   motion (`--dur-numeric`) — a test pins that ordering. That settle is the
+   cost of the entire animation pass, and it is a fraction of the fast
+   threshold. **Any surface that animates a prompt must
    arm its pad.** Unarmed, the animation lands inside every stored latency,
    crosses the thresholds in Settings, and moves the grade, the fluency
    decision, the mastery bucket and every median on Stats without anything
@@ -947,10 +954,11 @@ Three things about it are load-bearing and easy to undo:
   still runs, so the second glyph is not rendered at all rather than rendered
   briefly.
 
-`--dur-numeric` is 280ms and is its own token. It was first tied to
-`--dur-advance`, on the reading that both describe a prompt changing; that is
-120ms, which is right for a crossfade, where opacity has no intermediate shape
-worth seeing, and nowhere near enough to draw a moving glyph. The first attempt
+`--dur-numeric` is its own token, and the values live in `tokens.ts` and §7
+rather than here. It was first tied to `--dur-advance`, on the reading that both
+describe a prompt changing; that one is right for a crossfade, where opacity has
+no intermediate shape worth seeing, and nowhere near long enough to draw a
+moving glyph. The first attempt
 at this was a split-flap, which was worse still: two half-rotations at 60ms each
 is under four frames, and it was reported as looking like a rendering fault
 rather than an animation. `--ease-numeric` decelerates hard, which is what makes
@@ -1140,10 +1148,11 @@ both `scripts/generate-tts.mjs` and `src/features/audio/speech.ts`. Reusing the
 path would strand anyone who had already cached the old set, for a year.
 
 The clips are runtime-cached by `sw.ts` and deliberately kept out of the
-precache manifest, which stays around 930 KiB and is code, fonts and the icons.
-Six megabytes of
-audio at first install, most of it for years the user has not reached, would be
-paid by everyone and used by few.
+precache manifest, which is code, fonts and the icons. Six megabytes of audio at
+first install, most of it for years the user has not reached, would be paid by
+everyone and used by few. (This used to quote the manifest's size. That is a
+number that changes with every dependency bump and every screen added, so it was
+wrong more often than it was right, and the argument never needed it.)
 
 Lighthouse on the preview build, measured before the audio and the day-step
 trainer landed and not re-run since: 100 across the board on desktop, 90 on
