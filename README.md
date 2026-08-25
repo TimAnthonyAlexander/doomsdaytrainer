@@ -15,7 +15,7 @@ calls at all. Progress moves between devices through a JSON export.
 ```
 bun install
 bun run dev        # 127.0.0.1:47318, strictPort, loopback only
-bun run test       # vitest, 1364 tests
+bun run test       # vitest, 1469 tests
 bun run build      # vite build. The typecheck is separate, on purpose
 bun run preview    # 127.0.0.1:47319, the only way to exercise the service worker
 ```
@@ -47,7 +47,7 @@ src/features/    one folder per surface: onboarding, concept, learn, revise,
                  stats, settings, notifications, pwa
 src/features/audio/  not a surface: the spoken year clips, shared by Learn and Revise
 src/routes/      one file per screen, each one a thin assembly of feature parts
-src/theme/       the design tokens and the MUI theme, light and dark
+src/theme/       the design tokens, the motion tokens, the MUI theme, light and dark
 src/test/        Vitest setup and the paint helper the latency tests need
 src/sw.ts        the hand-written service worker, built via injectManifest
 ```
@@ -76,6 +76,13 @@ could first *see* the prompt. `useAnswerTimer` therefore starts on the frame
 after the commit, using `performance.now()`, and the pads refuse a tap that
 arrives before that frame — such a tap is the tail end of the previous answer,
 not a response to a prompt nobody has looked at yet.
+
+Since prompts animate their value, paint is no longer quite that moment: a
+changed number is on screen for a moment before it is readable. Pads take an
+`armed` prop that holds the clock until it settles, which is 140ms, well short
+of the 280ms the motion itself takes. Anything adding animation to a prompt has
+to arm it, or the animation ends up inside every recorded latency and the
+grades move with it.
 
 **Drills sit outside SM-2 on purpose.** Sprint, gauntlet and decade runs record
 attempt history and personal bests and never touch `interval`, `easeFactor`,

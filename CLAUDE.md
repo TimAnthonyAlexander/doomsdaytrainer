@@ -65,12 +65,12 @@ Path alias `@/` points at `src/`.
 src/domain/      pure, framework-free, unit tested. no React, no DOM, no Date.now in logic
 src/storage/     one IndexedDB document, migrations, export/import
 src/state/       one React context over the document, with actions
-src/components/  AnswerPad, the app shell, shared UI primitives
+src/components/  AnswerPad, NumericText, the app shell, shared UI primitives
 src/features/    one folder per surface, each owning its own logic and tests
 src/features/audio/  not a surface: the spoken clips, shared by Learn and Revise
 src/routes/      one screen component per route, thin
 src/test/        setup and the paint helper the latency tests need
-src/theme/       design tokens, MUI theme, light and dark
+src/theme/       design tokens, motion tokens, MUI theme, light and dark
 src/sw.ts        hand-written service worker, built via injectManifest
 ```
 
@@ -228,11 +228,11 @@ numbers, and the numbers were wrong.
   beside SM-2. Two correct, unhinted, sub-threshold answers on different days.
 - `diagnostics.ts` measures which route the user is actually taking, by slope
   rather than by speed.
-- `guidedDate.ts` is the whole method on one date as nine labelled steps, each
+- `guidedDate.ts` is the whole method on one date as twelve labelled steps, each
   carrying its question, its givens, its answer, its worked line and the reason
   it exists. It computes nothing itself — the arithmetic is `calc.ts`,
   `dayStep.ts` and `weekday.ts` — and every given names the step whose answer it
-  is, so a test can prove the nine screens agree with each other rather than
+  is, so a test can prove the twelve screens agree with each other rather than
   only agreeing with `weekdayFor`.
 - `scope.ts`, `time.ts`, `weekdayLifetime.ts` round it out.
 
@@ -308,6 +308,18 @@ violation, and several were bugs before they were rules.
    refuses a tap that arrives before the first paint. Without that, a double tap
    landing between auto-advance and the new prompt recorded 0 ms, which
    `gradeFor` reads as a perfect grade 5.
+
+   Prompts now animate their value, so paint is no longer quite the moment the
+   prompt can be read: the incoming glyph starts transparent and off-position.
+   `AnswerPad` and `MonthPad` take an `armed` prop, defaulting to true, which
+   holds the clock and refuses taps until the value has settled — 140ms
+   (`--dur-numeric-settle`), against the 280ms the motion takes in full. The
+   difference is deliberate and is the cost of the whole animation pass: 140ms
+   against a 2000ms fast threshold. **Any surface that animates a prompt must
+   arm its pad.** Unarmed, the animation lands inside every stored latency,
+   crosses the thresholds in Settings, and moves the grade, the fluency
+   decision, the mastery bucket and every median on Stats without anything
+   failing.
 4. **Drills never touch scheduling.** Sprint, gauntlet and decade record
    attempts through `recordDrillAttempt`, which appends history and leaves
    `interval`, `easeFactor`, `dueAt`, `repetitions` and `lapses` untouched.
@@ -590,11 +602,17 @@ The nav went from five entries to six. The argument against that in
 "already seven entries wide" when it was five.
 
 **Concept** is the method on one date, start to finish, with the user answering
-every step. Pick a date, and nine screens hand over the two tables and ask for
-each piece of arithmetic: which century anchor, take the 28s off, count the leap
-days, take the sevens off, add the anchor, which month doomsday, how many days
-on, the final number, and which day that is. It ends by stating what the date
-actually was.
+every step. Pick a date, and twelve screens hand over the two tables and ask for
+each piece of arithmetic: take the 28s off the year, count the leap days, add
+them up, take the sevens off for the year code, add the century anchor, reduce
+to the year's doomsday number, name the day that is, find the nearest doomsday
+in the month, count the days on from it, add those to the doomsday, reduce, and
+name the weekday. It ends by stating what the date actually was.
+
+The count is `GUIDED_STEP_IDS.length` in `guidedDate.ts` and nothing should
+hardcode it. This file said nine for a long time while the code said twelve,
+which is the sort of drift a doc can carry indefinitely because nothing builds
+against prose.
 
 The year code is **derived, never given**. That is the whole point of the
 screen. Handing it over would make the demonstration a magic trick performed at
@@ -603,7 +621,7 @@ worth watching a person do.
 
 Steps a date makes trivial become a line to read rather than a question with a
 forced answer: a year under 28 has no 28s to take off, and a date that is itself
-the month's doomsday is zero days on. The count stays nine either way, so the
+the month's doomsday is zero days on. The count stays twelve either way, so the
 walk never quietly shortens.
 
 Nothing on it is timed and nothing is written. A test walks the whole sequence
@@ -892,6 +910,57 @@ Copy rules are in BRIEF.md and they are enforced in review. No exclamation marks
 no congratulation, no gamified language, no streak theatre. When a session ends
 the app states what happened: "24 reviews, 3 wrong, median 1.4s".
 
+### Motion
+
+`src/theme/motion.ts` is the only place a component reaches for a duration or a
+curve. Everything there resolves to a `var(--dur-*)` rather than a number, for
+the same reason `palette.ts` resolves to `var(--…)`: the stylesheet zeroes those
+variables under `prefers-reduced-motion`, and a component holding the literal
+`180` would keep animating.
+
+The tokens were declared in §7 for a long time and almost entirely unconsumed.
+Components wrote `140ms ease-out` by hand, which is neither one of the five
+durations nor the app's curve, and — worse — it meant the feedback fill ramped
+when §7 says the colour is on the same frame as the tap. Both pads now share
+`FEEDBACK_TRANSITION`, which is `--dur-instant`.
+
+A changed value moves rather than cutting: `NumericText`. The old glyph leaves
+vertically while fading out, the new one arrives from the other side, the cell
+masks both, and only characters that actually change move. Direction follows the
+value, decided once per string so a year moves as one number rather than coming
+apart into four digits going different ways.
+
+Three things about it are load-bearing and easy to undo:
+
+- **The mask is `clip-path`, never `overflow: hidden`.** An inline-block whose
+  overflow is not `visible` takes its baseline from its bottom margin edge
+  (CSS 2.1 §10.8.1). The prompt mixes Plex Mono digits with a Plex Sans month,
+  and they only line up because each cell keeps a real text baseline. Clipping
+  with `overflow` drops the month several pixels below the digits, which is
+  exactly the bug that shipped once.
+- **The cell has no height and no centring.** Aligning cells by their boxes
+  aligns the boxes, not the text: two faces put their baseline at different
+  offsets inside a `line-height: 1` box. `vertical-align: baseline` on an
+  inline-block gives back the single shared baseline the prompt had when it was
+  plain inline content.
+- **Reduced motion changes the structure, not the speed.** A zeroed keyframe
+  still runs, so the second glyph is not rendered at all rather than rendered
+  briefly.
+
+`--dur-numeric` is 280ms and is its own token. It was first tied to
+`--dur-advance`, on the reading that both describe a prompt changing; that is
+120ms, which is right for a crossfade, where opacity has no intermediate shape
+worth seeing, and nowhere near enough to draw a moving glyph. The first attempt
+at this was a split-flap, which was worse still: two half-rotations at 60ms each
+is under four frames, and it was reported as looking like a rendering fault
+rather than an animation. `--ease-numeric` decelerates hard, which is what makes
+the incoming glyph readable at 140ms rather than 280.
+
+Animation on a prompt costs input latency, so it is confined to what is worth
+it. It never goes near the keypad — §7 gives the keys no press animation at all
+— and never inside the `DrillClock`, whose own docblock forbids a clock that
+changes appearance while it runs.
+
 ### The shipped mark
 
 `scripts/generate-icons.mjs` writes `favicon.svg` and all five PNGs, run by hand
@@ -980,7 +1049,7 @@ Tests to know about, because they encode decisions rather than behaviour:
 - the shell holding exactly one scroller, with the notice bar and the bottom bar
   outside it. jsdom has no layout, so the frame's height cannot be asserted —
   but the structure that produces it can, and the structure is what regressed
-- the guided walk agreeing with itself across all nine steps, over 750-odd
+- the guided walk agreeing with itself across all twelve steps, over 750-odd
   dates, rather than only agreeing with `weekdayFor` at the end
 - no step before the fourth naming a number the year code, which is the one way
   that screen could quietly stop teaching anything
@@ -1000,6 +1069,18 @@ Tests to know about, because they encode decisions rather than behaviour:
   sentence as well as a hue
 - a correct 21xx answer never being read as a forgotten anchor, which is the one
   way that verdict goes wrong and the one way it goes wrong silently
+- a tap during a prompt's transition recording nothing, and the latency being
+  timed from the settle rather than from the paint. This is the one that
+  protects every stored number from the animation pass
+- `NUMERIC_MS` and `NUMERIC_SETTLE_MS` matching their tokens, and the settle
+  being strictly shorter than the transition. Both constants are duplicated out
+  of the tokens because a JS timer cannot read a CSS custom property, and if the
+  two were ever made equal every answer would silently start being charged the
+  full animation
+- a value handed the same string it already shows not re-triggering, which is
+  what "only the characters that changed move" rests on
+- reduced motion rendering one glyph rather than two, asserted structurally
+  rather than by duration
 
 Do not weaken or delete a test to make a change pass. If a test breaks because
 behaviour genuinely changed, update it to assert the new behaviour and say so.
